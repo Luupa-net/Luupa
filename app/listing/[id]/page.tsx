@@ -19,9 +19,9 @@ export default async function ListingPage({ params }: { params: { id: string } }
         <div>
           <h1 className="font-display text-4xl font-semibold text-ink flex items-center gap-2">
             {listing.name}
-            {listing.verified && <BadgeCheck className="text-ignition" size={22} />}
+            {listing.verified && <BadgeCheck className="text-coral" size={22} />}
           </h1>
-          <p className="text-steel mt-1 capitalize">{listing.subcategory.replace("-", " ")} · {listing.area}</p>
+          <p className="text-stone mt-1 capitalize">{listing.subcategory.replace("-", " ")} · {listing.area}</p>
         </div>
       </div>
 
@@ -32,18 +32,18 @@ export default async function ListingPage({ params }: { params: { id: string } }
           <h3 className="font-semibold text-ink mb-3">Contact</h3>
           <div className="space-y-2 text-sm">
             {listing.phone && (
-              <p className="flex items-center gap-2 text-steel"><Phone size={15}/> {listing.phone}</p>
+              <p className="flex items-center gap-2 text-stone"><Phone size={15}/> {listing.phone}</p>
             )}
-            <p className="flex items-center gap-2 text-steel"><MapPin size={15}/> {listing.area}</p>
+            <p className="flex items-center gap-2 text-stone"><MapPin size={15}/> {listing.area}</p>
             {listing.hours && (
-              <p className="flex items-center gap-2 text-steel"><Clock size={15}/> {listing.hours}</p>
+              <p className="flex items-center gap-2 text-stone"><Clock size={15}/> {listing.hours}</p>
             )}
           </div>
           {listing.whatsapp && (
             <a
               href={`https://wa.me/${listing.whatsapp}?text=${waMessage}`}
               target="_blank"
-              className="inline-block mt-5 px-6 py-3 rounded-md bg-ignition text-white font-semibold hover:bg-ignition-dim transition-colors"
+              className="inline-block mt-5 px-6 py-3 rounded-full bg-coral text-white font-semibold hover:bg-coral-dim active:scale-95 transition-colors"
             >
               Message on WhatsApp
             </a>
@@ -53,7 +53,7 @@ export default async function ListingPage({ params }: { params: { id: string } }
         {listing.services && (
           <div>
             <h3 className="font-semibold text-ink mb-3">Services</h3>
-            <ul className="text-sm text-steel space-y-1">
+            <ul className="text-sm text-stone space-y-1">
               {(listing.services as string[]).map((s, i) => (
                 <li key={i}>• {s}</li>
               ))}

@@ -42,14 +42,14 @@ export default function BusinessLogin() {
 
         <button
           disabled={loading}
-          className="w-full h-12 rounded-md bg-ignition text-white font-semibold hover:bg-ignition-dim transition-colors disabled:opacity-60"
+          className="w-full h-12 rounded-full bg-coral text-white font-semibold hover:bg-coral-dim active:scale-95 transition-colors disabled:opacity-60"
         >
           {loading ? "Logging in…" : "Log in"}
         </button>
       </form>
 
-      <p className="text-sm text-steel mt-6">
-        New here? <a href="/business/signup" className="text-ignition-dim font-medium">List your business</a>
+      <p className="text-sm text-stone mt-6">
+        New here? <a href="/business/signup" className="text-coral-dim font-medium">List your business</a>
       </p>
     </div>
   );

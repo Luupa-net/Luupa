@@ -36,17 +36,17 @@ export default function Dashboard() {
     router.push("/");
   }
 
-  if (loading) return <div className="max-w-3xl mx-auto px-6 py-16 text-steel">Loading…</div>;
-  if (!listing) return <div className="max-w-3xl mx-auto px-6 py-16 text-steel">No listing found.</div>;
+  if (loading) return <div className="max-w-3xl mx-auto px-6 py-16 text-stone">Loading…</div>;
+  if (!listing) return <div className="max-w-3xl mx-auto px-6 py-16 text-stone">No listing found.</div>;
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-3xl font-semibold text-ink">Your listing</h1>
-        <button onClick={handleLogout} className="text-sm text-steel hover:text-ink">Log out</button>
+        <button onClick={handleLogout} className="text-sm text-stone hover:text-ink">Log out</button>
       </div>
 
-      <p className="text-sm mt-2 inline-block px-3 py-1 rounded-full bg-steel/10 text-steel capitalize">
+      <p className="text-sm mt-2 inline-block px-3 py-1 rounded-full bg-stone/10 text-stone capitalize">
         Status: {listing.status} · Tier: {listing.tier}
       </p>
 
@@ -72,7 +72,7 @@ export default function Dashboard() {
           <input className="input mt-1" value={listing.area || ""} onChange={(e) => setListing({ ...listing, area: e.target.value })} />
         </label>
 
-        <button className="px-6 py-3 rounded-md bg-ignition text-white font-semibold hover:bg-ignition-dim transition-colors">
+        <button className="px-6 py-3 rounded-full bg-coral text-white font-semibold hover:bg-coral-dim active:scale-95 transition-colors">
           Save changes
         </button>
         {saved && <span className="text-sm text-green-700 ml-3">Saved</span>}

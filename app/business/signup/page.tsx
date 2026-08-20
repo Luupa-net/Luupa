@@ -39,7 +39,7 @@ export default function BusinessSignup() {
   return (
     <div className="max-w-md mx-auto px-6 py-16">
       <h1 className="font-display text-3xl font-semibold text-ink">List your business</h1>
-      <p className="text-steel mt-2 text-sm">
+      <p className="text-stone mt-2 text-sm">
         Free to join. Get discovered by customers searching in your area.
       </p>
 
@@ -76,14 +76,14 @@ export default function BusinessSignup() {
 
         <button
           disabled={loading}
-          className="w-full h-12 rounded-md bg-ignition text-white font-semibold hover:bg-ignition-dim transition-colors disabled:opacity-60"
+          className="w-full h-12 rounded-full bg-coral text-white font-semibold hover:bg-coral-dim active:scale-95 transition-colors disabled:opacity-60"
         >
           {loading ? "Creating account…" : "Create account"}
         </button>
       </form>
 
-      <p className="text-sm text-steel mt-6">
-        Already listed? <a href="/business/login" className="text-ignition-dim font-medium">Log in</a>
+      <p className="text-sm text-stone mt-6">
+        Already listed? <a href="/business/login" className="text-coral-dim font-medium">Log in</a>
       </p>
     </div>
   );

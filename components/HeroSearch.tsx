@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { Search } from "lucide-react";
 
 const SUBCATEGORIES = [
   { slug: "detailing", label: "Detailing", keywords: ["detail", "interior", "exterior", "clean", "wash"] },
@@ -36,36 +37,40 @@ export default function HeroSearch() {
   }
 
   return (
-    <div className="w-full max-w-2xl">
+    <div className="w-full max-w-xl">
       <form onSubmit={handleSubmit} className="relative">
+        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Try 'ceramic coating Riffa' or 'window tint'"
-          className="w-full h-14 rounded-lg bg-graphite-light border border-white/10 text-canvas placeholder:text-titanium-dim px-5 pr-32 text-base focus:border-ignition transition-colors"
+          placeholder="Ceramic coating in Riffa..."
+          className="w-full h-14 rounded-full bg-white border-2 border-stone-line text-ink placeholder:text-stone-dim pl-11 pr-28 text-base shadow-sm focus:border-coral transition-colors"
         />
         <button
           type="submit"
-          className="absolute right-2 top-2 h-10 px-5 rounded-md bg-ignition text-graphite font-semibold text-sm hover:bg-ignition-light transition-colors"
+          className="absolute right-1.5 top-1.5 h-11 px-5 rounded-full bg-coral text-white font-semibold text-sm hover:bg-coral-dim active:scale-95 transition-all"
         >
           Search
         </button>
       </form>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      {/* Horizontal scroll chips — thumb-friendly, scales infinitely as categories grow */}
+      <div className="mt-4 -mx-5 px-5 flex gap-2 overflow-x-auto no-scrollbar">
         {SUBCATEGORIES.map((c) => {
           const active = matches.has(c.slug);
           return (
-            <span
+            <button
               key={c.slug}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-all duration-300 ${
+              type="button"
+              onClick={() => setQuery(c.label)}
+              className={`shrink-0 text-sm px-4 py-2 rounded-full border-2 transition-all whitespace-nowrap ${
                 active
-                  ? "bg-ignition/15 border-ignition text-ignition-light scale-105"
-                  : "border-white/10 text-titanium-dim"
+                  ? "bg-coral/10 border-coral text-coral-dim font-semibold"
+                  : "bg-white border-stone-line text-ink/70"
               }`}
             >
               {c.label}
-            </span>
+            </button>
           );
         })}
       </div>

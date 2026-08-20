@@ -16,19 +16,23 @@ export default function ListingCard({ listing }: { listing: Listing }) {
   return (
     <Link
       href={`/listing/${listing.id}`}
-      className={`block rounded-lg border bg-white p-5 hover:shadow-md transition-shadow ${
-        listing.featured ? "border-ignition/50" : "border-black/10"
+      className={`block rounded-xl border-2 bg-white p-5 active:scale-[0.98] transition-all ${
+        listing.featured ? "border-coral/40 shadow-md shadow-coral/5" : "border-stone-line"
       }`}
     >
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-2">
         <h3 className="font-display text-xl font-semibold text-ink">{listing.name}</h3>
-        {listing.verified && <BadgeCheck size={18} className="text-ignition shrink-0" />}
+        {listing.verified && (
+          <span className="shrink-0 flex items-center gap-1 text-xs font-medium text-teal-dim bg-teal/10 px-2 py-1 rounded-full">
+            <BadgeCheck size={13} /> Verified
+          </span>
+        )}
       </div>
-      <p className="text-xs uppercase tracking-wide text-steel mt-1">{listing.subcategory}</p>
+      <p className="text-xs uppercase tracking-wide text-stone mt-1.5">{listing.subcategory}</p>
       {listing.tier !== "free" && (
-        <p className="text-sm text-steel/80 mt-2 leading-relaxed line-clamp-2">{listing.description}</p>
+        <p className="text-sm text-ink/70 mt-2 leading-relaxed line-clamp-2">{listing.description}</p>
       )}
-      <div className="flex items-center gap-1 text-xs text-titanium-dim mt-3">
+      <div className="flex items-center gap-1 text-xs text-stone mt-3">
         <MapPin size={13} />
         {listing.area}
       </div>

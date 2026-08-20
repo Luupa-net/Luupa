@@ -8,10 +8,14 @@ html {
 }
 
 body {
-  background-color: #F7F6F3;
-  color: #14171C;
+  background-color: #FCF9F4;
+  color: #241F1A;
   font-family: 'Inter', sans-serif;
 }
+
+/* Hide scrollbar on horizontal chip/category scrollers, keep functionality */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 .font-display {
   font-family: 'Barlow Condensed', sans-serif;
@@ -22,7 +26,7 @@ body {
 a:focus-visible,
 button:focus-visible,
 input:focus-visible {
-  outline: 2px solid #E2703A;
+  outline: 2px solid #FF5A36;
   outline-offset: 2px;
 }
 
@@ -37,7 +41,7 @@ input:focus-visible {
 }
 .input:focus {
   outline: none;
-  border-color: #E2703A;
+  border-color: #FF5A36;
 }
 
 @media (prefers-reduced-motion: reduce) {

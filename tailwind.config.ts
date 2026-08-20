@@ -5,26 +5,30 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        graphite: {
-          DEFAULT: "#14171C",
-          light: "#1B1F26",
-          lighter: "#232832",
+        // Warm, light base — feels alive and inviting, not corporate/techy
+        canvas: "#FCF9F4",
+        canvas2: "#F5EFE4",
+        ink: "#241F1A",
+        // Coral-orange: proven top performer for urgency/excitement in CTAs
+        coral: {
+          DEFAULT: "#FF5A36",
+          light: "#FF7A5C",
+          dim: "#E44A28",
         },
-        titanium: {
-          DEFAULT: "#C9CDD3",
-          dim: "#8A8F98",
+        // Deep teal: balances the energy with trust/credibility (verified badges, checks)
+        teal: {
+          DEFAULT: "#0E6E64",
+          light: "#12897C",
+          dim: "#0A4F48",
         },
-        ignition: {
-          DEFAULT: "#E2703A",
-          light: "#F08B58",
-          dim: "#B85A2C",
+        // Warm neutral grays for secondary text/borders
+        stone: {
+          DEFAULT: "#7A7268",
+          dim: "#A79E92",
+          line: "#E8E0D3",
         },
-        steel: {
-          DEFAULT: "#3B4B5C",
-          light: "#4E6070",
-        },
-        canvas: "#F7F6F3",
-        ink: "#14171C",
+        // Small dark section (nav on mobile menu open, footer) — used sparingly, not dominant
+        graphite: "#241F1A",
       },
       fontFamily: {
         display: ["'Barlow Condensed'", "sans-serif"],
