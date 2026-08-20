@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import BackHome from "@/components/BackHome";
 
 export default function BusinessSignup() {
   const [businessName, setBusinessName] = useState("");
@@ -38,6 +39,7 @@ export default function BusinessSignup() {
 
   return (
     <div className="max-w-md mx-auto px-6 py-16">
+      <BackHome />
       <h1 className="font-display text-3xl font-semibold text-ink">List your business</h1>
       <p className="text-stone mt-2 text-sm">
         Free to join. Get discovered by customers searching in your area.
