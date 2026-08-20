@@ -22,7 +22,7 @@ export default function Navbar() {
           <Link href="/business/signup" className="hover:text-ink transition-colors">List your business</Link>
           <Link
             href="/business/login"
-            className="px-4 py-2 rounded-full bg-coral text-white font-semibold hover:bg-coral-dim transition-colors"
+            className="px-4 py-2 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim transition-colors"
           >
             Business login
           </Link>
@@ -57,7 +57,7 @@ export default function Navbar() {
           </Link>
           <Link
             href="/business/login"
-            className="mt-3 text-center py-3 rounded-full bg-coral text-white font-semibold"
+            className="mt-3 text-center py-3 rounded-lg bg-terra text-white font-medium"
             onClick={() => setOpen(false)}
           >
             Business login

@@ -72,7 +72,7 @@ export default function Dashboard() {
           <input className="input mt-1" value={listing.area || ""} onChange={(e) => setListing({ ...listing, area: e.target.value })} />
         </label>
 
-        <button className="px-6 py-3 rounded-full bg-coral text-white font-semibold hover:bg-coral-dim active:scale-95 transition-colors">
+        <button className="px-6 py-3 rounded-full bg-terra text-white font-semibold hover:bg-terra-dim active:scale-95 transition-colors">
           Save changes
         </button>
         {saved && <span className="text-sm text-green-700 ml-3">Saved</span>}

@@ -76,14 +76,14 @@ export default function BusinessSignup() {
 
         <button
           disabled={loading}
-          className="w-full h-12 rounded-full bg-coral text-white font-semibold hover:bg-coral-dim active:scale-95 transition-colors disabled:opacity-60"
+          className="w-full h-12 rounded-full bg-terra text-white font-semibold hover:bg-terra-dim active:scale-95 transition-colors disabled:opacity-60"
         >
           {loading ? "Creating account…" : "Create account"}
         </button>
       </form>
 
       <p className="text-sm text-stone mt-6">
-        Already listed? <a href="/business/login" className="text-coral-dim font-medium">Log in</a>
+        Already listed? <a href="/business/login" className="text-terra-dim font-medium">Log in</a>
       </p>
     </div>
   );

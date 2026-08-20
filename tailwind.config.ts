@@ -5,30 +5,27 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Warm, light base — feels alive and inviting, not corporate/techy
-        canvas: "#FCF9F4",
-        canvas2: "#F5EFE4",
-        ink: "#241F1A",
-        // Coral-orange: proven top performer for urgency/excitement in CTAs
-        coral: {
-          DEFAULT: "#FF5A36",
-          light: "#FF7A5C",
-          dim: "#E44A28",
+        canvas: "#FFFFFF",
+        canvas2: "#F7F6F3",
+        ink: "#14181F",
+        // Navy: the primary brand color — modern, trustworthy, premium. Used generously.
+        navy: {
+          DEFAULT: "#152A4E",
+          light: "#1F3A66",
+          dim: "#0D1B33",
         },
-        // Deep teal: balances the energy with trust/credibility (verified badges, checks)
-        teal: {
-          DEFAULT: "#0E6E64",
-          light: "#12897C",
-          dim: "#0A4F48",
+        // Terracotta: sparse accent, only for key actions — never a full section wash.
+        terra: {
+          DEFAULT: "#C4633B",
+          light: "#D67C52",
+          dim: "#A3512E",
         },
-        // Warm neutral grays for secondary text/borders
         stone: {
-          DEFAULT: "#7A7268",
-          dim: "#A79E92",
-          line: "#E8E0D3",
+          DEFAULT: "#6B7280",
+          dim: "#9CA3AF",
+          line: "#E7E5E0",
         },
-        // Small dark section (nav on mobile menu open, footer) — used sparingly, not dominant
-        graphite: "#241F1A",
+        graphite: "#14181F",
       },
       fontFamily: {
         display: ["'Barlow Condensed'", "sans-serif"],

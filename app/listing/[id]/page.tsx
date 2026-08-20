@@ -19,7 +19,7 @@ export default async function ListingPage({ params }: { params: { id: string } }
         <div>
           <h1 className="font-display text-4xl font-semibold text-ink flex items-center gap-2">
             {listing.name}
-            {listing.verified && <BadgeCheck className="text-coral" size={22} />}
+            {listing.verified && <BadgeCheck className="text-terra" size={22} />}
           </h1>
           <p className="text-stone mt-1 capitalize">{listing.subcategory.replace("-", " ")} · {listing.area}</p>
         </div>
@@ -43,7 +43,7 @@ export default async function ListingPage({ params }: { params: { id: string } }
             <a
               href={`https://wa.me/${listing.whatsapp}?text=${waMessage}`}
               target="_blank"
-              className="inline-block mt-5 px-6 py-3 rounded-full bg-coral text-white font-semibold hover:bg-coral-dim active:scale-95 transition-colors"
+              className="inline-block mt-5 px-6 py-3 rounded-full bg-terra text-white font-semibold hover:bg-terra-dim active:scale-95 transition-colors"
             >
               Message on WhatsApp
             </a>
