@@ -1,46 +1,53 @@
 import Link from "next/link";
 import HeroSearch from "@/components/HeroSearch";
 import HeroImage from "@/components/HeroImage";
+import SlidingPrompts from "@/components/SlidingPrompts";
+import BusinessQuickActions from "@/components/BusinessQuickActions";
 import { ArrowUpRight, Eye, MessageCircleMore, ShieldCheck } from "lucide-react";
 
 export default function HomePage() {
   return (
     <div>
-      {/* Full-bleed hero — photo, gradient, headline, search and ticker fused into one scene */}
-      <section className="relative min-h-[560px] sm:min-h-[620px] flex items-end overflow-hidden">
+      {/* Hero — shorter band, centered, blurred photo, no filler subtext */}
+      <section className="relative h-[300px] sm:h-[360px] flex items-center overflow-hidden">
         <HeroImage />
-        <div className="relative max-w-6xl mx-auto px-5 pb-12 sm:pb-16 w-full fade-up">
-          <h1 className="font-display text-white text-[2.5rem] leading-[1.06] sm:text-6xl font-semibold max-w-xl">
-            The shop you'd tell a friend about — before you find them yourself.
+        <div className="relative max-w-xl mx-auto px-5 w-full text-center fade-up">
+          <h1 className="font-display text-white text-3xl sm:text-4xl font-semibold">
+            Everything car care, in one place.
           </h1>
-          <p className="text-white/75 mt-4 max-w-md text-base sm:text-lg leading-relaxed">
-            Detailing, tinting, ceramic coating and customization across Bahrain, matched to what you're actually looking for.
-          </p>
-          <div className="mt-8">
+          <div className="mt-6">
             <HeroSearch />
           </div>
         </div>
       </section>
 
-      {/* Featured — appears once real listings exist, otherwise a quiet invite */}
-      <section className="max-w-6xl mx-auto px-5 py-16 sm:py-20">
-        <div className="flex items-baseline justify-between mb-5">
-          <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">Featured this week</h2>
-          <Link href="/browse" className="text-sm text-navy font-medium flex items-center gap-0.5 hover:gap-1.5 transition-all">
-            Browse all <ArrowUpRight size={14} />
-          </Link>
+      {/* Everything below flows as one continuous white surface — no alternating color blocks */}
+      <div className="max-w-6xl mx-auto px-5">
+        <div className="py-10 sm:py-12">
+          <BusinessQuickActions />
+          <SlidingPrompts />
         </div>
-        <div className="rounded-xl border border-dashed border-stone-line bg-canvas2 p-10 text-center">
-          <p className="text-stone text-sm">No businesses featured yet — the first ones to join get seen first.</p>
-          <Link href="/business/signup" className="text-navy font-medium text-sm mt-1.5 inline-block">
-            List yours first →
-          </Link>
-        </div>
-      </section>
 
-      {/* Why list — real reasoning, not filler, adds substance while the directory is still empty */}
-      <section className="bg-canvas2 px-5 py-16 sm:py-20">
-        <div className="max-w-6xl mx-auto">
+        <div className="h-px bg-stone-line" />
+
+        <section className="py-14 sm:py-16">
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">Featured this week</h2>
+            <Link href="/browse" className="text-sm text-navy font-medium flex items-center gap-0.5 hover:gap-1.5 transition-all">
+              Browse all <ArrowUpRight size={14} />
+            </Link>
+          </div>
+          <div className="rounded-xl border border-dashed border-stone-line p-10 text-center">
+            <p className="text-stone text-sm">No businesses featured yet — the first ones to join get seen first.</p>
+            <Link href="/business/signup" className="text-navy font-medium text-sm mt-1.5 inline-block">
+              List yours first →
+            </Link>
+          </div>
+        </section>
+
+        <div className="h-px bg-stone-line" />
+
+        <section className="py-14 sm:py-16">
           <h2 className="font-display text-2xl sm:text-3xl font-semibold text-ink max-w-md">
             Bahrain searches for car care every day. Most of it never reaches you.
           </h2>
@@ -61,11 +68,11 @@ export default function HomePage() {
               text="A verified badge and a real profile do the convincing before the first message is even sent."
             />
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      {/* For businesses — single confident panel */}
-      <section className="px-5 py-20 sm:py-24">
+      {/* Business CTA — the one deliberate accent block on the page */}
+      <section className="px-5 pb-20 sm:pb-24">
         <div className="max-w-6xl mx-auto bg-navy rounded-2xl px-8 py-14 sm:px-16 sm:py-16 text-center">
           <h2 className="font-display text-white text-3xl sm:text-4xl font-semibold max-w-lg mx-auto">
             Free to join. No catch, no contract.
