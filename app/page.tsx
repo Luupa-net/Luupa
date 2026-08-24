@@ -2,8 +2,9 @@ import Link from "next/link";
 import HeroSearch from "@/components/HeroSearch";
 import HeroImage from "@/components/HeroImage";
 import SlidingPrompts from "@/components/SlidingPrompts";
+import ComingSoon from "@/components/ComingSoon";
 import BusinessQuickActions from "@/components/BusinessQuickActions";
-import { ArrowUpRight, Eye, MessageCircleMore, ShieldCheck } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 export default function HomePage() {
   return (
@@ -25,7 +26,12 @@ export default function HomePage() {
       <div className="max-w-6xl mx-auto px-5">
         <div className="py-10 sm:py-12">
           <BusinessQuickActions />
-          <SlidingPrompts />
+
+          {/* Discover — two paired panels, same height, feel like one composed section */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <SlidingPrompts />
+            <ComingSoon />
+          </div>
         </div>
 
         <div className="h-px bg-stone-line" />
@@ -44,39 +50,20 @@ export default function HomePage() {
             </Link>
           </div>
         </section>
-
-        <div className="h-px bg-stone-line" />
-
-        <section className="py-14 sm:py-16">
-          <h2 className="font-display text-2xl sm:text-3xl font-semibold text-ink max-w-md">
-            Bahrain searches for car care every day. Most of it never reaches you.
-          </h2>
-          <div className="grid sm:grid-cols-3 gap-8 mt-10">
-            <Reason
-              icon={<Eye size={20} className="text-navy" />}
-              title="Show up when it counts"
-              text="Someone searching 'ceramic coating Riffa' finds a real answer — your shop, not a scroll of unrelated posts."
-            />
-            <Reason
-              icon={<MessageCircleMore size={20} className="text-navy" />}
-              title="They message you directly"
-              text="No booking fees, no middleman taking a cut. A customer taps through and reaches you on WhatsApp, same as always."
-            />
-            <Reason
-              icon={<ShieldCheck size={20} className="text-navy" />}
-              title="Trust, built in"
-              text="A verified badge and a real profile do the convincing before the first message is even sent."
-            />
-          </div>
-        </section>
       </div>
 
-      {/* Business CTA — the one deliberate accent block on the page */}
+      {/* Founding offer — honest, time-limited, not overstated */}
       <section className="px-5 pb-20 sm:pb-24">
         <div className="max-w-6xl mx-auto bg-navy rounded-2xl px-8 py-14 sm:px-16 sm:py-16 text-center">
+          <span className="inline-block text-xs uppercase tracking-wide font-medium text-terra-light bg-white/10 px-3 py-1.5 rounded-full mb-4">
+            Founding partner offer
+          </span>
           <h2 className="font-display text-white text-3xl sm:text-4xl font-semibold max-w-lg mx-auto">
-            Free to join. No catch, no contract.
+            Run a car care business? The first 10 get 3 months free.
           </h2>
+          <p className="text-white/60 text-sm mt-3 max-w-sm mx-auto">
+            After that, simple monthly pricing — no surprises, cancel anytime.
+          </p>
           <Link
             href="/business/signup"
             className="inline-block mt-7 px-8 py-3.5 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim active:scale-[0.98] transition-all"
@@ -85,16 +72,6 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
-    </div>
-  );
-}
-
-function Reason({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return (
-    <div>
-      <div className="w-10 h-10 rounded-lg bg-navy/10 flex items-center justify-center mb-3">{icon}</div>
-      <h3 className="font-display text-lg font-semibold text-ink">{title}</h3>
-      <p className="text-stone mt-1.5 text-sm leading-relaxed">{text}</p>
     </div>
   );
 }

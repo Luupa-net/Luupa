@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Sparkles, ArrowRight } from "lucide-react";
 
 const PROMPTS = [
   "Need your car showroom-ready before you sell it?",
@@ -16,35 +17,40 @@ export default function SlidingPrompts() {
   const router = useRouter();
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setIndex((i) => (i + 1) % PROMPTS.length);
-    }, 3200);
+    const id = setInterval(() => setIndex((i) => (i + 1) % PROMPTS.length), 3200);
     return () => clearInterval(id);
   }, []);
 
   return (
-    <button
-      onClick={() => router.push(`/browse?q=${encodeURIComponent(PROMPTS[index])}`)}
-      className="group w-full text-left"
-    >
-      <div className="flex items-center gap-3 h-14 overflow-hidden">
-        <span className="shrink-0 text-xs uppercase tracking-wide text-stone">Try</span>
-        <div className="relative flex-1 h-full">
+    <div className="bg-canvas2 rounded-xl p-6 flex flex-col h-full">
+      <div className="flex items-center gap-2 text-navy mb-4">
+        <Sparkles size={16} />
+        <span className="text-xs uppercase tracking-wide font-medium">Not sure what you need?</span>
+      </div>
+
+      <button
+        onClick={() => router.push(`/browse?q=${encodeURIComponent(PROMPTS[index])}`)}
+        className="group text-left flex-1 flex items-center"
+      >
+        <div className="relative w-full h-16">
           {PROMPTS.map((p, i) => (
             <span
               key={p}
-              className="absolute inset-0 flex items-center text-ink font-medium text-[15px] sm:text-base transition-all duration-500"
+              className="absolute inset-0 flex items-center text-ink font-medium text-lg leading-snug transition-all duration-500"
               style={{
                 opacity: i === index ? 1 : 0,
-                transform: i === index ? "translateY(0)" : "translateY(8px)",
+                transform: i === index ? "translateY(0)" : "translateY(10px)",
               }}
             >
               {p}
-              <span className="ml-2 text-terra opacity-0 group-hover:opacity-100 transition-opacity">→</span>
             </span>
           ))}
         </div>
-      </div>
-    </button>
+      </button>
+
+      <span className="flex items-center gap-1 text-sm text-navy font-medium mt-3">
+        See who can help <ArrowRight size={14} />
+      </span>
+    </div>
   );
 }

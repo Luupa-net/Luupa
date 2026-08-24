@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Home } from "lucide-react";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -26,16 +26,32 @@ export default function Navbar() {
           >
             Business login
           </Link>
+          <Link
+            href="/"
+            aria-label="Home"
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-ink/60 hover:text-ink hover:bg-canvas2 transition-colors"
+          >
+            <Home size={18} />
+          </Link>
         </nav>
 
-        {/* Mobile hamburger — real 44px tap target */}
-        <button
-          className="md:hidden w-11 h-11 flex items-center justify-center -mr-2"
-          onClick={() => setOpen(!open)}
-          aria-label={open ? "Close menu" : "Open menu"}
-        >
-          {open ? <X size={24} className="text-ink" /> : <Menu size={24} className="text-ink" />}
-        </button>
+        {/* Mobile: home icon + hamburger, both real 44px tap targets */}
+        <div className="md:hidden flex items-center gap-1">
+          <Link
+            href="/"
+            aria-label="Home"
+            className="w-11 h-11 flex items-center justify-center text-ink/70"
+          >
+            <Home size={20} />
+          </Link>
+          <button
+            className="w-11 h-11 flex items-center justify-center -mr-2"
+            onClick={() => setOpen(!open)}
+            aria-label={open ? "Close menu" : "Open menu"}
+          >
+            {open ? <X size={24} className="text-ink" /> : <Menu size={24} className="text-ink" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile menu panel */}

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import BackHome from "@/components/BackHome";
 
 export default function Dashboard() {
   const [listing, setListing] = useState<any>(null);
@@ -42,7 +41,6 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10">
-      <BackHome />
       <div className="flex items-center justify-between">
         <h1 className="font-display text-3xl font-semibold text-ink">Your listing</h1>
         <button onClick={handleLogout} className="text-sm text-stone hover:text-ink">Log out</button>

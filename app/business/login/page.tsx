@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import BackHome from "@/components/BackHome";
 
 export default function BusinessLogin() {
   const [email, setEmail] = useState("");
@@ -27,7 +26,6 @@ export default function BusinessLogin() {
 
   return (
     <div className="max-w-md mx-auto px-6 py-16">
-      <BackHome />
       <h1 className="font-display text-3xl font-semibold text-ink">Business login</h1>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
