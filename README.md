@@ -54,13 +54,6 @@ Visit http://localhost:3000
 - To add photos, connect Supabase Storage (a few lines of setup, documented on Supabase's site)
   and store the image URL in the `photos` field
 
-## Before you launch with real users
-
-Run `npm outdated` and update Next.js to the latest 14.x patch version before you have real
-business accounts and customer data flowing through the site — the version pinned here has a
-known security patch available. This is a low-risk, quick update (`npm install next@latest`),
-just flagging it so it doesn't get missed.
-
 ## Admin (manually approving new listings)
 
 New signups are created with `status: 'pending'` so they don't go live automatically.

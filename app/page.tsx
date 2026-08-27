@@ -52,24 +52,29 @@ export default function HomePage() {
         </section>
       </div>
 
-      {/* Founding offer — honest, time-limited, not overstated */}
+      {/* Founding offer — honest, time-limited, not overstated. Subtle ambient flare, no new content boxes. */}
       <section className="px-5 pb-20 sm:pb-24">
-        <div className="max-w-6xl mx-auto bg-navy rounded-2xl px-8 py-14 sm:px-16 sm:py-16 text-center">
-          <span className="inline-block text-xs uppercase tracking-wide font-medium text-terra-light bg-white/10 px-3 py-1.5 rounded-full mb-4">
-            Founding partner offer
-          </span>
-          <h2 className="font-display text-white text-3xl sm:text-4xl font-semibold max-w-lg mx-auto">
-            Run a car care business? The first 10 get 3 months free.
-          </h2>
-          <p className="text-white/60 text-sm mt-3 max-w-sm mx-auto">
-            After that, simple monthly pricing — no surprises, cancel anytime.
-          </p>
-          <Link
-            href="/business/signup"
-            className="inline-block mt-7 px-8 py-3.5 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim active:scale-[0.98] transition-all"
-          >
-            List your business
-          </Link>
+        <div className="max-w-6xl mx-auto relative bg-navy rounded-2xl px-8 py-14 sm:px-16 sm:py-16 text-center overflow-hidden">
+          <div className="absolute -top-16 -left-10 w-64 h-64 rounded-full bg-terra/25 blur-3xl drift-slow" />
+          <div className="absolute -bottom-20 -right-10 w-72 h-72 rounded-full bg-white/10 blur-3xl drift-slow-reverse" />
+
+          <div className="relative">
+            <span className="inline-block text-xs uppercase tracking-wide font-medium text-terra-light bg-white/10 px-3 py-1.5 rounded-full mb-4">
+              Founding partner offer
+            </span>
+            <h2 className="font-display text-white text-3xl sm:text-4xl font-semibold max-w-lg mx-auto">
+              Run a car care business? The first 10 get 3 months free.
+            </h2>
+            <p className="text-white/60 text-sm mt-3 max-w-sm mx-auto">
+              After that, simple monthly pricing — no surprises, cancel anytime.
+            </p>
+            <Link
+              href="/business/signup"
+              className="inline-block mt-7 px-8 py-3.5 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim active:scale-[0.98] transition-all"
+            >
+              List your business
+            </Link>
+          </div>
         </div>
       </section>
     </div>
