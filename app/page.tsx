@@ -1,7 +1,8 @@
 import Link from "next/link";
 import HeroSearch from "@/components/HeroSearch";
 import HeroImage from "@/components/HeroImage";
-import DiscoverPanel from "@/components/DiscoverPanel";
+import SlidingPrompts from "@/components/SlidingPrompts";
+import ComingSoon from "@/components/ComingSoon";
 import BusinessQuickActions from "@/components/BusinessQuickActions";
 import { ArrowUpRight } from "lucide-react";
 
@@ -25,7 +26,12 @@ export default function HomePage() {
       <div className="max-w-6xl mx-auto px-5">
         <div className="py-10 sm:py-12">
           <BusinessQuickActions />
-          <DiscoverPanel />
+
+          {/* Two matched panels — same background, same shape, feel like a pair */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <SlidingPrompts />
+            <ComingSoon />
+          </div>
         </div>
 
         <div className="h-px bg-stone-line" />

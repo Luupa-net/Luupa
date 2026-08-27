@@ -23,7 +23,7 @@ export default function SlidingPrompts() {
 
   return (
     <div className="bg-canvas2 rounded-xl p-6 flex flex-col h-full hover:shadow-md hover:shadow-black/[0.04] transition-shadow">
-      <div className="flex items-center gap-2 text-navy mb-4">
+      <div className="flex items-center gap-2 text-terra-dim mb-4">
         <Sparkles size={16} />
         <span className="text-xs uppercase tracking-wide font-medium">Not sure what you need?</span>
       </div>

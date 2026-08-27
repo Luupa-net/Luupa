@@ -10,9 +10,9 @@ export default function BusinessQuickActions() {
 
   useEffect(() => {
     async function check() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase.from("businesses").select("name").eq("owner_id", user.id).single();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      const { data } = await supabase.from("businesses").select("name").eq("owner_id", session.user.id).single();
       if (data) setBusinessName(data.name);
     }
     check();
