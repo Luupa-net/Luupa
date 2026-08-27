@@ -1,8 +1,7 @@
 import Link from "next/link";
 import HeroSearch from "@/components/HeroSearch";
 import HeroImage from "@/components/HeroImage";
-import SlidingPrompts from "@/components/SlidingPrompts";
-import ComingSoon from "@/components/ComingSoon";
+import DiscoverPanel from "@/components/DiscoverPanel";
 import BusinessQuickActions from "@/components/BusinessQuickActions";
 import { ArrowUpRight } from "lucide-react";
 
@@ -26,12 +25,7 @@ export default function HomePage() {
       <div className="max-w-6xl mx-auto px-5">
         <div className="py-10 sm:py-12">
           <BusinessQuickActions />
-
-          {/* Discover — two paired panels, same height, feel like one composed section */}
-          <div className="grid sm:grid-cols-2 gap-4">
-            <SlidingPrompts />
-            <ComingSoon />
-          </div>
+          <DiscoverPanel />
         </div>
 
         <div className="h-px bg-stone-line" />
@@ -55,8 +49,8 @@ export default function HomePage() {
       {/* Founding offer — honest, time-limited, not overstated. Subtle ambient flare, no new content boxes. */}
       <section className="px-5 pb-20 sm:pb-24">
         <div className="max-w-6xl mx-auto relative bg-navy rounded-2xl px-8 py-14 sm:px-16 sm:py-16 text-center overflow-hidden">
-          <div className="absolute -top-16 -left-10 w-64 h-64 rounded-full bg-terra/25 blur-3xl drift-slow" />
-          <div className="absolute -bottom-20 -right-10 w-72 h-72 rounded-full bg-white/10 blur-3xl drift-slow-reverse" />
+          <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full bg-terra/20 blur-2xl drift-slow" />
+          <div className="absolute -bottom-20 -right-10 w-64 h-64 rounded-full bg-white/10 blur-2xl drift-slow-reverse" />
 
           <div className="relative">
             <span className="inline-block text-xs uppercase tracking-wide font-medium text-terra-light bg-white/10 px-3 py-1.5 rounded-full mb-4">

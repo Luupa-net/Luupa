@@ -8,7 +8,7 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-canvas/95 backdrop-blur border-b border-stone-line">
+    <header className="sticky top-0 z-50 bg-canvas/95 border-b border-stone-line">
       <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
           <span className="font-display text-2xl font-semibold text-ink tracking-wide">

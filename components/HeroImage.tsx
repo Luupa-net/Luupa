@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 export default function HeroImage() {
   const [failed, setFailed] = useState(false);
@@ -8,11 +9,15 @@ export default function HeroImage() {
   return (
     <>
       {!failed && (
-        <img
+        <Image
           src="/bahrain-hero.jpg"
           alt=""
-          className="absolute inset-0 w-full h-full object-cover scale-110"
-          style={{ filter: "blur(3px)" }}
+          fill
+          priority
+          sizes="100vw"
+          quality={80}
+          className="object-cover scale-110"
+          style={{ filter: "blur(2px)" }}
           onError={() => setFailed(true)}
         />
       )}
