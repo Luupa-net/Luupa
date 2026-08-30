@@ -11,10 +11,25 @@ export default async function ListingPage({ params }: { params: { id: string } }
 
   if (!listing) return notFound();
 
+  // Fire-and-forget view tracking — doesn't block the page render, doesn't matter
+  // if it occasionally fails (e.g. offline admin preview)
+  supabase.rpc("increment_view_count", { business_id: listing.id }).then(() => {});
+
   const waMessage = encodeURIComponent(`Hi ${listing.name}, I found you on Luupa and I'd like to ask about ${listing.subcategory}.`);
+  const photos: string[] = listing.photos || [];
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10">
+      {photos.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 mb-8">
+          {photos.slice(0, 6).map((url, i) => (
+            <div key={i} className={`rounded-lg overflow-hidden bg-canvas2 ${i === 0 ? "col-span-3 aspect-[2/1]" : "aspect-square"}`}>
+              <img src={url} alt="" className="w-full h-full object-cover" />
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-start justify-between">
         <div>
           <h1 className="font-display text-4xl font-semibold text-ink flex items-center gap-2">

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import ListingCard, { Listing } from "@/components/ListingCard";
 
@@ -49,7 +50,7 @@ export default async function BrowsePage({
       {/* Mobile: horizontal scrolling filter chips. Desktop: sidebar (below) */}
       <div className="md:hidden mt-4 -mx-5 px-5 flex gap-2 overflow-x-auto no-scrollbar">
         {SUBCATEGORIES.map((s) => (
-          <a
+          <Link
             key={s.slug}
             href={`/browse?sub=${s.slug}`}
             className={`shrink-0 text-sm px-4 py-2 rounded-full border-2 whitespace-nowrap ${
@@ -59,7 +60,7 @@ export default async function BrowsePage({
             }`}
           >
             {s.label}
-          </a>
+          </Link>
         ))}
       </div>
 
@@ -71,7 +72,7 @@ export default async function BrowsePage({
             <ul className="space-y-2 text-sm text-stone">
               {SUBCATEGORIES.map((s) => (
                 <li key={s.slug}>
-                  <a href={`/browse?sub=${s.slug}`} className="hover:text-terra-dim">{s.label}</a>
+                  <Link href={`/browse?sub=${s.slug}`} className="hover:text-terra-dim">{s.label}</Link>
                 </li>
               ))}
             </ul>
@@ -81,7 +82,7 @@ export default async function BrowsePage({
             <ul className="space-y-2 text-sm text-stone">
               {AREAS.map((a) => (
                 <li key={a.slug}>
-                  <a href={`/browse?area=${a.slug}`} className="hover:text-terra-dim">{a.label}</a>
+                  <Link href={`/browse?area=${a.slug}`} className="hover:text-terra-dim">{a.label}</Link>
                 </li>
               ))}
             </ul>
@@ -98,9 +99,9 @@ export default async function BrowsePage({
           {!error && listings.length === 0 && (
             <div className="col-span-2 text-center py-16 border-2 border-dashed border-stone-line rounded-xl bg-white">
               <p className="text-stone">No businesses match yet. Be the first to get listed.</p>
-              <a href="/business/signup" className="text-terra-dim font-semibold mt-2 inline-block">
+              <Link href="/business/signup" className="text-terra-dim font-semibold mt-2 inline-block">
                 List your business →
-              </a>
+              </Link>
             </div>
           )}
           {listings.map((l) => (

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function BusinessLogin() {
   const [email, setEmail] = useState("");
@@ -49,7 +50,7 @@ export default function BusinessLogin() {
       </form>
 
       <p className="text-sm text-stone mt-6">
-        New here? <a href="/business/signup" className="text-terra-dim font-medium">List your business</a>
+        New here? <Link href="/business/signup" className="text-terra-dim font-medium">List your business</Link>
       </p>
     </div>
   );
