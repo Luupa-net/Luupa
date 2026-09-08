@@ -3,13 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
+import PasswordChecklist, { passwordIsValid } from "@/components/PasswordChecklist";
 import { Check, Plus, X, ChevronLeft } from "lucide-react";
-
-const SUBCATEGORIES = [
-  "Detailing", "Window Tinting", "Ceramic Coating & PPF", "Car Wash",
-  "Wraps & Vinyl", "Paint Correction", "Engine Detailing", "Mobile Detailing",
-];
-const AREAS = ["Manama", "Riffa", "Muharraq", "Isa Town", "Hamad Town"];
 
 const STEPS = ["Account", "Details", "Services", "Verification", "Review"];
 
@@ -17,8 +13,8 @@ type FormState = {
   email: string;
   password: string;
   name: string;
-  subcategory: string;
-  area: string;
+  subcategories: string[];
+  areas: string[];
   phone: string;
   whatsapp: string;
   hours: string;
@@ -30,7 +26,7 @@ type FormState = {
 };
 
 const initialState: FormState = {
-  email: "", password: "", name: "", subcategory: SUBCATEGORIES[0], area: AREAS[0],
+  email: "", password: "", name: "", subcategories: [], areas: [],
   phone: "", whatsapp: "", hours: "", description: "", services: [],
   crNumber: "", socialLink: "", applicantNote: "",
 };
@@ -48,6 +44,11 @@ export default function SignupWizard() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  function toggle(key: "subcategories" | "areas", value: string) {
+    const current = form[key];
+    update(key, current.includes(value) ? current.filter((v) => v !== value) : [...current, value]);
+  }
+
   function addService() {
     if (serviceInput.trim()) {
       update("services", [...form.services, serviceInput.trim()]);
@@ -62,10 +63,12 @@ export default function SignupWizard() {
   function validateStep(): string | null {
     if (step === 0) {
       if (!form.email || !form.password) return "Email and password are required.";
-      if (form.password.length < 8) return "Password must be at least 8 characters.";
+      if (!passwordIsValid(form.password)) return "Please meet all password requirements.";
     }
     if (step === 1) {
       if (!form.name || !form.phone || !form.whatsapp) return "Business name, phone, and WhatsApp are required.";
+      if (form.subcategories.length === 0) return "Select at least one service you offer.";
+      if (form.areas.length === 0) return "Select at least one area you serve.";
     }
     return null;
   }
@@ -100,8 +103,8 @@ export default function SignupWizard() {
       const { error: insertError } = await supabase.from("businesses").insert({
         owner_id: data.user.id,
         name: form.name,
-        subcategory: form.subcategory,
-        area: form.area,
+        subcategories: form.subcategories,
+        areas: form.areas,
         phone: form.phone,
         whatsapp: form.whatsapp,
         hours: form.hours,
@@ -165,29 +168,39 @@ export default function SignupWizard() {
           <Field label="Email">
             <input type="email" className="input" value={form.email} onChange={(e) => update("email", e.target.value)} />
           </Field>
-          <Field label="Password" hint="At least 8 characters">
+          <Field label="Password">
             <input type="password" className="input" value={form.password} onChange={(e) => update("password", e.target.value)} />
+            <PasswordChecklist password={form.password} />
           </Field>
         </div>
       )}
 
       {step === 1 && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <Field label="Business name">
             <input className="input" value={form.name} onChange={(e) => update("name", e.target.value)} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Service">
-              <select className="input" value={form.subcategory} onChange={(e) => update("subcategory", e.target.value)}>
-                {SUBCATEGORIES.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </Field>
-            <Field label="Area">
-              <select className="input" value={form.area} onChange={(e) => update("area", e.target.value)}>
-                {AREAS.map((a) => <option key={a}>{a}</option>)}
-              </select>
-            </Field>
+
+          <div>
+            <span className="text-sm font-medium text-ink">Services you offer</span>
+            <span className="block text-xs text-stone mt-0.5 mb-2">Select all that apply</span>
+            <div className="flex flex-wrap gap-2">
+              {SUBCATEGORIES.map((s) => (
+                <Chip key={s} label={s} active={form.subcategories.includes(s)} onClick={() => toggle("subcategories", s)} />
+              ))}
+            </div>
           </div>
+
+          <div>
+            <span className="text-sm font-medium text-ink">Areas you serve</span>
+            <span className="block text-xs text-stone mt-0.5 mb-2">Select all that apply</span>
+            <div className="flex flex-wrap gap-2">
+              {AREAS.map((a) => (
+                <Chip key={a} label={a} active={form.areas.includes(a)} onClick={() => toggle("areas", a)} />
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Phone">
               <input className="input" value={form.phone} onChange={(e) => update("phone", e.target.value)} />
@@ -259,7 +272,8 @@ export default function SignupWizard() {
         <div className="space-y-4 text-sm">
           <ReviewRow label="Email" value={form.email} onEdit={() => setStep(0)} />
           <ReviewRow label="Business name" value={form.name} onEdit={() => setStep(1)} />
-          <ReviewRow label="Service / Area" value={`${form.subcategory} · ${form.area}`} onEdit={() => setStep(1)} />
+          <ReviewRow label="Services" value={form.subcategories.join(", ") || "None selected"} onEdit={() => setStep(1)} />
+          <ReviewRow label="Areas" value={form.areas.join(", ") || "None selected"} onEdit={() => setStep(1)} />
           <ReviewRow label="Phone / WhatsApp" value={`${form.phone} / ${form.whatsapp}`} onEdit={() => setStep(1)} />
           <ReviewRow label="Services listed" value={form.services.length ? form.services.join(", ") : "None"} onEdit={() => setStep(2)} />
           <ReviewRow label="CR number" value={form.crNumber || "Not provided"} onEdit={() => setStep(3)} />
@@ -307,6 +321,20 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {hint && <span className="block text-xs text-stone mt-0.5">{hint}</span>}
       <div className="mt-1">{children}</div>
     </label>
+  );
+}
+
+function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-sm px-3.5 py-2 rounded-full border-2 transition-colors ${
+        active ? "bg-navy border-navy text-white font-medium" : "bg-white border-stone-line text-ink/70"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 

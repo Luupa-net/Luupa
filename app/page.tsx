@@ -3,7 +3,6 @@ import HeroSearch from "@/components/HeroSearch";
 import HeroImage from "@/components/HeroImage";
 import SlidingPrompts from "@/components/SlidingPrompts";
 import ComingSoon from "@/components/ComingSoon";
-import BusinessQuickActions from "@/components/BusinessQuickActions";
 import { ArrowUpRight } from "lucide-react";
 
 export default function HomePage() {
@@ -25,8 +24,6 @@ export default function HomePage() {
       {/* Everything below flows as one continuous white surface — no alternating color blocks */}
       <div className="max-w-6xl mx-auto px-5">
         <div className="py-10 sm:py-12">
-          <BusinessQuickActions />
-
           {/* Two matched panels — same background, same shape, feel like a pair */}
           <div className="grid sm:grid-cols-2 gap-4">
             <SlidingPrompts />

@@ -4,8 +4,8 @@ import { BadgeCheck, MapPin } from "lucide-react";
 export type Listing = {
   id: string;
   name: string;
-  subcategory: string;
-  area: string;
+  subcategories: string[];
+  areas: string[];
   description: string;
   verified: boolean;
   featured: boolean;
@@ -37,13 +37,13 @@ export default function ListingCard({ listing }: { listing: Listing }) {
             </span>
           )}
         </div>
-        <p className="text-xs uppercase tracking-wide text-stone mt-1.5">{listing.subcategory}</p>
+        <p className="text-xs uppercase tracking-wide text-stone mt-1.5">{(listing.subcategories || []).join(" · ")}</p>
         {listing.tier !== "free" && (
           <p className="text-sm text-ink/70 mt-2 leading-relaxed line-clamp-2">{listing.description}</p>
         )}
         <div className="flex items-center gap-1 text-xs text-stone mt-3">
           <MapPin size={13} />
-          {listing.area}
+          {(listing.areas || []).join(", ")}
         </div>
       </div>
     </Link>

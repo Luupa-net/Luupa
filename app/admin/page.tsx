@@ -6,8 +6,8 @@ import { CheckCircle2, XCircle, Clock, ShieldCheck, LogOut, ExternalLink } from 
 type Business = {
   id: string;
   name: string;
-  subcategory: string;
-  area: string;
+  subcategories: string[];
+  areas: string[];
   phone: string;
   whatsapp: string;
   description: string;
@@ -161,7 +161,7 @@ function BusinessCard({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="font-display text-lg font-semibold text-ink">{b.name}</h3>
-          <p className="text-xs text-stone mt-0.5">{b.subcategory} · {b.area}</p>
+          <p className="text-xs text-stone mt-0.5">{(b.subcategories || []).join(", ")} · {(b.areas || []).join(", ")}</p>
         </div>
         <StatusPill status={b.status} />
       </div>

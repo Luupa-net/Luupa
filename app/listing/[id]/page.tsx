@@ -15,7 +15,9 @@ export default async function ListingPage({ params }: { params: { id: string } }
   // if it occasionally fails (e.g. offline admin preview)
   supabase.rpc("increment_view_count", { business_id: listing.id }).then(() => {});
 
-  const waMessage = encodeURIComponent(`Hi ${listing.name}, I found you on Luupa and I'd like to ask about ${listing.subcategory}.`);
+  const subcategories: string[] = listing.subcategories || [];
+  const areas: string[] = listing.areas || [];
+  const waMessage = encodeURIComponent(`Hi ${listing.name}, I found you on Luupa and I'd like to ask about ${subcategories[0] || "your services"}.`);
   const photos: string[] = listing.photos || [];
 
   return (
@@ -30,13 +32,18 @@ export default async function ListingPage({ params }: { params: { id: string } }
         </div>
       )}
 
-      <div className="flex items-start justify-between">
+      <div className="flex items-start gap-4">
+        {listing.logo_url && (
+          <div className="w-14 h-14 rounded-full overflow-hidden bg-canvas2 shrink-0 border border-stone-line">
+            <img src={listing.logo_url} alt="" className="w-full h-full object-cover" />
+          </div>
+        )}
         <div>
           <h1 className="font-display text-4xl font-semibold text-ink flex items-center gap-2">
             {listing.name}
             {listing.verified && <BadgeCheck className="text-terra" size={22} />}
           </h1>
-          <p className="text-stone mt-1 capitalize">{listing.subcategory.replace("-", " ")} · {listing.area}</p>
+          <p className="text-stone mt-1">{subcategories.join(" · ")} · {areas.join(", ")}</p>
         </div>
       </div>
 
@@ -49,7 +56,7 @@ export default async function ListingPage({ params }: { params: { id: string } }
             {listing.phone && (
               <p className="flex items-center gap-2 text-stone"><Phone size={15}/> {listing.phone}</p>
             )}
-            <p className="flex items-center gap-2 text-stone"><MapPin size={15}/> {listing.area}</p>
+            <p className="flex items-center gap-2 text-stone"><MapPin size={15}/> {areas.join(", ")}</p>
             {listing.hours && (
               <p className="flex items-center gap-2 text-stone"><Clock size={15}/> {listing.hours}</p>
             )}

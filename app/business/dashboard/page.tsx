@@ -3,18 +3,14 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
 import ServicesEditor from "@/components/ServicesEditor";
 import PhotoUploader from "@/components/PhotoUploader";
+import LogoUploader from "@/components/LogoUploader";
 import { Clock, CheckCircle2, XCircle, Eye } from "lucide-react";
 
-const SUBCATEGORIES = [
-  "Detailing", "Window Tinting", "Ceramic Coating & PPF", "Car Wash",
-  "Wraps & Vinyl", "Paint Correction", "Engine Detailing", "Mobile Detailing",
-];
-const AREAS = ["Manama", "Riffa", "Muharraq", "Isa Town", "Hamad Town"];
-
 const EDITABLE_FIELDS = [
-  "name", "subcategory", "area", "phone", "whatsapp", "hours",
+  "name", "logo_url", "subcategories", "areas", "phone", "whatsapp", "hours",
   "description", "services", "photos", "cr_number", "social_link", "applicant_note",
 ] as const;
 
@@ -33,18 +29,24 @@ export default function Dashboard() {
         return;
       }
       const { data } = await supabase.from("businesses").select("*").eq("owner_id", user.id).single();
-      setListing(data);
+      setListing(data ? { ...data, subcategories: data.subcategories || [], areas: data.areas || [] } : null);
       setLoading(false);
     }
     load();
   }, [router]);
 
+  function toggle(key: "subcategories" | "areas", value: string) {
+    const current: string[] = listing[key] || [];
+    setListing({
+      ...listing,
+      [key]: current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
+    });
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
 
-    // Only send fields a business is actually allowed to edit — status, verified,
-    // and tier are admin-controlled and enforced at the database level regardless.
     const payload: Record<string, any> = {};
     EDITABLE_FIELDS.forEach((f) => { payload[f] = listing[f]; });
 
@@ -72,24 +74,41 @@ export default function Dashboard() {
       <StatusBanner status={listing.status} viewCount={listing.view_count ?? 0} />
 
       <form onSubmit={handleSave} className="mt-8 space-y-8">
+        {/* Logo */}
+        <section>
+          <h2 className="font-display text-lg font-semibold text-ink mb-3">Logo</h2>
+          <LogoUploader
+            ownerId={listing.owner_id}
+            logoUrl={listing.logo_url}
+            onChange={(logo_url) => setListing({ ...listing, logo_url })}
+          />
+        </section>
+
         {/* Details */}
         <section className="space-y-4">
           <h2 className="font-display text-lg font-semibold text-ink">Details</h2>
           <Field label="Business name">
             <input className="input" value={listing.name || ""} onChange={(e) => setListing({ ...listing, name: e.target.value })} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Service">
-              <select className="input" value={listing.subcategory || SUBCATEGORIES[0]} onChange={(e) => setListing({ ...listing, subcategory: e.target.value })}>
-                {SUBCATEGORIES.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </Field>
-            <Field label="Area">
-              <select className="input" value={listing.area || AREAS[0]} onChange={(e) => setListing({ ...listing, area: e.target.value })}>
-                {AREAS.map((a) => <option key={a}>{a}</option>)}
-              </select>
-            </Field>
+
+          <div>
+            <span className="text-sm font-medium text-ink">Services you offer</span>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {SUBCATEGORIES.map((s) => (
+                <Chip key={s} label={s} active={listing.subcategories.includes(s)} onClick={() => toggle("subcategories", s)} />
+              ))}
+            </div>
           </div>
+
+          <div>
+            <span className="text-sm font-medium text-ink">Areas you serve</span>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {AREAS.map((a) => (
+                <Chip key={a} label={a} active={listing.areas.includes(a)} onClick={() => toggle("areas", a)} />
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Phone">
               <input className="input" value={listing.phone || ""} onChange={(e) => setListing({ ...listing, phone: e.target.value })} />
@@ -119,7 +138,7 @@ export default function Dashboard() {
 
         {/* Services */}
         <section>
-          <h2 className="font-display text-lg font-semibold text-ink mb-3">Services</h2>
+          <h2 className="font-display text-lg font-semibold text-ink mb-3">Services & pricing</h2>
           <ServicesEditor
             services={listing.services || []}
             onChange={(services) => setListing({ ...listing, services })}
@@ -190,5 +209,19 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {hint && <span className="block text-xs text-stone mt-0.5">{hint}</span>}
       <div className="mt-1">{children}</div>
     </label>
+  );
+}
+
+function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-sm px-3.5 py-2 rounded-full border-2 transition-colors ${
+        active ? "bg-navy border-navy text-white font-medium" : "bg-white border-stone-line text-ink/70"
+      }`}
+    >
+      {label}
+    </button>
   );
 }

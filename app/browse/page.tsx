@@ -1,24 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import ListingCard, { Listing } from "@/components/ListingCard";
-
-const SUBCATEGORIES = [
-  { slug: "detailing", label: "Detailing" },
-  { slug: "tinting", label: "Tinting" },
-  { slug: "ceramic-ppf", label: "Ceramic & PPF" },
-  { slug: "car-wash", label: "Car Wash" },
-  { slug: "wraps", label: "Wraps" },
-  { slug: "paint-correction", label: "Paint Correction" },
-  { slug: "engine-detailing", label: "Engine Detailing" },
-  { slug: "mobile", label: "Mobile" },
-];
-const AREAS = [
-  { slug: "manama", label: "Manama" },
-  { slug: "riffa", label: "Riffa" },
-  { slug: "muharraq", label: "Muharraq" },
-  { slug: "isa-town", label: "Isa Town" },
-  { slug: "hamad-town", label: "Hamad Town" },
-];
+import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
 
 export default async function BrowsePage({
   searchParams,
@@ -27,12 +10,11 @@ export default async function BrowsePage({
 }) {
   let query = supabase.from("businesses").select("*").eq("status", "active");
 
-  if (searchParams.sub) query = query.eq("subcategory", searchParams.sub);
-  if (searchParams.area) query = query.eq("area", searchParams.area);
+  // subcategories/areas are arrays now — .contains() checks the array includes this value
+  if (searchParams.sub) query = query.contains("subcategories", [searchParams.sub]);
+  if (searchParams.area) query = query.contains("areas", [searchParams.area]);
   if (searchParams.q) {
-    query = query.or(
-      `name.ilike.%${searchParams.q}%,description.ilike.%${searchParams.q}%,subcategory.ilike.%${searchParams.q}%`
-    );
+    query = query.or(`name.ilike.%${searchParams.q}%,description.ilike.%${searchParams.q}%`);
   }
 
   const { data, error } = await query.order("tier", { ascending: false });
@@ -51,15 +33,15 @@ export default async function BrowsePage({
       <div className="md:hidden mt-4 -mx-5 px-5 flex gap-2 overflow-x-auto no-scrollbar">
         {SUBCATEGORIES.map((s) => (
           <Link
-            key={s.slug}
-            href={`/browse?sub=${s.slug}`}
+            key={s}
+            href={`/browse?sub=${encodeURIComponent(s)}`}
             className={`shrink-0 text-sm px-4 py-2 rounded-full border-2 whitespace-nowrap ${
-              searchParams.sub === s.slug
+              searchParams.sub === s
                 ? "bg-terra border-terra text-white font-semibold"
                 : "bg-white border-stone-line text-ink/70"
             }`}
           >
-            {s.label}
+            {s}
           </Link>
         ))}
       </div>
@@ -71,8 +53,8 @@ export default async function BrowsePage({
             <h4 className="font-semibold text-ink text-sm mb-3">Service</h4>
             <ul className="space-y-2 text-sm text-stone">
               {SUBCATEGORIES.map((s) => (
-                <li key={s.slug}>
-                  <Link href={`/browse?sub=${s.slug}`} className="hover:text-terra-dim">{s.label}</Link>
+                <li key={s}>
+                  <Link href={`/browse?sub=${encodeURIComponent(s)}`} className="hover:text-terra-dim">{s}</Link>
                 </li>
               ))}
             </ul>
@@ -81,8 +63,8 @@ export default async function BrowsePage({
             <h4 className="font-semibold text-ink text-sm mb-3">Area</h4>
             <ul className="space-y-2 text-sm text-stone">
               {AREAS.map((a) => (
-                <li key={a.slug}>
-                  <Link href={`/browse?area=${a.slug}`} className="hover:text-terra-dim">{a.label}</Link>
+                <li key={a}>
+                  <Link href={`/browse?area=${encodeURIComponent(a)}`} className="hover:text-terra-dim">{a}</Link>
                 </li>
               ))}
             </ul>
