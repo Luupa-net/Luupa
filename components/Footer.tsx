@@ -29,7 +29,7 @@ export default function Footer() {
         <div>
           <h4 className="text-white font-semibold mb-3">Contact</h4>
           <ul className="space-y-2">
-            <li>hello@luupa.net</li>
+            <li>luupa.net@gmail.com</li>
           </ul>
         </div>
       </div>

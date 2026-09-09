@@ -172,7 +172,7 @@ export default function Dashboard() {
         {suspended && (
           <Banner tone="red" icon={<XCircle size={18} />} title="Your listing is suspended">
             It's not visible to customers right now. If you think this is a mistake, contact{" "}
-            <a href="mailto:hello@luupa.net" className="underline">hello@luupa.net</a>.
+            <a href="mailto:luupa.net@gmail.com" className="underline">luupa.net@gmail.com</a>.
           </Banner>
         )}
 
