@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle, Clock, ShieldCheck, LogOut, ExternalLink } from "lucide-react";
+import { isEffectivelyVerified, VERIFICATION_DURATIONS, addMonths } from "@/lib/verification";
 
 type Business = {
   id: string;
@@ -17,6 +18,7 @@ type Business = {
   applicant_note: string | null;
   status: "pending" | "active" | "suspended";
   verified: boolean;
+  verified_until: string | null;
   view_count: number;
   created_at: string;
 };
@@ -64,12 +66,12 @@ export default function AdminPage() {
     setPassword("");
   }
 
-  async function updateStatus(businessId: string, status: string, verified: boolean) {
+  async function updateStatus(businessId: string, status: string, verified: boolean, verifiedUntil?: string | null) {
     setLoading(true);
     await fetch("/api/admin/update-status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ businessId, status, verified }),
+      body: JSON.stringify({ businessId, status, verified, verifiedUntil }),
     });
     await checkSession();
     setLoading(false);
@@ -152,10 +154,18 @@ function BusinessCard({
   loading,
 }: {
   business: Business;
-  onUpdate: (id: string, status: string, verified: boolean) => void;
+  onUpdate: (id: string, status: string, verified: boolean, verifiedUntil?: string | null) => void;
   loading: boolean;
 }) {
   const b = business;
+  const [showDurations, setShowDurations] = useState(false);
+  const effectivelyVerified = isEffectivelyVerified(b);
+
+  function grantVerification(months: number) {
+    const until = addMonths(new Date(), months).toISOString();
+    onUpdate(b.id, "active", true, until);
+    setShowDurations(false);
+  }
   return (
     <div className="border border-stone-line rounded-xl p-5 bg-white">
       <div className="flex items-start justify-between gap-4">
@@ -195,6 +205,12 @@ function BusinessCard({
 
       <p className="text-xs text-stone mt-3">
         Applied {new Date(b.created_at).toLocaleDateString()} · {b.view_count} views
+        {b.verified && (
+          <> · {effectivelyVerified
+            ? (b.verified_until ? `Verified until ${new Date(b.verified_until).toLocaleDateString()}` : "Verified (no expiry)")
+            : "Verification expired"}
+          </>
+        )}
       </p>
 
       <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-stone-line">
@@ -207,28 +223,44 @@ function BusinessCard({
             <CheckCircle2 size={15} /> Approve
           </button>
         )}
-        {b.status !== "active" && !b.verified && (
-          <button
-            disabled={loading}
-            onClick={() => onUpdate(b.id, "active", true)}
-            className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border border-navy/30 text-navy hover:bg-navy/5 transition-colors disabled:opacity-60"
-          >
-            <ShieldCheck size={15} /> Approve + verify
-          </button>
-        )}
         {b.status === "active" && (
-          <button
-            disabled={loading}
-            onClick={() => onUpdate(b.id, b.status, !b.verified)}
-            className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border border-navy/30 text-navy hover:bg-navy/5 transition-colors disabled:opacity-60"
-          >
-            <ShieldCheck size={15} /> {b.verified ? "Remove verified" : "Mark verified (paid)"}
-          </button>
+          effectivelyVerified ? (
+            <button
+              disabled={loading}
+              onClick={() => onUpdate(b.id, b.status, false, null)}
+              className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border border-navy/30 text-navy hover:bg-navy/5 transition-colors disabled:opacity-60"
+            >
+              <ShieldCheck size={15} /> Remove verified
+            </button>
+          ) : (
+            <div className="relative">
+              <button
+                disabled={loading}
+                onClick={() => setShowDurations((s) => !s)}
+                className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border border-navy/30 text-navy hover:bg-navy/5 transition-colors disabled:opacity-60"
+              >
+                <ShieldCheck size={15} /> Mark verified (paid)
+              </button>
+              {showDurations && (
+                <div className="absolute left-0 mt-2 bg-white rounded-lg border border-stone-line shadow-lg p-2 flex gap-1.5 z-10">
+                  {VERIFICATION_DURATIONS.map((d) => (
+                    <button
+                      key={d.months}
+                      onClick={() => grantVerification(d.months)}
+                      className="text-xs font-medium px-3 py-2 rounded-md bg-canvas2 text-ink hover:bg-navy hover:text-white transition-colors whitespace-nowrap"
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
         )}
         {b.status !== "suspended" && (
           <button
             disabled={loading}
-            onClick={() => onUpdate(b.id, "suspended", false)}
+            onClick={() => onUpdate(b.id, "suspended", false, null)}
             className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-60"
           >
             <XCircle size={15} /> Reject / suspend

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BadgeCheck, MapPin } from "lucide-react";
+import { isEffectivelyVerified } from "@/lib/verification";
 
 export type Listing = {
   id: string;
@@ -8,6 +9,7 @@ export type Listing = {
   areas: string[];
   description: string;
   verified: boolean;
+  verified_until?: string | null;
   featured: boolean;
   tier: "free" | "standard" | "featured";
   photos?: string[];
@@ -15,12 +17,13 @@ export type Listing = {
 
 export default function ListingCard({ listing }: { listing: Listing }) {
   const thumbnail = listing.photos?.[0];
+  const verified = isEffectivelyVerified(listing);
 
   return (
     <Link
       href={`/listing/${listing.id}`}
       className={`block rounded-xl border-2 bg-white overflow-hidden active:scale-[0.98] transition-all ${
-        listing.featured ? "border-terra/40 shadow-md shadow-terra/5" : "border-stone-line"
+        verified ? "border-navy/50 shadow-md shadow-navy/5" : listing.featured ? "border-terra/40 shadow-md shadow-terra/5" : "border-stone-line"
       }`}
     >
       {thumbnail && (
@@ -31,8 +34,8 @@ export default function ListingCard({ listing }: { listing: Listing }) {
       <div className="p-5">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-display text-xl font-semibold text-ink">{listing.name}</h3>
-          {listing.verified && (
-            <span className="shrink-0 flex items-center gap-1 text-xs font-medium text-navy-dim bg-navy/10 px-2 py-1 rounded-full">
+          {verified && (
+            <span className="shrink-0 flex items-center gap-1 text-xs font-semibold text-white bg-navy px-2.5 py-1 rounded-full">
               <BadgeCheck size={13} /> Verified
             </span>
           )}

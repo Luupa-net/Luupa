@@ -3,7 +3,7 @@ import { isValidAdminSession } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export async function GET() {
-  if (!isValidAdminSession()) {
+  if (!(await isValidAdminSession())) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 

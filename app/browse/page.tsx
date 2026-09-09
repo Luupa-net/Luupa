@@ -2,28 +2,46 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import ListingCard, { Listing } from "@/components/ListingCard";
 import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
+import { BadgeCheck } from "lucide-react";
+
+// SECURITY: the search query gets pasted into a raw PostgREST filter string
+// below — without escaping, someone could put a comma or parenthesis in the
+// search box to inject extra filter clauses. This strips those out first.
+function sanitizeSearchTerm(input: string): string {
+  return input.replace(/[,()%]/g, "").slice(0, 100);
+}
 
 export default async function BrowsePage({
   searchParams,
 }: {
-  searchParams: { q?: string; sub?: string; area?: string };
+  searchParams: Promise<{ q?: string; sub?: string; area?: string; verified?: string }>;
 }) {
+  // Next.js 15+: searchParams is now a Promise and must be awaited
+  const params = await searchParams;
   let query = supabase.from("businesses").select("*").eq("status", "active");
 
   // subcategories/areas are arrays now — .contains() checks the array includes this value
-  if (searchParams.sub) query = query.contains("subcategories", [searchParams.sub]);
-  if (searchParams.area) query = query.contains("areas", [searchParams.area]);
-  if (searchParams.q) {
-    query = query.or(`name.ilike.%${searchParams.q}%,description.ilike.%${searchParams.q}%`);
+  if (params.sub) query = query.contains("subcategories", [params.sub]);
+  if (params.area) query = query.contains("areas", [params.area]);
+  if (params.q) {
+    const term = sanitizeSearchTerm(params.q);
+    query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
+  }
+  if (params.verified === "true") {
+    // Only businesses whose verification hasn't expired — no expiry set, or expiry still in the future
+    query = query.eq("verified", true).or(`verified_until.is.null,verified_until.gt.${new Date().toISOString()}`);
   }
 
-  const { data, error } = await query.order("tier", { ascending: false });
+  // Verified businesses surface first by default, then higher tiers
+  const { data, error } = await query
+    .order("verified", { ascending: false })
+    .order("tier", { ascending: false });
   const listings = (data ?? []) as Listing[];
 
   return (
     <div className="max-w-6xl mx-auto px-5 py-6 sm:py-10">
       <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">
-        {searchParams.q ? `Results for "${searchParams.q}"` : "Browse car care businesses"}
+        {params.q ? `Results for "${params.q}"` : "Browse car care businesses"}
       </h1>
       <p className="text-stone mt-1 text-sm">
         {listings.length} {listings.length === 1 ? "business" : "businesses"} found
@@ -31,12 +49,22 @@ export default async function BrowsePage({
 
       {/* Mobile: horizontal scrolling filter chips. Desktop: sidebar (below) */}
       <div className="md:hidden mt-4 -mx-5 px-5 flex gap-2 overflow-x-auto no-scrollbar">
+        <Link
+          href={params.verified === "true" ? "/browse" : "/browse?verified=true"}
+          className={`shrink-0 flex items-center gap-1 text-sm px-4 py-2 rounded-full border-2 whitespace-nowrap ${
+            params.verified === "true"
+              ? "bg-navy border-navy text-white font-semibold"
+              : "bg-white border-stone-line text-ink/70"
+          }`}
+        >
+          <BadgeCheck size={14} /> Verified only
+        </Link>
         {SUBCATEGORIES.map((s) => (
           <Link
             key={s}
             href={`/browse?sub=${encodeURIComponent(s)}`}
             className={`shrink-0 text-sm px-4 py-2 rounded-full border-2 whitespace-nowrap ${
-              searchParams.sub === s
+              params.sub === s
                 ? "bg-terra border-terra text-white font-semibold"
                 : "bg-white border-stone-line text-ink/70"
             }`}
@@ -49,6 +77,16 @@ export default async function BrowsePage({
       <div className="grid md:grid-cols-[200px_1fr] gap-8 mt-6">
         {/* Sidebar — desktop only */}
         <aside className="hidden md:block space-y-6">
+          <div>
+            <Link
+              href={params.verified === "true" ? "/browse" : "/browse?verified=true"}
+              className={`flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg ${
+                params.verified === "true" ? "bg-navy text-white" : "bg-canvas2 text-ink"
+              }`}
+            >
+              <BadgeCheck size={14} /> Verified only
+            </Link>
+          </div>
           <div>
             <h4 className="font-semibold text-ink text-sm mb-3">Service</h4>
             <ul className="space-y-2 text-sm text-stone">

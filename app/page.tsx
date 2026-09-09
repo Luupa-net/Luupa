@@ -3,9 +3,21 @@ import HeroSearch from "@/components/HeroSearch";
 import HeroImage from "@/components/HeroImage";
 import SlidingPrompts from "@/components/SlidingPrompts";
 import ComingSoon from "@/components/ComingSoon";
+import ListingCard, { Listing } from "@/components/ListingCard";
+import { supabase } from "@/lib/supabase";
 import { ArrowUpRight } from "lucide-react";
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Real featured businesses — verified ones first, then featured tier, active only
+  const { data } = await supabase
+    .from("businesses")
+    .select("*")
+    .eq("status", "active")
+    .order("verified", { ascending: false })
+    .order("tier", { ascending: false })
+    .limit(4);
+  const featured = (data ?? []) as Listing[];
+
   return (
     <div>
       {/* Hero — shorter band, centered, blurred photo, no filler subtext */}
@@ -40,12 +52,20 @@ export default function HomePage() {
               Browse all <ArrowUpRight size={14} />
             </Link>
           </div>
-          <div className="rounded-xl border border-dashed border-stone-line p-10 text-center">
-            <p className="text-stone text-sm">No businesses featured yet — the first ones to join get seen first.</p>
-            <Link href="/business/signup" className="text-navy font-medium text-sm mt-1.5 inline-block">
-              List yours first →
-            </Link>
-          </div>
+          {featured.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-stone-line p-10 text-center">
+              <p className="text-stone text-sm">No businesses featured yet — the first ones to join get seen first.</p>
+              <Link href="/business/signup" className="text-navy font-medium text-sm mt-1.5 inline-block">
+                List yours first →
+              </Link>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {featured.map((l) => (
+                <ListingCard key={l.id} listing={l} />
+              ))}
+            </div>
+          )}
         </section>
       </div>
 

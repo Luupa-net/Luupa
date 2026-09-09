@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { isEffectivelyVerified } from "@/lib/verification";
 import {
   Menu, X, Home, ChevronDown, LayoutDashboard, BadgeCheck, LogOut, Eye,
 } from "lucide-react";
@@ -12,6 +13,7 @@ type BusinessSession = {
   name: string;
   logo_url: string | null;
   verified: boolean;
+  verified_until: string | null;
   status: "pending" | "active" | "suspended";
 };
 
@@ -32,7 +34,7 @@ export default function Navbar() {
     }
     const { data } = await supabase
       .from("businesses")
-      .select("name, logo_url, verified, status")
+      .select("name, logo_url, verified, verified_until, status")
       .eq("owner_id", session.user.id)
       .single();
     setBusiness(data ?? null);
@@ -67,6 +69,7 @@ export default function Navbar() {
   const statusRing = business?.status === "active" ? "ring-emerald-400"
     : business?.status === "pending" ? "ring-terra"
     : "ring-red-400";
+  const verified = business ? isEffectivelyVerified(business) : false;
 
   return (
     <header className="sticky top-0 z-50 bg-canvas/95 border-b border-stone-line">
@@ -93,7 +96,7 @@ export default function Navbar() {
                   ) : (
                     <span className="text-navy text-xs font-semibold">{business.name?.[0]?.toUpperCase()}</span>
                   )}
-                  {business.verified && (
+                  {verified && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-navy ring-2 ring-white flex items-center justify-center">
                       <BadgeCheck size={9} className="text-white" />
                     </span>
@@ -107,13 +110,13 @@ export default function Navbar() {
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-stone-line shadow-lg shadow-black/5 py-1.5 animate-[fadeUp_0.15s_ease-out]">
                   <div className="px-3.5 py-2.5 border-b border-stone-line">
                     <p className="text-sm font-medium text-ink truncate">{business.name}</p>
-                    <p className="text-xs text-stone capitalize mt-0.5">{business.status}{business.verified ? " · Verified" : ""}</p>
+                    <p className="text-xs text-stone capitalize mt-0.5">{business.status}{verified ? " · Verified" : ""}</p>
                   </div>
                   <DropdownItem href="/business/dashboard" icon={<LayoutDashboard size={15} />} label="Dashboard" onClick={() => setDropdownOpen(false)} />
                   {business.status === "active" && (
                     <DropdownItem href="/browse" icon={<Eye size={15} />} label="View live site" onClick={() => setDropdownOpen(false)} />
                   )}
-                  {!business.verified && (
+                  {!verified && (
                     <DropdownItem href="/business/verify" icon={<BadgeCheck size={15} />} label="Get verified" onClick={() => setDropdownOpen(false)} />
                   )}
                   <button
@@ -177,7 +180,7 @@ export default function Navbar() {
                   ) : (
                     <span className="text-navy text-xs font-semibold">{business.name?.[0]?.toUpperCase()}</span>
                   )}
-                  {business.verified && (
+                  {verified && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-navy ring-2 ring-white flex items-center justify-center">
                       <BadgeCheck size={9} className="text-white" />
                     </span>
@@ -185,13 +188,13 @@ export default function Navbar() {
                 </span>
                 <div>
                   <p className="text-sm font-medium text-ink">{business.name}</p>
-                  <p className="text-xs text-stone capitalize">{business.status}{business.verified ? " · Verified" : ""}</p>
+                  <p className="text-xs text-stone capitalize">{business.status}{verified ? " · Verified" : ""}</p>
                 </div>
               </div>
               <Link href="/business/dashboard" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
                 Dashboard
               </Link>
-              {!business.verified && (
+              {!verified && (
                 <Link href="/business/verify" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
                   Get verified
                 </Link>

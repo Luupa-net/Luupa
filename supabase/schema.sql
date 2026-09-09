@@ -17,6 +17,7 @@ create table businesses (
   services jsonb default '[]',
   photos jsonb default '[]',
   verified boolean default false,
+  verified_until timestamptz,
   tier text default 'free' check (tier in ('free', 'standard', 'featured')),
   status text default 'pending' check (status in ('pending', 'active', 'suspended')),
   cr_number text,
@@ -64,6 +65,7 @@ begin
      and coalesce(current_setting('app.bypass_admin_protection', true), '') != 'true' then
     new.status := old.status;
     new.verified := old.verified;
+    new.verified_until := old.verified_until;
     new.tier := old.tier;
     new.view_count := old.view_count;
   end if;
@@ -98,13 +100,27 @@ create policy "Public can view business photos"
   on storage.objects for select
   using (bucket_id = 'business-photos');
 
-create policy "Authenticated users can upload their own photos"
+-- SECURITY: restricts uploads to the user's own folder (matches the delete
+-- policy below) — without this, any logged-in business could upload into
+-- another business's photo folder.
+create policy "Authenticated users can upload only to their own folder"
   on storage.objects for insert
-  with check (bucket_id = 'business-photos' and auth.role() = 'authenticated');
+  with check (
+    bucket_id = 'business-photos'
+    and auth.role() = 'authenticated'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 create policy "Users can delete their own uploaded photos"
   on storage.objects for delete
   using (bucket_id = 'business-photos' and owner = auth.uid());
+
+-- Real enforcement, not just the client-side checks — closes a gap where
+-- someone could call the storage API directly with an oversized or non-image file.
+update storage.buckets
+set file_size_limit = 5242880,
+    allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+where id = 'business-photos';
 
 -- A newly signed-up user can create exactly one listing tied to themselves
 create policy "Users can insert their own business"

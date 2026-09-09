@@ -16,8 +16,9 @@ export function createAdminToken(): string {
   return expectedToken();
 }
 
-export function isValidAdminSession(): boolean {
-  const cookie = cookies().get(COOKIE_NAME)?.value;
+export async function isValidAdminSession(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const cookie = cookieStore.get(COOKIE_NAME)?.value;
   if (!cookie) return false;
 
   const expected = expectedToken();

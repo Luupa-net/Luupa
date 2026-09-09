@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
 import { computeCompleteness } from "@/lib/completeness";
+import { isEffectivelyVerified } from "@/lib/verification";
 import ServicesEditor from "@/components/ServicesEditor";
 import PhotoUploader from "@/components/PhotoUploader";
 import LogoUploader from "@/components/LogoUploader";
@@ -71,6 +72,7 @@ export default function Dashboard() {
   if (!listing) return <div className="max-w-4xl mx-auto px-6 py-16 text-stone">No listing found.</div>;
 
   const { percent, items } = computeCompleteness(listing);
+  const verified = isEffectivelyVerified(listing);
   const missing = items.filter((i) => !i.done);
   const suspended = listing.status === "suspended";
   const daysSinceApplied = Math.floor((Date.now() - new Date(listing.created_at).getTime()) / 86400000);
@@ -91,7 +93,7 @@ export default function Dashboard() {
             <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">{listing.name}</h1>
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               <StatusBadge status={listing.status} />
-              {listing.verified && (
+              {verified && (
                 <span className="flex items-center gap-1 text-xs font-semibold text-white bg-navy px-2.5 py-1 rounded-full">
                   <BadgeCheck size={13} /> Verified
                 </span>
@@ -237,7 +239,7 @@ export default function Dashboard() {
                 <input className="input" value={listing.social_link || ""} onChange={(e) => setListing({ ...listing, social_link: e.target.value })} />
               </Field>
 
-              {!listing.verified && (
+              {!verified && (
                 <div className="rounded-xl bg-navy/5 border border-navy/10 px-5 py-4 flex items-start gap-3">
                   <ShieldCheck size={18} className="text-navy shrink-0 mt-0.5" />
                   <div>

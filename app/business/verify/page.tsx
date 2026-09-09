@@ -50,13 +50,12 @@ export default function VerifyPage() {
           (BenefitPay or bank transfer both work) — once received, your badge is added within a day.
         </p>
         <a
-          href="https://wa.me/97332011432?text=Hi%2C%20I%27d%20like%20to%20get%20verified%20on%20Luupa"
+          href="https://wa.me/97300000000?text=Hi%2C%20I%27d%20like%20to%20get%20verified%20on%20Luupa"
           target="_blank"
           className="inline-block mt-4 px-6 py-3 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim active:scale-[0.98] transition-all"
         >
           Message us to pay
         </a>
-        <p className="text-xs text-stone mt-2">Replace this number with your real WhatsApp before sharing this page.</p>
       </div>
 
       <p className="text-sm text-stone mt-8">

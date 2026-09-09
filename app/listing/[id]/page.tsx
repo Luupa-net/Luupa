@@ -1,12 +1,15 @@
 import { supabase } from "@/lib/supabase";
+import { isEffectivelyVerified } from "@/lib/verification";
 import { BadgeCheck, Phone, MapPin, Clock } from "lucide-react";
 import { notFound } from "next/navigation";
 
-export default async function ListingPage({ params }: { params: { id: string } }) {
+export default async function ListingPage({ params }: { params: Promise<{ id: string }> }) {
+  // Next.js 15+: params is now a Promise and must be awaited
+  const { id } = await params;
   const { data: listing } = await supabase
     .from("businesses")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (!listing) return notFound();
@@ -15,6 +18,7 @@ export default async function ListingPage({ params }: { params: { id: string } }
   // if it occasionally fails (e.g. offline admin preview)
   supabase.rpc("increment_view_count", { business_id: listing.id }).then(() => {});
 
+  const verified = isEffectivelyVerified(listing);
   const subcategories: string[] = listing.subcategories || [];
   const areas: string[] = listing.areas || [];
   const waMessage = encodeURIComponent(`Hi ${listing.name}, I found you on Luupa and I'd like to ask about ${subcategories[0] || "your services"}.`);
@@ -41,7 +45,7 @@ export default async function ListingPage({ params }: { params: { id: string } }
         <div>
           <h1 className="font-display text-4xl font-semibold text-ink flex items-center gap-2">
             {listing.name}
-            {listing.verified && <BadgeCheck className="text-terra" size={22} />}
+            {verified && <BadgeCheck className="text-navy" size={22} />}
           </h1>
           <p className="text-stone mt-1">{subcategories.join(" · ")} · {areas.join(", ")}</p>
         </div>
