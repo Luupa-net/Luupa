@@ -8,6 +8,7 @@ import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
 import { computeCompleteness } from "@/lib/completeness";
 import { isEffectivelyVerified } from "@/lib/verification";
 import { isValidBahrainPhone, isValidWhatsAppNumber } from "@/lib/validation";
+import { PUBLIC_FIELDS } from "@/lib/businessFields";
 import ServicesEditor from "@/components/ServicesEditor";
 import PhotoUploader from "@/components/PhotoUploader";
 import LogoUploader from "@/components/LogoUploader";
@@ -16,13 +17,6 @@ import {
   Clock, CheckCircle2, XCircle, Eye, BadgeCheck, ImageIcon, Wrench,
   ShieldCheck, ExternalLink, User, FolderClock,
 } from "lucide-react";
-
-// Fields that affect what a customer actually sees — once a listing is live,
-// changes to these are held for admin review instead of applying instantly.
-const PUBLIC_FIELDS = [
-  "name", "logo_url", "subcategories", "areas", "phone", "whatsapp",
-  "hours", "description", "services", "photos",
-] as const;
 
 // Internal/verification info — never shown to customers, so no review needed.
 const DIRECT_FIELDS = ["cr_number", "social_link", "applicant_note"] as const;

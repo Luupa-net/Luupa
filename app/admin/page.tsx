@@ -48,6 +48,7 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [tab, setTab] = useState<"pending" | "active" | "suspended">("pending");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function checkSession() {
@@ -136,12 +137,17 @@ export default function AdminPage() {
     );
   }
 
-  const filtered = businesses.filter((b) => b.status === tab);
+  const filtered = businesses
+    .filter((b) => b.status === tab)
+    .filter((b) => !search.trim() || b.name.toLowerCase().includes(search.trim().toLowerCase()));
   const counts = {
     pending: businesses.filter((b) => b.status === "pending").length,
     active: businesses.filter((b) => b.status === "active").length,
     suspended: businesses.filter((b) => b.status === "suspended").length,
   };
+  const verifiedCount = businesses.filter((b) => isEffectivelyVerified(b)).length;
+  const pendingChangesCount = businesses.filter((b) => !!b.pending_changes).length;
+  const totalViews = businesses.reduce((sum, b) => sum + (b.view_count || 0), 0);
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10">
@@ -152,18 +158,35 @@ export default function AdminPage() {
         </button>
       </div>
 
-      <div className="flex gap-2 mt-6">
-        {(["pending", "active", "suspended"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
-              tab === t ? "bg-navy text-white" : "bg-canvas2 text-ink/70"
-            }`}
-          >
-            {t} ({counts[t]})
-          </button>
-        ))}
+      {/* Overview — at-a-glance counts across everything, not just the current tab */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-6">
+        <OverviewStat label="Total" value={businesses.length} />
+        <OverviewStat label="Verified" value={verifiedCount} tone="navy" />
+        <OverviewStat label="Changes to review" value={pendingChangesCount} tone={pendingChangesCount > 0 ? "terra" : undefined} />
+        <OverviewStat label="Total views" value={totalViews} />
+        <OverviewStat label="Suspended" value={counts.suspended} tone={counts.suspended > 0 ? "red" : undefined} />
+      </div>
+
+      <div className="flex items-center gap-3 mt-6 flex-wrap">
+        <div className="flex gap-2">
+          {(["pending", "active", "suspended"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+                tab === t ? "bg-navy text-white" : "bg-canvas2 text-ink/70"
+              }`}
+            >
+              {t} ({counts[t]})
+            </button>
+          ))}
+        </div>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name…"
+          className="input flex-1 min-w-[180px] max-w-xs"
+        />
       </div>
 
       <div className="mt-6 space-y-4">
@@ -249,12 +272,26 @@ function BusinessCard({
         <div className="mt-4 rounded-lg bg-terra/5 border border-terra/20 p-4">
           <p className="text-sm font-semibold text-terra-dim mb-2">Pending changes — not yet visible to customers</p>
           <div className="space-y-1 text-sm">
-            {Object.entries(business.pending_changes).map(([key, value]) => (
-              <div key={key} className="flex justify-between gap-3">
-                <span className="text-stone">{FIELD_LABELS[key] || key}</span>
-                <span className="text-ink font-medium text-right">{formatFieldValue(key, value)}</span>
-              </div>
-            ))}
+            {Object.entries(business.pending_changes)
+              .map(([key, value]) => ({
+                key,
+                value,
+                changed: formatFieldValue(key, value) !== formatFieldValue(key, (business as any)[key]),
+              }))
+              .sort((a, b) => Number(b.changed) - Number(a.changed)) // changed fields first
+              .map(({ key, value, changed }) => (
+                <div
+                  key={key}
+                  className={`flex justify-between gap-3 rounded-md px-2 -mx-2 py-1 ${changed ? "bg-terra/10" : ""}`}
+                >
+                  <span className={changed ? "text-terra-dim font-medium" : "text-stone"}>
+                    {changed && "● "}{FIELD_LABELS[key] || key}
+                  </span>
+                  <span className={`text-right ${changed ? "text-ink font-semibold" : "text-stone"}`}>
+                    {formatFieldValue(key, value)}
+                  </span>
+                </div>
+              ))}
           </div>
           <div className="flex gap-2 mt-3">
             <button
@@ -338,6 +375,20 @@ function BusinessCard({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+function OverviewStat({ label, value, tone }: { label: string; value: number; tone?: "navy" | "terra" | "red" }) {
+  const tones = {
+    navy: "text-navy",
+    terra: "text-terra-dim",
+    red: "text-red-600",
+  };
+  return (
+    <div className="rounded-lg bg-canvas2 px-3.5 py-3">
+      <p className={`font-display text-xl font-semibold ${tone ? tones[tone] : "text-ink"}`}>{value}</p>
+      <p className="text-xs text-stone mt-0.5">{label}</p>
     </div>
   );
 }
