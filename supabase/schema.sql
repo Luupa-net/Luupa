@@ -24,6 +24,7 @@ create table businesses (
   social_link text,
   applicant_note text,
   view_count integer default 0,
+  pending_changes jsonb,
   created_at timestamptz default now()
 );
 

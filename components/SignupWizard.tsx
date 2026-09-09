@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { SUBCATEGORIES, AREAS, Service } from "@/lib/taxonomy";
+import { isValidBahrainPhone, isValidWhatsAppNumber } from "@/lib/validation";
 import ServicesEditor from "@/components/ServicesEditor";
 import PasswordChecklist, { passwordIsValid } from "@/components/PasswordChecklist";
 import { Check, ChevronLeft } from "lucide-react";
@@ -56,6 +57,8 @@ export default function SignupWizard() {
     }
     if (step === 1) {
       if (!form.name || !form.phone || !form.whatsapp) return "Business name, phone, and WhatsApp are required.";
+      if (!isValidBahrainPhone(form.phone)) return "Phone should be an 8-digit Bahrain number.";
+      if (!isValidWhatsAppNumber(form.whatsapp)) return "WhatsApp number looks incomplete — include the country code.";
       if (form.subcategories.length === 0) return "Select at least one service you offer.";
       if (form.areas.length === 0) return "Select at least one area you serve.";
     }

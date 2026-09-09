@@ -7,12 +7,15 @@ import { isEffectivelyVerified, VERIFICATION_DURATIONS, addMonths } from "@/lib/
 type Business = {
   id: string;
   name: string;
+  logo_url: string | null;
   subcategories: string[];
   areas: string[];
   phone: string;
   whatsapp: string;
+  hours: string;
   description: string;
   services: { name: string; price?: string }[];
+  photos: string[];
   cr_number: string | null;
   social_link: string | null;
   applicant_note: string | null;
@@ -21,7 +24,23 @@ type Business = {
   verified_until: string | null;
   view_count: number;
   created_at: string;
+  pending_changes: Record<string, any> | null;
 };
+
+const FIELD_LABELS: Record<string, string> = {
+  name: "Name", logo_url: "Logo", subcategories: "Services offered", areas: "Areas served",
+  phone: "Phone", whatsapp: "WhatsApp", hours: "Hours", description: "Description",
+  services: "Services list", photos: "Photos",
+};
+
+function formatFieldValue(key: string, value: any): string {
+  if (value == null || value === "") return "(empty)";
+  if (key === "subcategories" || key === "areas") return (value as string[]).join(", ");
+  if (key === "services") return (value as { name: string; price?: string }[]).map((s) => s.name).join(", ") || "(none)";
+  if (key === "photos") return `${(value as string[]).length} photo${(value as string[]).length === 1 ? "" : "s"}`;
+  if (key === "logo_url") return value ? "New logo uploaded" : "(none)";
+  return String(value);
+}
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null); // null = checking
@@ -72,6 +91,17 @@ export default function AdminPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ businessId, status, verified, verifiedUntil }),
+    });
+    await checkSession();
+    setLoading(false);
+  }
+
+  async function reviewChanges(businessId: string, action: "approve" | "reject") {
+    setLoading(true);
+    await fetch("/api/admin/review-changes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ businessId, action }),
     });
     await checkSession();
     setLoading(false);
@@ -141,7 +171,7 @@ export default function AdminPage() {
           <p className="text-stone text-sm py-10 text-center">Nothing here right now.</p>
         )}
         {filtered.map((b) => (
-          <BusinessCard key={b.id} business={b} onUpdate={updateStatus} loading={loading} />
+          <BusinessCard key={b.id} business={b} onUpdate={updateStatus} onReviewChanges={reviewChanges} loading={loading} />
         ))}
       </div>
     </div>
@@ -151,10 +181,12 @@ export default function AdminPage() {
 function BusinessCard({
   business,
   onUpdate,
+  onReviewChanges,
   loading,
 }: {
   business: Business;
   onUpdate: (id: string, status: string, verified: boolean, verifiedUntil?: string | null) => void;
+  onReviewChanges: (id: string, action: "approve" | "reject") => void;
   loading: boolean;
 }) {
   const b = business;
@@ -212,6 +244,36 @@ function BusinessCard({
           </>
         )}
       </p>
+
+      {business.pending_changes && (
+        <div className="mt-4 rounded-lg bg-terra/5 border border-terra/20 p-4">
+          <p className="text-sm font-semibold text-terra-dim mb-2">Pending changes — not yet visible to customers</p>
+          <div className="space-y-1 text-sm">
+            {Object.entries(business.pending_changes).map(([key, value]) => (
+              <div key={key} className="flex justify-between gap-3">
+                <span className="text-stone">{FIELD_LABELS[key] || key}</span>
+                <span className="text-ink font-medium text-right">{formatFieldValue(key, value)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button
+              disabled={loading}
+              onClick={() => onReviewChanges(business.id, "approve")}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-navy text-white hover:bg-navy-light transition-colors disabled:opacity-60"
+            >
+              <CheckCircle2 size={13} /> Approve changes
+            </button>
+            <button
+              disabled={loading}
+              onClick={() => onReviewChanges(business.id, "reject")}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-60"
+            >
+              <XCircle size={13} /> Reject changes
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-stone-line">
         {b.status !== "active" && (
