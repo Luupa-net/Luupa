@@ -13,6 +13,7 @@ const STEPS = ["Account", "Details", "Services", "Verification", "Review"];
 
 type FormState = {
   email: string;
+  emailConfirm: string;
   password: string;
   name: string;
   subcategories: string[];
@@ -28,7 +29,7 @@ type FormState = {
 };
 
 const initialState: FormState = {
-  email: "", password: "", name: "", subcategories: [], areas: [],
+  email: "", emailConfirm: "", password: "", name: "", subcategories: [], areas: [],
   phone: "", whatsapp: "", hours: "", description: "", services: [],
   crNumber: "", socialLink: "", applicantNote: "",
 };
@@ -53,6 +54,9 @@ export default function SignupWizard() {
   function validateStep(): string | null {
     if (step === 0) {
       if (!form.email || !form.password) return "Email and password are required.";
+      if (form.email.trim().toLowerCase() !== form.emailConfirm.trim().toLowerCase()) {
+        return "Emails don't match — please check for typos.";
+      }
       if (!passwordIsValid(form.password)) return "Please meet all password requirements.";
     }
     if (step === 1) {
@@ -159,6 +163,15 @@ export default function SignupWizard() {
         <div className="space-y-4">
           <Field label="Email">
             <input type="email" className="input" value={form.email} onChange={(e) => update("email", e.target.value)} />
+          </Field>
+          <Field label="Confirm email" hint="Retype it — pasting is disabled here so typos actually get caught">
+            <input
+              type="email"
+              className="input"
+              value={form.emailConfirm}
+              onChange={(e) => update("emailConfirm", e.target.value)}
+              onPaste={(e) => e.preventDefault()}
+            />
           </Field>
           <Field label="Password">
             <input type="password" className="input" value={form.password} onChange={(e) => update("password", e.target.value)} />

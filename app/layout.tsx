@@ -1,3 +1,5 @@
+// Built for Sarah.
+
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import Navbar from "@/components/Navbar";
