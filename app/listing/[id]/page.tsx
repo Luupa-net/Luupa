@@ -72,12 +72,15 @@ export default async function ListingPage({ params }: { params: { id: string } }
           )}
         </div>
 
-        {listing.services && (
+        {listing.services && listing.services.length > 0 && (
           <div>
             <h3 className="font-semibold text-ink mb-3">Services</h3>
-            <ul className="text-sm text-stone space-y-1">
-              {(listing.services as string[]).map((s, i) => (
-                <li key={i}>• {s}</li>
+            <ul className="text-sm space-y-2">
+              {(listing.services as { name: string; price?: string }[]).map((s, i) => (
+                <li key={i} className="flex items-baseline justify-between gap-3 border-b border-dashed border-stone-line pb-2">
+                  <span className="text-ink">{s.name}</span>
+                  {s.price && <span className="text-stone shrink-0">BHD {s.price}</span>}
+                </li>
               ))}
             </ul>
           </div>

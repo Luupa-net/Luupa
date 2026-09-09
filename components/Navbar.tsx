@@ -64,9 +64,9 @@ export default function Navbar() {
     router.push("/");
   }
 
-  const statusDot = business?.status === "active" ? "bg-emerald-500"
-    : business?.status === "pending" ? "bg-terra"
-    : "bg-stone-dim";
+  const statusRing = business?.status === "active" ? "ring-emerald-400"
+    : business?.status === "pending" ? "ring-terra"
+    : "ring-red-400";
 
   return (
     <header className="sticky top-0 z-50 bg-canvas/95 border-b border-stone-line">
@@ -87,13 +87,17 @@ export default function Navbar() {
                 onClick={() => setDropdownOpen((o) => !o)}
                 className="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border border-stone-line hover:border-navy/30 transition-colors"
               >
-                <span className="relative w-7 h-7 rounded-full bg-navy/10 overflow-hidden flex items-center justify-center shrink-0">
+                <span className={`relative w-7 h-7 rounded-full bg-navy/10 overflow-hidden flex items-center justify-center shrink-0 ring-2 ${statusRing}`}>
                   {business.logo_url ? (
                     <img src={business.logo_url} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-navy text-xs font-semibold">{business.name?.[0]?.toUpperCase()}</span>
                   )}
-                  <span className={`absolute bottom-0 right-0 w-2 h-2 rounded-full ring-2 ring-white ${statusDot}`} />
+                  {business.verified && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-navy ring-2 ring-white flex items-center justify-center">
+                      <BadgeCheck size={9} className="text-white" />
+                    </span>
+                  )}
                 </span>
                 <span className="text-ink font-medium max-w-[120px] truncate">{business.name}</span>
                 <ChevronDown size={14} className={`text-stone transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
@@ -110,12 +114,7 @@ export default function Navbar() {
                     <DropdownItem href="/browse" icon={<Eye size={15} />} label="View live site" onClick={() => setDropdownOpen(false)} />
                   )}
                   {!business.verified && (
-                    <a
-                      href="mailto:hello@luupa.net?subject=Verification request"
-                      className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas2 transition-colors"
-                    >
-                      <BadgeCheck size={15} /> Get verified
-                    </a>
+                    <DropdownItem href="/business/verify" icon={<BadgeCheck size={15} />} label="Get verified" onClick={() => setDropdownOpen(false)} />
                   )}
                   <button
                     onClick={handleLogout}
@@ -172,13 +171,17 @@ export default function Navbar() {
           {business ? (
             <>
               <div className="flex items-center gap-2.5 py-3 border-b border-stone-line">
-                <span className="relative w-8 h-8 rounded-full bg-navy/10 overflow-hidden flex items-center justify-center shrink-0">
+                <span className={`relative w-8 h-8 rounded-full bg-navy/10 overflow-hidden flex items-center justify-center shrink-0 ring-2 ${statusRing}`}>
                   {business.logo_url ? (
                     <img src={business.logo_url} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-navy text-xs font-semibold">{business.name?.[0]?.toUpperCase()}</span>
                   )}
-                  <span className={`absolute bottom-0 right-0 w-2 h-2 rounded-full ring-2 ring-white ${statusDot}`} />
+                  {business.verified && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-navy ring-2 ring-white flex items-center justify-center">
+                      <BadgeCheck size={9} className="text-white" />
+                    </span>
+                  )}
                 </span>
                 <div>
                   <p className="text-sm font-medium text-ink">{business.name}</p>
@@ -189,9 +192,9 @@ export default function Navbar() {
                 Dashboard
               </Link>
               {!business.verified && (
-                <a href="mailto:hello@luupa.net?subject=Verification request" className="py-3 text-base font-medium text-ink border-b border-stone-line">
+                <Link href="/business/verify" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
                   Get verified
-                </a>
+                </Link>
               )}
               <button onClick={handleLogout} className="py-3 text-base font-medium text-red-600 text-left">
                 Log out

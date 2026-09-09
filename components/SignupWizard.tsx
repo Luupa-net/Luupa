@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
+import { SUBCATEGORIES, AREAS, Service } from "@/lib/taxonomy";
+import ServicesEditor from "@/components/ServicesEditor";
 import PasswordChecklist, { passwordIsValid } from "@/components/PasswordChecklist";
-import { Check, Plus, X, ChevronLeft } from "lucide-react";
+import { Check, ChevronLeft } from "lucide-react";
 
 const STEPS = ["Account", "Details", "Services", "Verification", "Review"];
 
@@ -19,7 +20,7 @@ type FormState = {
   whatsapp: string;
   hours: string;
   description: string;
-  services: string[];
+  services: Service[];
   crNumber: string;
   socialLink: string;
   applicantNote: string;
@@ -34,7 +35,6 @@ const initialState: FormState = {
 export default function SignupWizard() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(initialState);
-  const [serviceInput, setServiceInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -47,17 +47,6 @@ export default function SignupWizard() {
   function toggle(key: "subcategories" | "areas", value: string) {
     const current = form[key];
     update(key, current.includes(value) ? current.filter((v) => v !== value) : [...current, value]);
-  }
-
-  function addService() {
-    if (serviceInput.trim()) {
-      update("services", [...form.services, serviceInput.trim()]);
-      setServiceInput("");
-    }
-  }
-
-  function removeService(i: number) {
-    update("services", form.services.filter((_, idx) => idx !== i));
   }
 
   function validateStep(): string | null {
@@ -220,34 +209,11 @@ export default function SignupWizard() {
 
       {step === 2 && (
         <div>
-          <Field label="Add a service" hint="e.g. Ceramic coating — from BHD 80">
-            <div className="flex gap-2">
-              <input
-                className="input"
-                value={serviceInput}
-                onChange={(e) => setServiceInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addService(); } }}
-              />
-              <button
-                type="button"
-                onClick={addService}
-                className="w-11 h-11 shrink-0 rounded-lg bg-navy text-white flex items-center justify-center hover:bg-navy-light transition-colors"
-              >
-                <Plus size={18} />
-              </button>
-            </div>
-          </Field>
-          <div className="mt-4 space-y-2">
-            {form.services.length === 0 && (
-              <p className="text-sm text-stone">No services added yet — optional, but recommended.</p>
-            )}
-            {form.services.map((s, i) => (
-              <div key={i} className="flex items-center justify-between bg-white rounded-lg px-4 py-2.5 text-sm">
-                <span className="text-ink">{s}</span>
-                <button onClick={() => removeService(i)} aria-label="Remove"><X size={15} className="text-stone" /></button>
-              </div>
-            ))}
-          </div>
+          <p className="text-sm text-stone -mt-1 mb-3">
+            Add each service separately with its own price — customers can scan a long list much
+            faster this way than a paragraph of text.
+          </p>
+          <ServicesEditor services={form.services} onChange={(services) => update("services", services)} />
         </div>
       )}
 
@@ -275,7 +241,11 @@ export default function SignupWizard() {
           <ReviewRow label="Services" value={form.subcategories.join(", ") || "None selected"} onEdit={() => setStep(1)} />
           <ReviewRow label="Areas" value={form.areas.join(", ") || "None selected"} onEdit={() => setStep(1)} />
           <ReviewRow label="Phone / WhatsApp" value={`${form.phone} / ${form.whatsapp}`} onEdit={() => setStep(1)} />
-          <ReviewRow label="Services listed" value={form.services.length ? form.services.join(", ") : "None"} onEdit={() => setStep(2)} />
+          <ReviewRow
+            label="Services listed"
+            value={form.services.length ? form.services.map((s) => s.price ? `${s.name} (BHD ${s.price})` : s.name).join(", ") : "None"}
+            onEdit={() => setStep(2)}
+          />
           <ReviewRow label="CR number" value={form.crNumber || "Not provided"} onEdit={() => setStep(3)} />
           <ReviewRow label="Social / website" value={form.socialLink || "Not provided"} onEdit={() => setStep(3)} />
           <p className="text-stone text-xs pt-2">

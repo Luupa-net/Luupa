@@ -11,7 +11,7 @@ type Business = {
   phone: string;
   whatsapp: string;
   description: string;
-  services: string[];
+  services: { name: string; price?: string }[];
   cr_number: string | null;
   social_link: string | null;
   applicant_note: string | null;
@@ -182,7 +182,9 @@ function BusinessCard({
       {b.services?.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3">
           {b.services.map((s, i) => (
-            <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-canvas2 text-ink/70">{s}</span>
+            <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-canvas2 text-ink/70">
+              {s.name}{s.price ? ` (BHD ${s.price})` : ""}
+            </span>
           ))}
         </div>
       )}
@@ -205,13 +207,22 @@ function BusinessCard({
             <CheckCircle2 size={15} /> Approve
           </button>
         )}
-        {!b.verified && (
+        {b.status !== "active" && !b.verified && (
           <button
             disabled={loading}
             onClick={() => onUpdate(b.id, "active", true)}
             className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border border-navy/30 text-navy hover:bg-navy/5 transition-colors disabled:opacity-60"
           >
             <ShieldCheck size={15} /> Approve + verify
+          </button>
+        )}
+        {b.status === "active" && (
+          <button
+            disabled={loading}
+            onClick={() => onUpdate(b.id, b.status, !b.verified)}
+            className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border border-navy/30 text-navy hover:bg-navy/5 transition-colors disabled:opacity-60"
+          >
+            <ShieldCheck size={15} /> {b.verified ? "Remove verified" : "Mark verified (paid)"}
           </button>
         )}
         {b.status !== "suspended" && (

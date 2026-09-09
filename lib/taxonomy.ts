@@ -10,3 +10,5 @@ export const SUBCATEGORIES = [
 ];
 
 export const AREAS = ["Manama", "Riffa", "Muharraq", "Isa Town", "Hamad Town"];
+
+export type Service = { name: string; price?: string };
