@@ -15,7 +15,7 @@ import LogoUploader from "@/components/LogoUploader";
 import CompletenessRing from "@/components/CompletenessRing";
 import {
   Clock, CheckCircle2, XCircle, Eye, BadgeCheck, ImageIcon, Wrench,
-  ShieldCheck, ExternalLink, User, FolderClock,
+  ShieldCheck, ExternalLink, User, FolderClock, Inbox, Mail, MailOpen, CalendarClock,
 } from "lucide-react";
 
 // Internal/verification info — never shown to customers, so no review needed.
@@ -23,6 +23,8 @@ const DIRECT_FIELDS = ["cr_number", "social_link", "applicant_note"] as const;
 
 const TABS = [
   { key: "Profile", icon: User },
+  { key: "Inbox", icon: Inbox },
+  { key: "Bookings", icon: CalendarClock },
   { key: "Photos", icon: ImageIcon },
   { key: "Services", icon: Wrench },
   { key: "Verification", icon: ShieldCheck },
@@ -36,6 +38,8 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("Profile");
+  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -51,11 +55,35 @@ export default function Dashboard() {
         setLiveRow(normalized);
         // Draft starts from whatever's pending, falling back to the live version
         setForm({ ...normalized, ...(normalized.pending_changes || {}) });
+
+        const { data: inq } = await supabase
+          .from("inquiries")
+          .select("*")
+          .eq("business_id", data.id)
+          .order("created_at", { ascending: false });
+        setInquiries(inq || []);
+
+        const { data: bks } = await supabase
+          .from("bookings")
+          .select("*")
+          .eq("business_id", data.id)
+          .order("created_at", { ascending: false });
+        setBookings(bks || []);
       }
       setLoading(false);
     }
     load();
   }, [router]);
+
+  async function markAsRead(inquiryId: string) {
+    setInquiries((prev) => prev.map((i) => (i.id === inquiryId ? { ...i, read: true } : i)));
+    await supabase.from("inquiries").update({ read: true }).eq("id", inquiryId);
+  }
+
+  async function respondToBooking(bookingId: string, status: "confirmed" | "declined") {
+    setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
+    await supabase.from("bookings").update({ status }).eq("id", bookingId);
+  }
 
   function toggle(key: "subcategories" | "areas", value: string) {
     const current: string[] = form[key] || [];
@@ -186,9 +214,9 @@ export default function Dashboard() {
         {/* Stats — icon-badge cards with real color, elevated against the tinted page background */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
           <StatCard icon={<Eye size={16} />} tint="navy" label="Profile views" value={liveRow.view_count ?? 0} />
-          <StatCard icon={<Wrench size={16} />} tint="terra" label="Services" value={(form.services || []).length} />
+          <StatCard icon={<Wrench size={16} />} tint="stone" label="Services" value={(form.services || []).length} />
           <StatCard icon={<ImageIcon size={16} />} tint="emerald" label="Photos" value={(form.photos || []).length} />
-          <StatCard icon={<CheckCircle2 size={16} />} tint="stone" label="Checklist done" value={`${items.filter(i => i.done).length}/${items.length}`} />
+          <StatCard icon={<Inbox size={16} />} tint="terra" label="Inquiries" value={inquiries.length} />
         </div>
 
         {/* Getting-started checklist — replaces the flat progress bar with something actionable */}
@@ -217,11 +245,25 @@ export default function Dashboard() {
               <button
                 key={key}
                 onClick={() => setTab(key)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors relative ${
                   tab === key ? "bg-navy text-white" : "text-ink/70 hover:bg-white"
                 }`}
               >
                 <Icon size={14} /> {key}
+                {key === "Inbox" && inquiries.filter((i) => !i.read).length > 0 && (
+                  <span className={`text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center ${
+                    tab === key ? "bg-white text-navy" : "bg-terra text-white"
+                  }`}>
+                    {inquiries.filter((i) => !i.read).length}
+                  </span>
+                )}
+                {key === "Bookings" && bookings.filter((b) => b.status === "pending").length > 0 && (
+                  <span className={`text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center ${
+                    tab === key ? "bg-white text-navy" : "bg-terra text-white"
+                  }`}>
+                    {bookings.filter((b) => b.status === "pending").length}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -268,6 +310,82 @@ export default function Dashboard() {
                   <Field label="Description" hint="Shown to customers, used for search matching">
                     <textarea className="input h-28 py-2" value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                   </Field>
+                </div>
+              )}
+
+              {tab === "Inbox" && (
+                <div className="space-y-2.5">
+                  {inquiries.length === 0 && (
+                    <p className="text-sm text-stone text-center py-8">No inquiries yet — they'll show up here the moment a customer reaches out.</p>
+                  )}
+                  {inquiries.map((inq) => (
+                    <button
+                      key={inq.id}
+                      type="button"
+                      onClick={() => !inq.read && markAsRead(inq.id)}
+                      className={`w-full text-left rounded-lg border p-4 transition-colors ${
+                        inq.read ? "border-stone-line bg-white" : "border-terra/30 bg-terra/5"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          {inq.read ? <MailOpen size={14} className="text-stone" /> : <Mail size={14} className="text-terra" />}
+                          <span className="font-medium text-ink text-sm">{inq.customer_name}</span>
+                        </div>
+                        <span className="text-xs text-stone shrink-0">{new Date(inq.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-sm text-stone mt-1">{inq.customer_contact}</p>
+                      {inq.message && <p className="text-sm text-ink/80 mt-1.5">{inq.message}</p>}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {tab === "Bookings" && (
+                <div className="space-y-2.5">
+                  {bookings.length === 0 && (
+                    <p className="text-sm text-stone text-center py-8">No booking requests yet — they'll show up here when a customer requests an appointment.</p>
+                  )}
+                  {bookings.map((bk) => (
+                    <div
+                      key={bk.id}
+                      className={`rounded-lg border p-4 ${
+                        bk.status === "pending" ? "border-terra/30 bg-terra/5" : "border-stone-line bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium text-ink text-sm">{bk.customer_name}</span>
+                        <BookingStatusPill status={bk.status} />
+                      </div>
+                      <p className="text-sm text-stone mt-1">{bk.customer_contact}</p>
+                      {bk.service && <p className="text-sm text-ink/80 mt-1">{bk.service}</p>}
+                      {(bk.preferred_date || bk.preferred_time) && (
+                        <p className="text-sm text-navy mt-1 font-medium">
+                          {bk.preferred_date ? new Date(bk.preferred_date).toLocaleDateString() : ""} {bk.preferred_time}
+                        </p>
+                      )}
+                      {bk.note && <p className="text-sm text-stone mt-1 italic">"{bk.note}"</p>}
+
+                      {bk.status === "pending" && (
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            type="button"
+                            onClick={() => respondToBooking(bk.id, "confirmed")}
+                            className="text-xs font-medium px-3 py-1.5 rounded-md bg-navy text-white hover:bg-navy-light transition-colors"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => respondToBooking(bk.id, "declined")}
+                            className="text-xs font-medium px-3 py-1.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -330,6 +448,15 @@ export default function Dashboard() {
       </div>
     </div>
   );
+}
+
+function BookingStatusPill({ status }: { status: string }) {
+  const config = {
+    pending: "bg-terra/15 text-terra-dim",
+    confirmed: "bg-emerald-100 text-emerald-700",
+    declined: "bg-stone-line text-stone",
+  }[status] ?? "bg-stone-line text-stone";
+  return <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize shrink-0 ${config}`}>{status}</span>;
 }
 
 function StatusBadge({ status }: { status: string }) {

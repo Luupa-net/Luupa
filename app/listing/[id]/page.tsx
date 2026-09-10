@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import { isEffectivelyVerified } from "@/lib/verification";
 import { BadgeCheck, Phone, MapPin, Clock } from "lucide-react";
 import { notFound } from "next/navigation";
+import RequestQuoteForm from "@/components/RequestQuoteForm";
+import BookingForm from "@/components/BookingForm";
 
 export default async function ListingPage({ params }: { params: Promise<{ id: string }> }) {
   // Next.js 15+: params is now a Promise and must be awaited
@@ -74,6 +76,8 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
               Message on WhatsApp
             </a>
           )}
+          <RequestQuoteForm businessId={listing.id} />
+          <BookingForm businessId={listing.id} services={listing.services} />
         </div>
 
         {listing.services && listing.services.length > 0 && (

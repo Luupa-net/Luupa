@@ -34,6 +34,7 @@ create table inquiries (
   customer_name text,
   customer_contact text,
   message text,
+  read boolean default false,
   created_at timestamptz default now()
 );
 
@@ -139,3 +140,43 @@ create policy "Owners can view their own inquiries"
 create policy "Anyone can submit an inquiry"
   on inquiries for insert
   with check (true);
+
+-- Business owners can mark their own inquiries as read
+create policy "Owners can update their own inquiries"
+  on inquiries for update
+  using (
+    business_id in (select id from businesses where owner_id = auth.uid())
+  );
+
+-- Booking requests — customer requests a date/time, business confirms or
+-- declines. Not a live slot-blocking calendar yet, human-reviewed for now.
+create table bookings (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid references businesses(id) not null,
+  customer_name text not null,
+  customer_contact text not null,
+  service text,
+  preferred_date date,
+  preferred_time text,
+  note text,
+  status text default 'pending' check (status in ('pending', 'confirmed', 'declined')),
+  created_at timestamptz default now()
+);
+
+alter table bookings enable row level security;
+
+create policy "Anyone can submit a booking request"
+  on bookings for insert
+  with check (true);
+
+create policy "Owners can view their own bookings"
+  on bookings for select
+  using (
+    business_id in (select id from businesses where owner_id = auth.uid())
+  );
+
+create policy "Owners can update their own bookings"
+  on bookings for update
+  using (
+    business_id in (select id from businesses where owner_id = auth.uid())
+  );
