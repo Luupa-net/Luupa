@@ -3,9 +3,16 @@ import HeroSearch from "@/components/HeroSearch";
 import HeroImage from "@/components/HeroImage";
 import SlidingPrompts from "@/components/SlidingPrompts";
 import ComingSoon from "@/components/ComingSoon";
-import ListingCard, { Listing } from "@/components/ListingCard";
+import FeaturedCard from "@/components/FeaturedCard";
+import type { Listing } from "@/components/ListingCard";
 import { supabase } from "@/lib/supabase";
 import { ArrowUpRight } from "lucide-react";
+
+// PERMANENT FIX for the "changes don't show up" bug: without this, Next.js
+// treats this page as static and bakes it in at build/deploy time, so any
+// database change (new business, edited listing) never shows until the next
+// deploy. This forces a fresh database read on every single visit instead.
+export const revalidate = 0;
 
 export default async function HomePage() {
   // Real featured businesses — verified ones first, then featured tier, active only
@@ -15,7 +22,7 @@ export default async function HomePage() {
     .eq("status", "active")
     .order("verified", { ascending: false })
     .order("tier", { ascending: false })
-    .limit(4);
+    .limit(8);
   const featured = (data ?? []) as Listing[];
 
   return (
@@ -60,9 +67,9 @@ export default async function HomePage() {
               </Link>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {featured.map((l) => (
-                <ListingCard key={l.id} listing={l} />
+                <FeaturedCard key={l.id} listing={l} />
               ))}
             </div>
           )}
