@@ -12,7 +12,12 @@ import { ArrowUpRight } from "lucide-react";
 // treats this page as static and bakes it in at build/deploy time, so any
 // database change (new business, edited listing) never shows until the next
 // deploy. This forces a fresh database read on every single visit instead.
-export const revalidate = 0;
+// FIX: revalidate=0 (no caching at all) was hitting the database on every
+// single visit — this is almost certainly what caused both the slowness and
+// the Supabase resource warning. A short 30-second window means the page is
+// served instantly from cache for most visitors, while still staying fresh
+// enough that a new/edited listing shows up within half a minute.
+export const revalidate = 30;
 
 export default async function HomePage() {
   // Real featured businesses — verified ones first, then featured tier, active only
