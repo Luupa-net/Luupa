@@ -16,3 +16,17 @@ export function isValidWhatsAppNumber(whatsapp: string): boolean {
   // reasonable range since businesses may occasionally list a non-Bahrain number
   return digits.length >= 10 && digits.length <= 15;
 }
+
+/**
+ * FIX: customers typing a booking/quote request almost always just type their
+ * local 8-digit number (e.g. "32011432"), with no country code. WhatsApp's
+ * wa.me links require the full international number to actually open a real
+ * chat — without it, the link silently fails instead of erroring loudly, which
+ * is exactly why "Send invoice" looked like it worked but nothing arrived.
+ * This adds Bahrain's country code automatically when it's missing.
+ */
+export function normalizeWhatsAppNumber(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 8) return `973${digits}`; // bare local number
+  return digits; // already has a country code (or something unusual) — leave it
+}

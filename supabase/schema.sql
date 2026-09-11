@@ -155,6 +155,7 @@ create table bookings (
   business_id uuid references businesses(id) not null,
   customer_name text not null,
   customer_contact text not null,
+  customer_email text,
   service text,
   preferred_date date,
   preferred_time text,

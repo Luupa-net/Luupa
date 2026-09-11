@@ -9,7 +9,7 @@ import { getMonthGrid, getWeekDays, addDays, addMonths, toKey, isSameDay, WEEKDA
 import ManualBookingForm from "@/components/ManualBookingForm";
 import BookingModal from "@/components/BookingModal";
 import {
-  ArrowLeft, ChevronLeft, ChevronRight, Plus, TrendingUp, TrendingDown, Minus,
+  ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Plus, TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
 
 type View = "month" | "week" | "day";
@@ -22,6 +22,7 @@ export default function BookingsPage() {
   const [anchor, setAnchor] = useState(new Date());
   const [showAddForm, setShowAddForm] = useState(false);
   const [selected, setSelected] = useState<any>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -100,12 +101,57 @@ export default function BookingsPage() {
 
         {/* Calendar */}
         <div className="mt-6 bg-white rounded-2xl border border-stone-line overflow-hidden">
-          <div className="flex items-center justify-between p-4 border-b border-stone-line">
-            <h2 className="font-display text-lg font-semibold text-ink">
+          <div className="flex items-center justify-between p-4 border-b border-stone-line relative">
+            <button
+              onClick={() => setShowDatePicker((s) => !s)}
+              className="flex items-center gap-1.5 font-display text-lg font-semibold text-ink hover:text-navy transition-colors"
+            >
               {view === "month" && anchor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
               {view === "week" && `Week of ${getWeekDays(anchor)[0].toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
               {view === "day" && anchor.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
-            </h2>
+              <ChevronDown size={15} className="text-stone" />
+            </button>
+
+            {showDatePicker && (
+              <div className="absolute top-full left-4 mt-1 bg-white rounded-xl border border-stone-line shadow-lg p-3 flex gap-2 z-20">
+                <select
+                  value={anchor.getMonth()}
+                  onChange={(e) => setAnchor(new Date(anchor.getFullYear(), Number(e.target.value), anchor.getDate()))}
+                  className="input text-sm"
+                >
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <option key={i} value={i}>{new Date(2000, i, 1).toLocaleDateString(undefined, { month: "long" })}</option>
+                  ))}
+                </select>
+                {view === "day" && (
+                  <select
+                    value={anchor.getDate()}
+                    onChange={(e) => setAnchor(new Date(anchor.getFullYear(), anchor.getMonth(), Number(e.target.value)))}
+                    className="input text-sm"
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                )}
+                <select
+                  value={anchor.getFullYear()}
+                  onChange={(e) => setAnchor(new Date(Number(e.target.value), anchor.getMonth(), anchor.getDate()))}
+                  className="input text-sm"
+                >
+                  {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 1 + i).map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setShowDatePicker(false)}
+                  className="text-sm font-medium px-3 py-2 rounded-lg bg-navy text-white"
+                >
+                  Go
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               {(["month", "week", "day"] as const).map((v) => (
                 <button

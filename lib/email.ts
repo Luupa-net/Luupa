@@ -53,3 +53,40 @@ export async function sendVerifiedEmail(to: string, businessName: string, verifi
     console.error("Failed to send verified email:", err);
   }
 }
+
+type InvoiceDetails = {
+  businessName: string;
+  customerName: string;
+  service?: string;
+  vehicle?: string;
+  amount?: string;
+  paymentMethod: "cash" | "card";
+};
+
+export async function sendInvoiceEmail(to: string, details: InvoiceDetails) {
+  if (!resend) return { sent: false, reason: "not_configured" };
+  try {
+    await resend.emails.send({
+      from: FROM,
+      to,
+      subject: `Invoice from ${details.businessName}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #152A4E;">Invoice from ${details.businessName}</h2>
+          <p>Hi ${details.customerName},</p>
+          <table style="width: 100%; margin: 16px 0; font-size: 14px;">
+            ${details.service ? `<tr><td style="color:#6B7280; padding:4px 0;">Service</td><td style="text-align:right; font-weight:600;">${details.service}</td></tr>` : ""}
+            ${details.vehicle ? `<tr><td style="color:#6B7280; padding:4px 0;">Vehicle</td><td style="text-align:right;">${details.vehicle}</td></tr>` : ""}
+            ${details.amount ? `<tr><td style="color:#6B7280; padding:4px 0;">Total</td><td style="text-align:right; font-weight:600;">BHD ${details.amount}</td></tr>` : ""}
+            <tr><td style="color:#6B7280; padding:4px 0;">Payment</td><td style="text-align:right;">${details.paymentMethod === "cash" ? "Cash" : "Card"}</td></tr>
+          </table>
+          <p style="color:#6B7280; font-size:13px; margin-top:24px;">Thank you for choosing ${details.businessName}, sent via Luupa.</p>
+        </div>
+      `,
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error("Failed to send invoice email:", err);
+    return { sent: false, reason: "send_failed" };
+  }
+}

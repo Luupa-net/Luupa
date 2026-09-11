@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { normalizeWhatsAppNumber } from "@/lib/validation";
+import BookingStepper from "@/components/BookingStepper";
 import {
-  X, UserCheck, Wrench, CheckCircle2, CircleDollarSign, Send, Car,
+  X, UserCheck, Wrench, CheckCircle2, CircleDollarSign, Car,
+  Mail, MessageCircle, Loader2, Check,
 } from "lucide-react";
 
 export default function BookingModal({
@@ -20,6 +23,8 @@ export default function BookingModal({
   const [bk, setBk] = useState(booking);
   const [amount, setAmount] = useState("");
   const [saving, setSaving] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailResult, setEmailResult] = useState<"sent" | "not_configured" | "failed" | null>(null);
 
   function apply(changes: Record<string, any>) {
     setBk((prev: any) => ({ ...prev, ...changes }));
@@ -32,27 +37,69 @@ export default function BookingModal({
       vehicle_make: bk.vehicle_make,
       vehicle_model: bk.vehicle_model,
       vehicle_plate: bk.vehicle_plate,
+      customer_email: bk.customer_email,
       note: bk.note,
     }).eq("id", bk.id);
     setSaving(false);
-    onUpdate(bk.id, { vehicle_make: bk.vehicle_make, vehicle_model: bk.vehicle_model, vehicle_plate: bk.vehicle_plate, note: bk.note });
+    onUpdate(bk.id, {
+      vehicle_make: bk.vehicle_make, vehicle_model: bk.vehicle_model,
+      vehicle_plate: bk.vehicle_plate, customer_email: bk.customer_email, note: bk.note,
+    });
   }
 
-  function sendInvoice(method: "cash" | "card") {
+  function invoiceLines(method: "cash" | "card") {
+    const vehicle = bk.vehicle_make || bk.vehicle_model
+      ? `${bk.vehicle_make || ""} ${bk.vehicle_model || ""}${bk.vehicle_plate ? ` (${bk.vehicle_plate})` : ""}`.trim()
+      : "";
+    return { vehicle };
+  }
+
+  function sendWhatsAppInvoice(method: "cash" | "card") {
     apply({ payment_method: method, paid: true });
+    const { vehicle } = invoiceLines(method);
     const lines = [
       `Invoice from ${businessName}`,
       `Customer: ${bk.customer_name}`,
       bk.service ? `Service: ${bk.service}` : "",
-      bk.vehicle_make || bk.vehicle_model ? `Vehicle: ${bk.vehicle_make || ""} ${bk.vehicle_model || ""}${bk.vehicle_plate ? ` (${bk.vehicle_plate})` : ""}` : "",
+      vehicle ? `Vehicle: ${vehicle}` : "",
       amount ? `Total: BHD ${amount}` : "",
       `Payment: ${method === "cash" ? "Cash" : "Card"}`,
       ``,
       `Thank you for choosing ${businessName}!`,
     ].filter(Boolean).join("\n");
 
-    const digits = (bk.customer_contact || "").replace(/\D/g, "");
-    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(lines)}`, "_blank");
+    const number = normalizeWhatsAppNumber(bk.customer_contact || "");
+    window.open(`https://wa.me/${number}?text=${encodeURIComponent(lines)}`, "_blank");
+  }
+
+  async function sendEmailInvoice(method: "cash" | "card") {
+    if (!bk.customer_email) return;
+    apply({ payment_method: method, paid: true });
+    setSendingEmail(true);
+    setEmailResult(null);
+    const { vehicle } = invoiceLines(method);
+    const { data: { session } } = await supabase.auth.getSession();
+
+    try {
+      const res = await fetch("/api/send-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          to: bk.customer_email,
+          businessName,
+          customerName: bk.customer_name,
+          service: bk.service,
+          vehicle,
+          amount,
+          paymentMethod: method,
+        }),
+      });
+      const result = await res.json();
+      setEmailResult(result.sent ? "sent" : result.reason === "not_configured" ? "not_configured" : "failed");
+    } catch {
+      setEmailResult("failed");
+    }
+    setSendingEmail(false);
   }
 
   const btn = "flex items-center gap-1.5 text-sm font-medium px-4 py-2.5 rounded-lg transition-colors";
@@ -60,9 +107,14 @@ export default function BookingModal({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b border-stone-line">
-          <h3 className="font-display text-lg font-semibold text-ink">{bk.customer_name}</h3>
-          <button onClick={onClose} aria-label="Close"><X size={18} className="text-stone" /></button>
+        <div className="sticky top-0 bg-navy px-6 py-5 rounded-t-2xl sm:rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <h3 className="font-display text-xl font-semibold text-white">{bk.customer_name}</h3>
+            <button onClick={onClose} aria-label="Close"><X size={18} className="text-white/70 hover:text-white" /></button>
+          </div>
+          <div className="mt-4">
+            <BookingStepper status={bk.status} />
+          </div>
         </div>
 
         <div className="p-6 space-y-5">
@@ -84,6 +136,18 @@ export default function BookingModal({
             <input placeholder="Plate number" value={bk.vehicle_plate || ""} onChange={(e) => setBk({ ...bk, vehicle_plate: e.target.value })} className="input mt-2.5" />
           </div>
 
+          {/* Customer email, for the email invoice option */}
+          <div>
+            <p className="flex items-center gap-1.5 text-sm font-medium text-ink mb-2"><Mail size={14} /> Customer email</p>
+            <input
+              type="email"
+              placeholder="Optional — needed to send an email invoice"
+              value={bk.customer_email || ""}
+              onChange={(e) => setBk({ ...bk, customer_email: e.target.value })}
+              className="input"
+            />
+          </div>
+
           {/* Notes */}
           <div>
             <p className="text-sm font-medium text-ink mb-2">Notes</p>
@@ -101,9 +165,9 @@ export default function BookingModal({
 
           <div className="h-px bg-stone-line" />
 
-          {/* Status workflow */}
+          {/* Status actions — the stepper up top shows where things stand, these move it forward */}
           <div>
-            <p className="text-sm font-medium text-ink mb-2">Status</p>
+            <p className="text-sm font-medium text-ink mb-2">Update status</p>
             <div className="flex flex-wrap gap-2">
               {bk.status === "pending" && (
                 <>
@@ -124,8 +188,8 @@ export default function BookingModal({
               {bk.status === "in_progress" && (
                 <button onClick={() => apply({ status: "completed" })} className={`${btn} bg-navy text-white`}><CheckCircle2 size={14} /> Mark completed</button>
               )}
-              {!["pending", "declined", "no_show", "cancelled"].includes(bk.status) && (
-                <span className="text-xs text-stone self-center capitalize">Current: {bk.status.replace("_", " ")}</span>
+              {["declined", "no_show", "cancelled", "completed"].includes(bk.status) && (
+                <span className="text-xs text-stone self-center">Nothing further to do here.</span>
               )}
             </div>
           </div>
@@ -142,13 +206,42 @@ export default function BookingModal({
                   placeholder="Amount (BHD, optional)"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="input mb-2.5"
+                  className="input mb-3"
                 />
-                <div className="flex gap-2">
-                  <button onClick={() => sendInvoice("cash")} className={`${btn} bg-canvas2 text-ink flex-1 justify-center`}>Cash</button>
-                  <button onClick={() => sendInvoice("card")} className={`${btn} bg-canvas2 text-ink flex-1 justify-center`}>Card</button>
+
+                <p className="text-xs text-stone mb-1.5 flex items-center gap-1"><MessageCircle size={11} /> Send invoice via WhatsApp</p>
+                <div className="flex gap-2 mb-3">
+                  <button onClick={() => sendWhatsAppInvoice("cash")} className={`${btn} bg-canvas2 text-ink flex-1 justify-center`}>Cash</button>
+                  <button onClick={() => sendWhatsAppInvoice("card")} className={`${btn} bg-canvas2 text-ink flex-1 justify-center`}>Card</button>
                 </div>
-                <p className="text-xs text-stone mt-2 flex items-center gap-1"><Send size={11} /> Sends an invoice message straight to their WhatsApp.</p>
+
+                <p className="text-xs text-stone mb-1.5 flex items-center gap-1"><Mail size={11} /> Or send by email</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => sendEmailInvoice("cash")}
+                    disabled={!bk.customer_email || sendingEmail}
+                    className={`${btn} bg-canvas2 text-ink flex-1 justify-center disabled:opacity-40`}
+                  >
+                    {sendingEmail ? <Loader2 size={14} className="animate-spin" /> : "Cash"}
+                  </button>
+                  <button
+                    onClick={() => sendEmailInvoice("card")}
+                    disabled={!bk.customer_email || sendingEmail}
+                    className={`${btn} bg-canvas2 text-ink flex-1 justify-center disabled:opacity-40`}
+                  >
+                    {sendingEmail ? <Loader2 size={14} className="animate-spin" /> : "Card"}
+                  </button>
+                </div>
+                {!bk.customer_email && <p className="text-xs text-stone mt-1.5">Add a customer email above to enable this.</p>}
+                {emailResult === "sent" && (
+                  <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1"><Check size={12} /> Email sent.</p>
+                )}
+                {emailResult === "not_configured" && (
+                  <p className="text-xs text-terra-dim mt-1.5">Email sending isn't set up yet on this account.</p>
+                )}
+                {emailResult === "failed" && (
+                  <p className="text-xs text-red-600 mt-1.5">Couldn't send that email — try WhatsApp instead for now.</p>
+                )}
               </div>
             </>
           )}
