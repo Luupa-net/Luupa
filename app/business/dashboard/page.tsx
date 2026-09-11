@@ -80,11 +80,6 @@ export default function Dashboard() {
     await supabase.from("inquiries").update({ read: true }).eq("id", inquiryId);
   }
 
-  async function respondToBooking(bookingId: string, status: "confirmed" | "declined") {
-    setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
-    await supabase.from("bookings").update({ status }).eq("id", bookingId);
-  }
-
   function toggle(key: "subcategories" | "areas", value: string) {
     const current: string[] = form[key] || [];
     setForm({
@@ -342,50 +337,19 @@ export default function Dashboard() {
               )}
 
               {tab === "Bookings" && (
-                <div className="space-y-2.5">
-                  {bookings.length === 0 && (
-                    <p className="text-sm text-stone text-center py-8">No booking requests yet — they'll show up here when a customer requests an appointment.</p>
-                  )}
-                  {bookings.map((bk) => (
-                    <div
-                      key={bk.id}
-                      className={`rounded-lg border p-4 ${
-                        bk.status === "pending" ? "border-terra/30 bg-terra/5" : "border-stone-line bg-white"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium text-ink text-sm">{bk.customer_name}</span>
-                        <BookingStatusPill status={bk.status} />
-                      </div>
-                      <p className="text-sm text-stone mt-1">{bk.customer_contact}</p>
-                      {bk.service && <p className="text-sm text-ink/80 mt-1">{bk.service}</p>}
-                      {(bk.preferred_date || bk.preferred_time) && (
-                        <p className="text-sm text-navy mt-1 font-medium">
-                          {bk.preferred_date ? new Date(bk.preferred_date).toLocaleDateString() : ""} {bk.preferred_time}
-                        </p>
-                      )}
-                      {bk.note && <p className="text-sm text-stone mt-1 italic">"{bk.note}"</p>}
-
-                      {bk.status === "pending" && (
-                        <div className="flex gap-2 mt-3">
-                          <button
-                            type="button"
-                            onClick={() => respondToBooking(bk.id, "confirmed")}
-                            className="text-xs font-medium px-3 py-1.5 rounded-md bg-navy text-white hover:bg-navy-light transition-colors"
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => respondToBooking(bk.id, "declined")}
-                            className="text-xs font-medium px-3 py-1.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div className="text-center py-6">
+                  <p className="font-display text-3xl font-semibold text-ink">
+                    {bookings.filter((b) => b.status === "pending").length}
+                  </p>
+                  <p className="text-sm text-stone mt-1">
+                    {bookings.filter((b) => b.status === "pending").length === 1 ? "request" : "requests"} awaiting your response
+                  </p>
+                  <Link
+                    href="/business/bookings"
+                    className="inline-block mt-5 px-6 py-3 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim transition-colors"
+                  >
+                    Open bookings
+                  </Link>
                 </div>
               )}
 
@@ -448,15 +412,6 @@ export default function Dashboard() {
       </div>
     </div>
   );
-}
-
-function BookingStatusPill({ status }: { status: string }) {
-  const config = {
-    pending: "bg-terra/15 text-terra-dim",
-    confirmed: "bg-emerald-100 text-emerald-700",
-    declined: "bg-stone-line text-stone",
-  }[status] ?? "bg-stone-line text-stone";
-  return <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize shrink-0 ${config}`}>{status}</span>;
 }
 
 function StatusBadge({ status }: { status: string }) {

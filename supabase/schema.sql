@@ -159,7 +159,9 @@ create table bookings (
   preferred_date date,
   preferred_time text,
   note text,
-  status text default 'pending' check (status in ('pending', 'confirmed', 'declined')),
+  status text default 'pending' check (status in ('pending', 'confirmed', 'declined', 'arrived', 'in_progress', 'completed', 'no_show', 'cancelled')),
+  paid boolean default false,
+  source text default 'luupa' check (source in ('luupa', 'manual')),
   created_at timestamptz default now()
 );
 
