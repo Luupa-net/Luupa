@@ -56,18 +56,14 @@ export default function Dashboard() {
         // Draft starts from whatever's pending, falling back to the live version
         setForm({ ...normalized, ...(normalized.pending_changes || {}) });
 
-        const { data: inq } = await supabase
-          .from("inquiries")
-          .select("*")
-          .eq("business_id", data.id)
-          .order("created_at", { ascending: false });
+        // PERFORMANCE FIX: these two don't depend on each other, so running
+        // them at the same time instead of one-after-another is a large part
+        // of why the dashboard was taking so long to load.
+        const [{ data: inq }, { data: bks }] = await Promise.all([
+          supabase.from("inquiries").select("*").eq("business_id", data.id).order("created_at", { ascending: false }),
+          supabase.from("bookings").select("*").eq("business_id", data.id).order("created_at", { ascending: false }),
+        ]);
         setInquiries(inq || []);
-
-        const { data: bks } = await supabase
-          .from("bookings")
-          .select("*")
-          .eq("business_id", data.id)
-          .order("created_at", { ascending: false });
         setBookings(bks || []);
       }
       setLoading(false);

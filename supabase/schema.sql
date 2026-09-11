@@ -162,6 +162,10 @@ create table bookings (
   status text default 'pending' check (status in ('pending', 'confirmed', 'declined', 'arrived', 'in_progress', 'completed', 'no_show', 'cancelled')),
   paid boolean default false,
   source text default 'luupa' check (source in ('luupa', 'manual')),
+  vehicle_make text,
+  vehicle_model text,
+  vehicle_plate text,
+  payment_method text check (payment_method in ('cash', 'card')),
   created_at timestamptz default now()
 );
 
