@@ -32,7 +32,7 @@ export default function BookingsPage() {
         router.push("/business/login");
         return;
       }
-      const { data: biz } = await supabase.from("businesses").select("id, name").eq("owner_id", user.id).single();
+      const { data: biz } = await supabase.from("businesses").select("id, name, payment_qr_url").eq("owner_id", user.id).single();
       if (biz) {
         setBusiness(biz);
         const { data: bks } = await supabase
@@ -196,6 +196,7 @@ export default function BookingsPage() {
         <BookingModal
           booking={selected}
           businessName={business.name}
+          paymentQrUrl={business.payment_qr_url}
           onUpdate={updateBooking}
           onClose={() => setSelected(null)}
         />

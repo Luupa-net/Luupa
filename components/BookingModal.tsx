@@ -4,6 +4,8 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
 import BookingStepper from "@/components/BookingStepper";
+import PlateInput from "@/components/PlateInput";
+import PhoneInput from "@/components/PhoneInput";
 import {
   X, UserCheck, Wrench, CheckCircle2, CircleDollarSign, Car,
   Mail, MessageCircle, Loader2, Check,
@@ -12,11 +14,13 @@ import {
 export default function BookingModal({
   booking,
   businessName,
+  paymentQrUrl,
   onUpdate,
   onClose,
 }: {
   booking: any;
   businessName: string;
+  paymentQrUrl?: string | null;
   onUpdate: (id: string, changes: Record<string, any>) => void;
   onClose: () => void;
 }) {
@@ -38,12 +42,14 @@ export default function BookingModal({
       vehicle_model: bk.vehicle_model,
       vehicle_plate: bk.vehicle_plate,
       customer_email: bk.customer_email,
+      customer_contact: bk.customer_contact,
       note: bk.note,
     }).eq("id", bk.id);
     setSaving(false);
     onUpdate(bk.id, {
       vehicle_make: bk.vehicle_make, vehicle_model: bk.vehicle_model,
-      vehicle_plate: bk.vehicle_plate, customer_email: bk.customer_email, note: bk.note,
+      vehicle_plate: bk.vehicle_plate, customer_email: bk.customer_email,
+      customer_contact: bk.customer_contact, note: bk.note,
     });
   }
 
@@ -64,6 +70,7 @@ export default function BookingModal({
       vehicle ? `Vehicle: ${vehicle}` : "",
       amount ? `Total: BHD ${amount}` : "",
       `Payment: ${method === "cash" ? "Cash" : "Card"}`,
+      paymentQrUrl ? `\nPay via BenefitPay: ${paymentQrUrl}` : "",
       ``,
       `Thank you for choosing ${businessName}!`,
     ].filter(Boolean).join("\n");
@@ -92,6 +99,7 @@ export default function BookingModal({
           vehicle,
           amount,
           paymentMethod: method,
+          qrUrl: paymentQrUrl,
         }),
       });
       const result = await res.json();
@@ -118,9 +126,13 @@ export default function BookingModal({
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Contact + appointment info */}
+          {/* Contact — editable, since a correct country code is what makes the WhatsApp invoice actually send */}
+          <div>
+            <p className="text-xs text-stone mb-1">Contact</p>
+            <PhoneInput value={bk.customer_contact || ""} onChange={(v) => setBk({ ...bk, customer_contact: v })} />
+          </div>
+
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <Info label="Contact" value={bk.customer_contact} />
             <Info label="Service" value={bk.service || "—"} />
             <Info label="Date" value={bk.preferred_date ? new Date(bk.preferred_date).toLocaleDateString() : "—"} />
             <Info label="Time" value={bk.preferred_time || "—"} />
@@ -133,7 +145,9 @@ export default function BookingModal({
               <input placeholder="Make" value={bk.vehicle_make || ""} onChange={(e) => setBk({ ...bk, vehicle_make: e.target.value })} className="input" />
               <input placeholder="Model" value={bk.vehicle_model || ""} onChange={(e) => setBk({ ...bk, vehicle_model: e.target.value })} className="input" />
             </div>
-            <input placeholder="Plate number" value={bk.vehicle_plate || ""} onChange={(e) => setBk({ ...bk, vehicle_plate: e.target.value })} className="input mt-2.5" />
+            <div className="mt-2.5">
+              <PlateInput value={bk.vehicle_plate || ""} onChange={(formatted) => setBk({ ...bk, vehicle_plate: formatted })} />
+            </div>
           </div>
 
           {/* Customer email, for the email invoice option */}
@@ -202,6 +216,9 @@ export default function BookingModal({
                 <p className="flex items-center gap-1.5 text-sm font-medium text-ink mb-2">
                   <CircleDollarSign size={14} /> Payment {bk.paid && <span className="text-emerald-600 text-xs">· Paid ({bk.payment_method})</span>}
                 </p>
+                {paymentQrUrl && (
+                  <p className="text-xs text-navy mb-2">Your BenefitPay QR code will be included automatically.</p>
+                )}
                 <input
                   placeholder="Amount (BHD, optional)"
                   value={amount}

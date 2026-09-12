@@ -18,6 +18,7 @@ type FormState = {
   name: string;
   subcategories: string[];
   areas: string[];
+  isMobile: boolean;
   phone: string;
   whatsapp: string;
   hours: string;
@@ -29,7 +30,7 @@ type FormState = {
 };
 
 const initialState: FormState = {
-  email: "", emailConfirm: "", password: "", name: "", subcategories: [], areas: [],
+  email: "", emailConfirm: "", password: "", name: "", subcategories: [], areas: [], isMobile: false,
   phone: "", whatsapp: "", hours: "", description: "", services: [],
   crNumber: "", socialLink: "", applicantNote: "",
 };
@@ -101,6 +102,7 @@ export default function SignupWizard() {
         name: form.name,
         subcategories: form.subcategories,
         areas: form.areas,
+        is_mobile: form.isMobile,
         phone: form.phone,
         whatsapp: form.whatsapp,
         hours: form.hours,
@@ -196,8 +198,21 @@ export default function SignupWizard() {
             </div>
           </div>
 
+          <label className="flex items-start gap-2.5 rounded-lg border border-stone-line px-4 py-3.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.isMobile}
+              onChange={(e) => update("isMobile", e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="text-sm font-medium text-ink block">We come to you</span>
+              <span className="text-xs text-stone">Mobile service, no fixed shop — we travel to the customer</span>
+            </span>
+          </label>
+
           <div>
-            <span className="text-sm font-medium text-ink">Areas you serve</span>
+            <span className="text-sm font-medium text-ink">{form.isMobile ? "Areas you travel to" : "Areas you serve"}</span>
             <span className="block text-xs text-stone mt-0.5 mb-2">Select all that apply</span>
             <div className="flex flex-wrap gap-2">
               {AREAS.map((a) => (
@@ -256,6 +271,7 @@ export default function SignupWizard() {
           <ReviewRow label="Business name" value={form.name} onEdit={() => setStep(1)} />
           <ReviewRow label="Services" value={form.subcategories.join(", ") || "None selected"} onEdit={() => setStep(1)} />
           <ReviewRow label="Areas" value={form.areas.join(", ") || "None selected"} onEdit={() => setStep(1)} />
+          <ReviewRow label="Service type" value={form.isMobile ? "Mobile — comes to customer" : "Fixed location"} onEdit={() => setStep(1)} />
           <ReviewRow label="Phone / WhatsApp" value={`${form.phone} / ${form.whatsapp}`} onEdit={() => setStep(1)} />
           <ReviewRow
             label="Services listed"

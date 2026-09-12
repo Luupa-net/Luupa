@@ -61,6 +61,7 @@ type InvoiceDetails = {
   vehicle?: string;
   amount?: string;
   paymentMethod: "cash" | "card";
+  qrUrl?: string;
 };
 
 export async function sendInvoiceEmail(to: string, details: InvoiceDetails) {
@@ -80,6 +81,12 @@ export async function sendInvoiceEmail(to: string, details: InvoiceDetails) {
             ${details.amount ? `<tr><td style="color:#6B7280; padding:4px 0;">Total</td><td style="text-align:right; font-weight:600;">BHD ${details.amount}</td></tr>` : ""}
             <tr><td style="color:#6B7280; padding:4px 0;">Payment</td><td style="text-align:right;">${details.paymentMethod === "cash" ? "Cash" : "Card"}</td></tr>
           </table>
+          ${details.qrUrl ? `
+            <div style="text-align:center; margin: 20px 0; padding: 16px; background:#F7F6F3; border-radius: 12px;">
+              <p style="font-size: 13px; color:#6B7280; margin: 0 0 10px 0;">Pay via BenefitPay</p>
+              <img src="${details.qrUrl}" alt="BenefitPay QR code" style="max-width: 160px; border-radius: 8px;" />
+            </div>
+          ` : ""}
           <p style="color:#6B7280; font-size:13px; margin-top:24px;">Thank you for choosing ${details.businessName}, sent via Luupa.</p>
         </div>
       `,

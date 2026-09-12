@@ -13,13 +13,14 @@ import ServicesEditor from "@/components/ServicesEditor";
 import PhotoUploader from "@/components/PhotoUploader";
 import LogoUploader from "@/components/LogoUploader";
 import CompletenessRing from "@/components/CompletenessRing";
+import PaymentQRUploader from "@/components/PaymentQRUploader";
 import {
   Clock, CheckCircle2, XCircle, Eye, BadgeCheck, ImageIcon, Wrench,
   ShieldCheck, ExternalLink, User, FolderClock, Inbox, Mail, MailOpen, CalendarClock,
 } from "lucide-react";
 
 // Internal/verification info — never shown to customers, so no review needed.
-const DIRECT_FIELDS = ["cr_number", "social_link", "applicant_note"] as const;
+const DIRECT_FIELDS = ["cr_number", "social_link", "applicant_note", "payment_qr_url"] as const;
 
 const TABS = [
   { key: "Profile", icon: User },
@@ -279,8 +280,20 @@ export default function Dashboard() {
                       ))}
                     </div>
                   </div>
+                  <label className="flex items-start gap-2.5 rounded-lg border border-stone-line px-4 py-3.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.is_mobile || false}
+                      onChange={(e) => setForm({ ...form, is_mobile: e.target.checked })}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="text-sm font-medium text-ink block">We come to you</span>
+                      <span className="text-xs text-stone">Mobile service, no fixed shop</span>
+                    </span>
+                  </label>
                   <div>
-                    <span className="text-sm font-medium text-ink">Areas you serve</span>
+                    <span className="text-sm font-medium text-ink">{form.is_mobile ? "Areas you travel to" : "Areas you serve"}</span>
                     <div className="flex flex-wrap gap-2 mt-2">
                       {AREAS.map((a) => (
                         <Chip key={a} label={a} active={form.areas.includes(a)} onClick={() => toggle("areas", a)} />
@@ -373,6 +386,12 @@ export default function Dashboard() {
                   <Field label="Instagram or website">
                     <input className="input" value={form.social_link || ""} onChange={(e) => setForm({ ...form, social_link: e.target.value })} />
                   </Field>
+
+                  <PaymentQRUploader
+                    ownerId={form.owner_id}
+                    qrUrl={form.payment_qr_url}
+                    onChange={(payment_qr_url) => setForm({ ...form, payment_qr_url })}
+                  />
 
                   {!verified && (
                     <div className="rounded-xl bg-navy/5 border border-navy/10 px-5 py-4 flex items-start gap-3">

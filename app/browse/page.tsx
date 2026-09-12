@@ -2,7 +2,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import ListingCard, { Listing } from "@/components/ListingCard";
 import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, Car } from "lucide-react";
 
 // SECURITY: the search query gets pasted into a raw PostgREST filter string
 // below — without escaping, someone could put a comma or parenthesis in the
@@ -14,7 +14,7 @@ function sanitizeSearchTerm(input: string): string {
 export default async function BrowsePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sub?: string; area?: string; verified?: string }>;
+  searchParams: Promise<{ q?: string; sub?: string; area?: string; verified?: string; mobile?: string }>;
 }) {
   // Next.js 15+: searchParams is now a Promise and must be awaited
   const params = await searchParams;
@@ -30,6 +30,9 @@ export default async function BrowsePage({
   if (params.verified === "true") {
     // Only businesses whose verification hasn't expired — no expiry set, or expiry still in the future
     query = query.eq("verified", true).or(`verified_until.is.null,verified_until.gt.${new Date().toISOString()}`);
+  }
+  if (params.mobile === "true") {
+    query = query.eq("is_mobile", true);
   }
 
   // Verified businesses surface first by default, then higher tiers
@@ -59,6 +62,16 @@ export default async function BrowsePage({
         >
           <BadgeCheck size={14} /> Verified only
         </Link>
+        <Link
+          href={params.mobile === "true" ? "/browse" : "/browse?mobile=true"}
+          className={`shrink-0 flex items-center gap-1 text-sm px-4 py-2 rounded-full border-2 whitespace-nowrap ${
+            params.mobile === "true"
+              ? "bg-navy border-navy text-white font-semibold"
+              : "bg-white border-stone-line text-ink/70"
+          }`}
+        >
+          <Car size={14} /> Comes to you
+        </Link>
         {SUBCATEGORIES.map((s) => (
           <Link
             key={s}
@@ -85,6 +98,14 @@ export default async function BrowsePage({
               }`}
             >
               <BadgeCheck size={14} /> Verified only
+            </Link>
+            <Link
+              href={params.mobile === "true" ? "/browse" : "/browse?mobile=true"}
+              className={`flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg mt-1.5 ${
+                params.mobile === "true" ? "bg-navy text-white" : "bg-canvas2 text-ink"
+              }`}
+            >
+              <Car size={14} /> Comes to you
             </Link>
           </div>
           <div>

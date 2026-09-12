@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BadgeCheck, MapPin } from "lucide-react";
+import { BadgeCheck, MapPin, Car } from "lucide-react";
 import { isEffectivelyVerified } from "@/lib/verification";
 
 export type Listing = {
@@ -13,6 +13,7 @@ export type Listing = {
   featured: boolean;
   tier: "free" | "standard" | "featured";
   photos?: string[];
+  is_mobile?: boolean;
 };
 
 export default function ListingCard({ listing }: { listing: Listing }) {
@@ -45,8 +46,8 @@ export default function ListingCard({ listing }: { listing: Listing }) {
           <p className="text-sm text-ink/70 mt-2 leading-relaxed line-clamp-2">{listing.description}</p>
         )}
         <div className="flex items-center gap-1 text-xs text-stone mt-3">
-          <MapPin size={13} />
-          {(listing.areas || []).join(", ")}
+          {listing.is_mobile ? <Car size={13} /> : <MapPin size={13} />}
+          {listing.is_mobile ? `Comes to you — ${(listing.areas || []).join(", ")}` : (listing.areas || []).join(", ")}
         </div>
       </div>
     </Link>

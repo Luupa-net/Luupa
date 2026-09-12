@@ -15,12 +15,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 
-  const { to, businessName, customerName, service, vehicle, amount, paymentMethod } = await req.json();
+  const { to, businessName, customerName, service, vehicle, amount, paymentMethod, qrUrl } = await req.json();
 
   if (!to || !businessName || !customerName || !["cash", "card"].includes(paymentMethod)) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
-  const result = await sendInvoiceEmail(to, { businessName, customerName, service, vehicle, amount, paymentMethod });
+  const result = await sendInvoiceEmail(to, { businessName, customerName, service, vehicle, amount, paymentMethod, qrUrl });
   return NextResponse.json(result);
 }

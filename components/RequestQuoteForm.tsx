@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { MessageSquarePlus, Check } from "lucide-react";
+import PhoneInput from "@/components/PhoneInput";
 
 export default function RequestQuoteForm({ businessId }: { businessId: string }) {
   const [open, setOpen] = useState(false);
@@ -53,13 +54,7 @@ export default function RequestQuoteForm({ businessId }: { businessId: string })
         onChange={(e) => setName(e.target.value)}
         className="input"
       />
-      <input
-        required
-        placeholder="Phone or WhatsApp"
-        value={contact}
-        onChange={(e) => setContact(e.target.value)}
-        className="input"
-      />
+      <PhoneInput value={contact} onChange={setContact} placeholder="Phone or WhatsApp" />
       <textarea
         placeholder="What do you need? (optional)"
         value={message}

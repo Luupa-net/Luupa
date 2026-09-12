@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { CalendarPlus, Check } from "lucide-react";
+import PhoneInput from "@/components/PhoneInput";
 
 export default function BookingForm({
   businessId,
@@ -65,13 +66,7 @@ export default function BookingForm({
         onChange={(e) => setName(e.target.value)}
         className="input"
       />
-      <input
-        required
-        placeholder="Phone or WhatsApp"
-        value={contact}
-        onChange={(e) => setContact(e.target.value)}
-        className="input"
-      />
+      <PhoneInput value={contact} onChange={setContact} placeholder="Phone or WhatsApp" />
 
       {services && services.length > 0 ? (
         <select value={service} onChange={(e) => setService(e.target.value)} className="input">

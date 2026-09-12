@@ -17,6 +17,8 @@ create table businesses (
   services jsonb default '[]',
   photos jsonb default '[]',
   verified boolean default false,
+  is_mobile boolean default false,
+  payment_qr_url text,
   verified_until timestamptz,
   tier text default 'free' check (tier in ('free', 'standard', 'featured')),
   status text default 'pending' check (status in ('pending', 'active', 'suspended')),
@@ -35,6 +37,7 @@ create table inquiries (
   customer_contact text,
   message text,
   read boolean default false,
+  archived boolean default false,
   created_at timestamptz default now()
 );
 

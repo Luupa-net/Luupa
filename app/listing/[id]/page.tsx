@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { isEffectivelyVerified } from "@/lib/verification";
-import { BadgeCheck, Phone, MapPin, Clock } from "lucide-react";
+import { BadgeCheck, Phone, MapPin, Clock, Car } from "lucide-react";
 import { notFound } from "next/navigation";
 import RequestQuoteForm from "@/components/RequestQuoteForm";
 import BookingForm from "@/components/BookingForm";
@@ -62,7 +62,10 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
             {listing.phone && (
               <p className="flex items-center gap-2 text-stone"><Phone size={15}/> {listing.phone}</p>
             )}
-            <p className="flex items-center gap-2 text-stone"><MapPin size={15}/> {areas.join(", ")}</p>
+            <p className="flex items-center gap-2 text-stone">
+              {listing.is_mobile ? <Car size={15}/> : <MapPin size={15}/>}
+              {listing.is_mobile ? `Comes to you — serves ${areas.join(", ")}` : areas.join(", ")}
+            </p>
             {listing.hours && (
               <p className="flex items-center gap-2 text-stone"><Clock size={15}/> {listing.hours}</p>
             )}

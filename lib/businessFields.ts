@@ -5,5 +5,5 @@
 // silently merged in the moment an admin clicks Approve.
 export const PUBLIC_FIELDS = [
   "name", "logo_url", "subcategories", "areas", "phone", "whatsapp",
-  "hours", "description", "services", "photos",
+  "hours", "description", "services", "photos", "is_mobile",
 ] as const;
