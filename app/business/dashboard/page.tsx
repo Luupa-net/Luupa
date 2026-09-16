@@ -16,7 +16,7 @@ import CompletenessRing from "@/components/CompletenessRing";
 import PaymentQRUploader from "@/components/PaymentQRUploader";
 import {
   Clock, CheckCircle2, XCircle, Eye, BadgeCheck, ImageIcon, Wrench,
-  ShieldCheck, ExternalLink, User, FolderClock, Inbox, Mail, MailOpen, CalendarClock,
+  ShieldCheck, ExternalLink, User, FolderClock, Inbox,
 } from "lucide-react";
 
 // Internal/verification info — never shown to customers, so no review needed.
@@ -24,8 +24,6 @@ const DIRECT_FIELDS = ["cr_number", "social_link", "applicant_note", "payment_qr
 
 const TABS = [
   { key: "Profile", icon: User },
-  { key: "Inbox", icon: Inbox },
-  { key: "Bookings", icon: CalendarClock },
   { key: "Photos", icon: ImageIcon },
   { key: "Services", icon: Wrench },
   { key: "Verification", icon: ShieldCheck },
@@ -39,8 +37,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("Profile");
-  const [inquiries, setInquiries] = useState<any[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
+  const [inquiriesCount, setInquiriesCount] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -57,25 +54,17 @@ export default function Dashboard() {
         // Draft starts from whatever's pending, falling back to the live version
         setForm({ ...normalized, ...(normalized.pending_changes || {}) });
 
-        // PERFORMANCE FIX: these two don't depend on each other, so running
-        // them at the same time instead of one-after-another is a large part
-        // of why the dashboard was taking so long to load.
-        const [{ data: inq }, { data: bks }] = await Promise.all([
-          supabase.from("inquiries").select("*").eq("business_id", data.id).order("created_at", { ascending: false }),
-          supabase.from("bookings").select("*").eq("business_id", data.id).order("created_at", { ascending: false }),
-        ]);
-        setInquiries(inq || []);
-        setBookings(bks || []);
+        // Just a count now — the full inquiry list lives on its own page
+        const { count } = await supabase
+          .from("inquiries")
+          .select("*", { count: "exact", head: true })
+          .eq("business_id", data.id);
+        setInquiriesCount(count || 0);
       }
       setLoading(false);
     }
     load();
   }, [router]);
-
-  async function markAsRead(inquiryId: string) {
-    setInquiries((prev) => prev.map((i) => (i.id === inquiryId ? { ...i, read: true } : i)));
-    await supabase.from("inquiries").update({ read: true }).eq("id", inquiryId);
-  }
 
   function toggle(key: "subcategories" | "areas", value: string) {
     const current: string[] = form[key] || [];
@@ -208,7 +197,7 @@ export default function Dashboard() {
           <StatCard icon={<Eye size={16} />} tint="navy" label="Profile views" value={liveRow.view_count ?? 0} />
           <StatCard icon={<Wrench size={16} />} tint="stone" label="Services" value={(form.services || []).length} />
           <StatCard icon={<ImageIcon size={16} />} tint="emerald" label="Photos" value={(form.photos || []).length} />
-          <StatCard icon={<Inbox size={16} />} tint="terra" label="Inquiries" value={inquiries.length} />
+          <StatCard icon={<Inbox size={16} />} tint="terra" label="Inquiries" value={inquiriesCount} />
         </div>
 
         {/* Getting-started checklist — replaces the flat progress bar with something actionable */}
@@ -242,20 +231,6 @@ export default function Dashboard() {
                 }`}
               >
                 <Icon size={14} /> {key}
-                {key === "Inbox" && inquiries.filter((i) => !i.read).length > 0 && (
-                  <span className={`text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center ${
-                    tab === key ? "bg-white text-navy" : "bg-terra text-white"
-                  }`}>
-                    {inquiries.filter((i) => !i.read).length}
-                  </span>
-                )}
-                {key === "Bookings" && bookings.filter((b) => b.status === "pending").length > 0 && (
-                  <span className={`text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center ${
-                    tab === key ? "bg-white text-navy" : "bg-terra text-white"
-                  }`}>
-                    {bookings.filter((b) => b.status === "pending").length}
-                  </span>
-                )}
               </button>
             ))}
           </div>
@@ -314,51 +289,6 @@ export default function Dashboard() {
                   <Field label="Description" hint="Shown to customers, used for search matching">
                     <textarea className="input h-28 py-2" value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                   </Field>
-                </div>
-              )}
-
-              {tab === "Inbox" && (
-                <div className="space-y-2.5">
-                  {inquiries.length === 0 && (
-                    <p className="text-sm text-stone text-center py-8">No inquiries yet — they'll show up here the moment a customer reaches out.</p>
-                  )}
-                  {inquiries.map((inq) => (
-                    <button
-                      key={inq.id}
-                      type="button"
-                      onClick={() => !inq.read && markAsRead(inq.id)}
-                      className={`w-full text-left rounded-lg border p-4 transition-colors ${
-                        inq.read ? "border-stone-line bg-white" : "border-terra/30 bg-terra/5"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          {inq.read ? <MailOpen size={14} className="text-stone" /> : <Mail size={14} className="text-terra" />}
-                          <span className="font-medium text-ink text-sm">{inq.customer_name}</span>
-                        </div>
-                        <span className="text-xs text-stone shrink-0">{new Date(inq.created_at).toLocaleDateString()}</span>
-                      </div>
-                      <p className="text-sm text-stone mt-1">{inq.customer_contact}</p>
-                      {inq.message && <p className="text-sm text-ink/80 mt-1.5">{inq.message}</p>}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {tab === "Bookings" && (
-                <div className="text-center py-6">
-                  <p className="font-display text-3xl font-semibold text-ink">
-                    {bookings.filter((b) => b.status === "pending").length}
-                  </p>
-                  <p className="text-sm text-stone mt-1">
-                    {bookings.filter((b) => b.status === "pending").length === 1 ? "request" : "requests"} awaiting your response
-                  </p>
-                  <Link
-                    href="/business/bookings"
-                    className="inline-block mt-5 px-6 py-3 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim transition-colors"
-                  >
-                    Open bookings
-                  </Link>
                 </div>
               )}
 

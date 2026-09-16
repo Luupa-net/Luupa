@@ -7,9 +7,11 @@ import { supabase } from "@/lib/supabase";
 import { isEffectivelyVerified } from "@/lib/verification";
 import {
   Menu, X, Home, ChevronDown, LayoutDashboard, BadgeCheck, LogOut, Eye,
+  Inbox, CalendarClock,
 } from "lucide-react";
 
 type BusinessSession = {
+  id: string;
   name: string;
   logo_url: string | null;
   verified: boolean;
@@ -22,6 +24,8 @@ export default function Navbar() {
   const [business, setBusiness] = useState<BusinessSession | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingBookingsCount, setPendingBookingsCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -34,11 +38,21 @@ export default function Navbar() {
     }
     const { data } = await supabase
       .from("businesses")
-      .select("name, logo_url, verified, verified_until, status")
+      .select("id, name, logo_url, verified, verified_until, status")
       .eq("owner_id", session.user.id)
       .single();
     setBusiness(data ?? null);
     setChecked(true);
+
+    if (data) {
+      // Both counts run at the same time, not one after another
+      const [{ count: unread }, { count: pending }] = await Promise.all([
+        supabase.from("inquiries").select("*", { count: "exact", head: true }).eq("business_id", data.id).eq("read", false),
+        supabase.from("bookings").select("*", { count: "exact", head: true }).eq("business_id", data.id).eq("status", "pending"),
+      ]);
+      setUnreadCount(unread || 0);
+      setPendingBookingsCount(pending || 0);
+    }
   }
 
   useEffect(() => {
@@ -85,6 +99,9 @@ export default function Navbar() {
           <Link href="/browse" className="hover:text-ink transition-colors">Browse</Link>
 
           {!checked ? null : business ? (
+            <>
+              <NavIconLink href="/business/inbox" icon={<Inbox size={18} />} count={unreadCount} label="Inbox" />
+              <NavIconLink href="/business/bookings" icon={<CalendarClock size={18} />} count={pendingBookingsCount} label="Bookings" />
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen((o) => !o)}
@@ -128,6 +145,7 @@ export default function Navbar() {
                 </div>
               )}
             </div>
+            </>
           ) : (
             <>
               <Link href="/business/signup" className="hover:text-ink transition-colors">List your business</Link>
@@ -191,6 +209,12 @@ export default function Navbar() {
                   <p className="text-xs text-stone capitalize">{business.status}{verified ? " · Verified" : ""}</p>
                 </div>
               </div>
+              <Link href="/business/inbox" className="py-3 text-base font-medium text-ink border-b border-stone-line flex items-center justify-between" onClick={() => setOpen(false)}>
+                Inbox {unreadCount > 0 && <span className="text-xs font-bold bg-terra text-white px-2 py-0.5 rounded-full">{unreadCount}</span>}
+              </Link>
+              <Link href="/business/bookings" className="py-3 text-base font-medium text-ink border-b border-stone-line flex items-center justify-between" onClick={() => setOpen(false)}>
+                Bookings {pendingBookingsCount > 0 && <span className="text-xs font-bold bg-terra text-white px-2 py-0.5 rounded-full">{pendingBookingsCount}</span>}
+              </Link>
               <Link href="/business/dashboard" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
                 Dashboard
               </Link>
@@ -220,6 +244,19 @@ export default function Navbar() {
         </nav>
       )}
     </header>
+  );
+}
+
+function NavIconLink({ href, icon, count, label }: { href: string; icon: React.ReactNode; count: number; label: string }) {
+  return (
+    <Link href={href} aria-label={label} className="relative w-9 h-9 rounded-lg flex items-center justify-center text-ink/60 hover:text-ink hover:bg-canvas2 transition-colors">
+      {icon}
+      {count > 0 && (
+        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-terra text-white text-[10px] font-bold flex items-center justify-center">
+          {count > 9 ? "9+" : count}
+        </span>
+      )}
+    </Link>
   );
 }
 

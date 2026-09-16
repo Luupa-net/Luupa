@@ -14,19 +14,19 @@ export default function HeroSearch() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2.5 w-full max-w-lg mx-auto">
+    <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 w-full">
       <div className="relative flex-1">
         <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ceramic coating in Riffa..."
-          className="w-full h-13 rounded-lg bg-white/95 backdrop-blur border-0 text-ink placeholder:text-stone-dim pl-11 pr-4 py-3.5 text-[15px] shadow-lg shadow-black/10 focus:ring-2 focus:ring-terra transition-shadow"
+          placeholder="Ceramic coating in Riffa…"
+          className="w-full h-16 rounded-2xl bg-white border-2 border-ink text-ink placeholder:text-stone pl-12 pr-4 font-bodyAlt text-[16px] focus:outline-none focus:ring-2 focus:ring-coral transition-shadow"
         />
       </div>
       <button
         type="submit"
-        className="px-6 py-3.5 rounded-lg bg-terra text-white font-medium text-[15px] hover:bg-terra-dim active:scale-[0.98] transition-all shadow-lg shadow-black/10 shrink-0"
+        className="h-16 px-9 rounded-2xl bg-coral text-white font-bodyAlt font-bold text-[16px] hover:bg-coral-dim active:scale-[0.98] transition-all shrink-0"
       >
         Search
       </button>

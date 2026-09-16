@@ -1,26 +1,19 @@
 import Link from "next/link";
 import HeroSearch from "@/components/HeroSearch";
-import HeroImage from "@/components/HeroImage";
 import SlidingPrompts from "@/components/SlidingPrompts";
 import ComingSoon from "@/components/ComingSoon";
 import FeaturedCard from "@/components/FeaturedCard";
+import BahrainMapPlaceholder from "@/components/BahrainMapPlaceholder";
+import Reveal from "@/components/Reveal";
 import type { Listing } from "@/components/ListingCard";
 import { supabase } from "@/lib/supabase";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Check, Search as SearchIcon, MessageCircle } from "lucide-react";
 
-// PERMANENT FIX for the "changes don't show up" bug: without this, Next.js
-// treats this page as static and bakes it in at build/deploy time, so any
-// database change (new business, edited listing) never shows until the next
-// deploy. This forces a fresh database read on every single visit instead.
-// FIX: revalidate=0 (no caching at all) was hitting the database on every
-// single visit — this is almost certainly what caused both the slowness and
-// the Supabase resource warning. A short 30-second window means the page is
-// served instantly from cache for most visitors, while still staying fresh
-// enough that a new/edited listing shows up within half a minute.
+// Real database read on every visit, refreshed at most every 30s — see git
+// history for why this specific value matters (fixed a real slowness bug).
 export const revalidate = 30;
 
 export default async function HomePage() {
-  // Real featured businesses — verified ones first, then featured tier, active only
   const { data } = await supabase
     .from("businesses")
     .select("*")
@@ -31,43 +24,60 @@ export default async function HomePage() {
   const featured = (data ?? []) as Listing[];
 
   return (
-    <div>
-      {/* Hero — shorter band, centered, blurred photo, no filler subtext */}
-      <section className="relative h-[300px] sm:h-[360px] flex items-center overflow-hidden">
-        <HeroImage />
-        <div className="relative max-w-xl mx-auto px-5 w-full text-center fade-up">
-          <h1 className="font-display text-white text-3xl sm:text-4xl font-semibold">
-            Everything car care, in one place.
-          </h1>
-          <div className="mt-6">
+    <div className="bg-cream">
+      {/* HERO — side by side: search left, Bahrain map right */}
+      <section className="max-w-6xl mx-auto px-5 pt-16 sm:pt-24 pb-14 sm:pb-20">
+        <div className="flex flex-col lg:flex-row items-center gap-12">
+          <div className="flex-1 max-w-xl">
+            <span className="inline-flex items-center gap-2 bg-ink text-cream text-xs font-bodyAlt font-semibold px-4 py-2 rounded-full mb-7">
+              Now onboarding founding businesses in Bahrain
+            </span>
+            <h1 className="font-displayAlt text-4xl sm:text-5xl lg:text-[64px] leading-[0.98] font-bold tracking-tight text-ink mb-6">
+              Everything car care,<br />in one <span className="text-coral">place.</span>
+            </h1>
+            <p className="font-bodyAlt text-lg text-stone mb-9 leading-relaxed">
+              Find a real, reviewed detailing shop, tinting studio or ceramic coating pro near you — no more guessing from a random Instagram post.
+            </p>
             <HeroSearch />
           </div>
+
+          <BahrainMapPlaceholder />
         </div>
       </section>
 
-      {/* Everything below flows as one continuous white surface — no alternating color blocks */}
+      {/* TRUST STRIP */}
+      <section className="max-w-6xl mx-auto px-5 pb-16 sm:pb-20 flex flex-wrap gap-x-10 gap-y-3 font-bodyAlt">
+        {["Free to list, always", "Every listing personally reviewed", "Built in Bahrain, for Bahrain"].map((t) => (
+          <div key={t} className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <Check size={18} className="text-coral" strokeWidth={3} />
+            {t}
+          </div>
+        ))}
+      </section>
+
       <div className="max-w-6xl mx-auto px-5">
-        <div className="py-10 sm:py-12">
-          {/* Two matched panels — same background, same shape, feel like a pair */}
-          <div className="grid sm:grid-cols-2 gap-4">
+        {/* TWO PANELS */}
+        <Reveal>
+          <div className="grid sm:grid-cols-2 gap-4 pb-10 sm:pb-12">
             <SlidingPrompts />
             <ComingSoon />
           </div>
-        </div>
+        </Reveal>
 
         <div className="h-px bg-stone-line" />
 
-        <section className="py-14 sm:py-16">
+        {/* FEATURED */}
+        <Reveal className="py-14 sm:py-16">
           <div className="flex items-baseline justify-between mb-5">
-            <h2 className="font-display text-xl sm:text-2xl font-semibold text-ink">Featured this week</h2>
-            <Link href="/browse" className="text-sm text-navy font-medium flex items-center gap-0.5 hover:gap-1.5 transition-all">
+            <h2 className="font-displayAlt text-xl sm:text-2xl font-bold text-ink">Featured this week</h2>
+            <Link href="/browse" className="text-sm text-coral font-bodyAlt font-bold flex items-center gap-0.5 hover:gap-1.5 transition-all">
               Browse all <ArrowUpRight size={14} />
             </Link>
           </div>
           {featured.length === 0 ? (
             <div className="rounded-xl border border-dashed border-stone-line p-10 text-center">
               <p className="text-stone text-sm">No businesses featured yet — the first ones to join get seen first.</p>
-              <Link href="/business/signup" className="text-navy font-medium text-sm mt-1.5 inline-block">
+              <Link href="/business/signup" className="text-coral font-bodyAlt font-bold text-sm mt-1.5 inline-block">
                 List yours first →
               </Link>
             </div>
@@ -78,34 +88,54 @@ export default async function HomePage() {
               ))}
             </div>
           )}
-        </section>
+        </Reveal>
       </div>
 
-      {/* Founding offer — honest, time-limited, not overstated. Subtle ambient flare, no new content boxes. */}
-      <section className="px-5 pb-20 sm:pb-24">
-        <div className="max-w-6xl mx-auto relative bg-navy rounded-2xl px-8 py-14 sm:px-16 sm:py-16 text-center overflow-hidden">
-          <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full bg-terra/20 blur-2xl drift-slow" />
-          <div className="absolute -bottom-20 -right-10 w-64 h-64 rounded-full bg-white/10 blur-2xl drift-slow-reverse" />
+      {/* HOW IT WORKS */}
+      <Reveal className="max-w-6xl mx-auto px-5 py-16 sm:py-20">
+        <h2 className="font-displayAlt text-2xl sm:text-3xl font-bold text-ink text-center mb-12">How it works</h2>
+        <div className="grid sm:grid-cols-3 gap-8 text-center">
+          {[
+            { icon: SearchIcon, title: "Search your area", body: "Tell us what you need and where." },
+            { icon: Check, title: "Compare real profiles", body: "Photos, prices, and a verified badge." },
+            { icon: MessageCircle, title: "Message on WhatsApp", body: "Straight to the business, no middleman." },
+          ].map((step, i) => (
+            <div key={step.title}>
+              <div className="w-14 h-14 rounded-2xl bg-coral text-white font-displayAlt font-bold text-xl flex items-center justify-center mx-auto mb-5">
+                {i + 1}
+              </div>
+              <p className="font-displayAlt text-lg font-bold text-ink mb-1.5">{step.title}</p>
+              <p className="font-bodyAlt text-sm text-stone">{step.body}</p>
+            </div>
+          ))}
+        </div>
+      </Reveal>
+
+      {/* FOUNDING OFFER */}
+      <Reveal className="px-5 pb-20 sm:pb-24">
+        <div className="max-w-6xl mx-auto relative bg-ink rounded-[32px] px-8 py-14 sm:px-16 sm:py-20 text-center overflow-hidden">
+          <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full bg-coral/25 blur-2xl" />
+          <div className="absolute -bottom-20 -right-10 w-64 h-64 rounded-full bg-skyblue/20 blur-2xl" />
 
           <div className="relative">
-            <span className="inline-block text-xs uppercase tracking-wide font-medium text-terra-light bg-white/10 px-3 py-1.5 rounded-full mb-4">
+            <span className="inline-block text-xs font-bodyAlt uppercase tracking-wide font-bold text-skyblue bg-white/10 px-3 py-1.5 rounded-full mb-5">
               Founding partner offer
             </span>
-            <h2 className="font-display text-white text-3xl sm:text-4xl font-semibold max-w-lg mx-auto">
-              Run a car care business? The first 10 get 3 months free.
+            <h2 className="font-displayAlt text-white text-3xl sm:text-4xl font-bold max-w-lg mx-auto leading-tight">
+              Run a car care business? The first 10 get verified, completely free.
             </h2>
-            <p className="text-white/60 text-sm mt-3 max-w-sm mx-auto">
-              After that, simple monthly pricing — no surprises, cancel anytime.
+            <p className="text-white/60 font-bodyAlt text-sm mt-3 max-w-sm mx-auto">
+              Listing is always free. Verification normally carries a small fee — not for our first 10.
             </p>
             <Link
               href="/business/signup"
-              className="inline-block mt-7 px-8 py-3.5 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim active:scale-[0.98] transition-all"
+              className="inline-block mt-8 px-9 py-4 rounded-full bg-coral text-white font-bodyAlt font-bold hover:bg-coral-dim active:scale-[0.98] transition-all"
             >
               List your business
             </Link>
           </div>
         </div>
-      </section>
+      </Reveal>
     </div>
   );
 }

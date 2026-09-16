@@ -26,10 +26,24 @@ const config: Config = {
           line: "#E7E5E0",
         },
         graphite: "#14181F",
+        // Homepage refresh only — a brighter accent pair, used alongside navy/ink,
+        // not a replacement for terra/navy elsewhere in the app.
+        coral: {
+          DEFAULT: "#FF5A36",
+          dim: "#E24E2D",
+        },
+        skyblue: {
+          DEFAULT: "#2D6CDF",
+          dim: "#1F56B8",
+        },
+        cream: "#FFFDF8",
       },
       fontFamily: {
         display: ["'Barlow Condensed'", "sans-serif"],
         body: ["'Inter'", "sans-serif"],
+        // Homepage refresh only
+        displayAlt: ["'Space Grotesk'", "sans-serif"],
+        bodyAlt: ["'Sora'", "sans-serif"],
       },
       borderRadius: {
         sm: "4px",

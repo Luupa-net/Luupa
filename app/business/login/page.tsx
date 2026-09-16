@@ -33,7 +33,11 @@ export default function BusinessLogin() {
     setLoading(true);
     setError(null);
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/business/reset-password`,
+      // FIX: window.location.origin pointed wherever the request was made from —
+      // if that was local dev (localhost:3000), the emailed link only worked
+      // while that local server happened to still be running. Always point to
+      // the real site instead, regardless of where "forgot password" was clicked.
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/business/reset-password`,
     });
     setLoading(false);
     if (resetError) {

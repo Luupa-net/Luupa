@@ -10,13 +10,17 @@ export default function ManualBookingForm({
   businessId,
   onAdded,
   onClose,
+  initialName = "",
+  initialContact = "",
 }: {
   businessId: string;
   onAdded: (booking: any) => void;
   onClose: () => void;
+  initialName?: string;
+  initialContact?: string;
 }) {
-  const [name, setName] = useState("");
-  const [contact, setContact] = useState("");
+  const [name, setName] = useState(initialName);
+  const [contact, setContact] = useState(initialContact);
   const [service, setService] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");

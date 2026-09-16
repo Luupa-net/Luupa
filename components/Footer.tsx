@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function Footer() {
   return (
     <footer className="bg-graphite text-white/60 mt-20">
-      <div className="max-w-6xl mx-auto px-5 py-12 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
+      <div className="max-w-6xl mx-auto px-5 py-12 grid grid-cols-2 md:grid-cols-5 gap-8 text-sm">
         <div className="col-span-2 md:col-span-1">
           <span className="font-display text-xl text-white">luupa</span>
           <p className="mt-3 max-w-[220px] leading-relaxed">
@@ -27,9 +27,17 @@ export default function Footer() {
           </ul>
         </div>
         <div>
-          <h4 className="text-white font-semibold mb-3">Contact</h4>
+          <h4 className="text-white font-semibold mb-3">Company</h4>
           <ul className="space-y-2">
-            <li>luupa.net@gmail.com</li>
+            <li><Link href="/about" className="hover:text-white">About</Link></li>
+            <li><a href="mailto:luupa.net@gmail.com" className="hover:text-white">Contact us</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="text-white font-semibold mb-3">Legal</h4>
+          <ul className="space-y-2">
+            <li><Link href="/terms" className="hover:text-white">Terms & conditions</Link></li>
+            <li><Link href="/privacy" className="hover:text-white">Privacy policy</Link></li>
           </ul>
         </div>
       </div>
