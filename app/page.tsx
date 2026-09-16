@@ -4,6 +4,7 @@ import SlidingPrompts from "@/components/SlidingPrompts";
 import ComingSoon from "@/components/ComingSoon";
 import FeaturedCard from "@/components/FeaturedCard";
 import BahrainMapPlaceholder from "@/components/BahrainMapPlaceholder";
+import BusinessFAQ from "@/components/BusinessFAQ";
 import Reveal from "@/components/Reveal";
 import type { Listing } from "@/components/ListingCard";
 import { supabase } from "@/lib/supabase";
@@ -83,8 +84,10 @@ export default async function HomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {featured.map((l) => (
-                <FeaturedCard key={l.id} listing={l} />
+              {featured.map((l, i) => (
+                <Reveal key={l.id} delay={i * 90}>
+                  <FeaturedCard listing={l} />
+                </Reveal>
               ))}
             </div>
           )}
@@ -109,6 +112,11 @@ export default async function HomePage() {
             </div>
           ))}
         </div>
+      </Reveal>
+
+      {/* BUSINESS FAQ — right before the ask, so questions are answered before they're asked to commit */}
+      <Reveal>
+        <BusinessFAQ />
       </Reveal>
 
       {/* FOUNDING OFFER */}

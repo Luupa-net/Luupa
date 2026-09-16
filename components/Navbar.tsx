@@ -90,7 +90,7 @@ export default function Navbar() {
       <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
           <span className="font-display text-2xl font-semibold text-ink tracking-wide">
-            luupa
+            luup<span className="text-coral">a</span>
           </span>
         </Link>
 
