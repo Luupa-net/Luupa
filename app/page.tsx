@@ -3,7 +3,7 @@ import HeroSearch from "@/components/HeroSearch";
 import SlidingPrompts from "@/components/SlidingPrompts";
 import ComingSoon from "@/components/ComingSoon";
 import FeaturedCard from "@/components/FeaturedCard";
-import BahrainMapPlaceholder from "@/components/BahrainMapPlaceholder";
+import BahrainMap from "@/components/BahrainMap";
 import BusinessFAQ from "@/components/BusinessFAQ";
 import Reveal from "@/components/Reveal";
 import type { Listing } from "@/components/ListingCard";
@@ -42,7 +42,7 @@ export default async function HomePage() {
             <HeroSearch />
           </div>
 
-          <BahrainMapPlaceholder />
+          <BahrainMap />
         </div>
       </section>
 
@@ -111,6 +111,24 @@ export default async function HomePage() {
               <p className="font-bodyAlt text-sm text-stone">{step.body}</p>
             </div>
           ))}
+        </div>
+      </Reveal>
+
+      {/* VERIFICATION TEASER — brief, no pricing shown here, links to the full page */}
+      <Reveal>
+        <div className="max-w-3xl mx-auto px-5 pt-4">
+          <div className="bg-skyblue/10 rounded-2xl px-7 py-8 flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
+            <div className="flex-1">
+              <p className="font-displayAlt font-bold text-lg text-ink mb-1">Run a business? Get the verified badge.</p>
+              <p className="text-sm text-stone font-bodyAlt">Shows customers you've been personally checked — free for our first 10 founding businesses.</p>
+            </div>
+            <Link
+              href="/business/verify"
+              className="shrink-0 px-6 py-3 rounded-full bg-skyblue text-white font-bodyAlt font-bold text-sm hover:bg-skyblue-dim transition-colors"
+            >
+              Learn more
+            </Link>
+          </div>
         </div>
       </Reveal>
 
