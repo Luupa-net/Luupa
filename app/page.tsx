@@ -4,11 +4,10 @@ import SlidingPrompts from "@/components/SlidingPrompts";
 import ComingSoon from "@/components/ComingSoon";
 import FeaturedCard from "@/components/FeaturedCard";
 import BahrainMap from "@/components/BahrainMap";
-import BusinessFAQ from "@/components/BusinessFAQ";
 import Reveal from "@/components/Reveal";
 import type { Listing } from "@/components/ListingCard";
 import { supabase } from "@/lib/supabase";
-import { ArrowUpRight, Check, Search as SearchIcon, MessageCircle } from "lucide-react";
+import { ArrowUpRight, Check, Search as SearchIcon, MessageCircle, BadgeCheck } from "lucide-react";
 
 // Real database read on every visit, refreshed at most every 30s — see git
 // history for why this specific value matters (fixed a real slowness bug).
@@ -48,11 +47,13 @@ export default async function HomePage() {
 
       {/* TRUST STRIP */}
       <section className="max-w-6xl mx-auto px-5 pb-16 sm:pb-20 flex flex-wrap gap-x-10 gap-y-3 font-bodyAlt">
-        {["Free to list, always", "Every listing personally reviewed", "Built in Bahrain, for Bahrain"].map((t) => (
-          <div key={t} className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <Check size={18} className="text-coral" strokeWidth={3} />
-            {t}
-          </div>
+        {["Free to list, always", "Every listing personally reviewed", "Built in Bahrain, for Bahrain"].map((t, i) => (
+          <Reveal key={t} delay={i * 150}>
+            <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <Check size={18} className="text-coral" strokeWidth={3} />
+              {t}
+            </div>
+          </Reveal>
         ))}
       </section>
 
@@ -114,27 +115,32 @@ export default async function HomePage() {
         </div>
       </Reveal>
 
-      {/* VERIFICATION TEASER — brief, no pricing shown here, links to the full page */}
+      {/* VERIFIED, EXPLAINED — to customers first (what it means for them), then the business pitch */}
       <Reveal>
         <div className="max-w-3xl mx-auto px-5 pt-4">
-          <div className="bg-skyblue/10 rounded-2xl px-7 py-8 flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
-            <div className="flex-1">
-              <p className="font-displayAlt font-bold text-lg text-ink mb-1">Run a business? Get the verified badge.</p>
-              <p className="text-sm text-stone font-bodyAlt">Shows customers you've been personally checked — free for our first 10 founding businesses.</p>
+          <div className="bg-skyblue/10 rounded-2xl px-7 py-9 text-center sm:text-left">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <div className="w-14 h-14 rounded-2xl bg-skyblue text-white flex items-center justify-center shrink-0">
+                <BadgeCheck size={26} />
+              </div>
+              <div className="flex-1">
+                <p className="font-displayAlt font-bold text-lg text-ink mb-1.5">What the verified badge means</p>
+                <p className="text-sm text-stone font-bodyAlt leading-relaxed">
+                  A blue checkmark on a listing means that business has been personally checked, not just self-submitted — it's the clearest sign on Luupa that who you're contacting is real and trustworthy.
+                </p>
+              </div>
             </div>
-            <Link
-              href="/business/verify"
-              className="shrink-0 px-6 py-3 rounded-full bg-skyblue text-white font-bodyAlt font-bold text-sm hover:bg-skyblue-dim transition-colors"
-            >
-              Learn more
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-6 border-t border-skyblue/20">
+              <p className="text-sm text-stone font-bodyAlt">Run a business? Get verified free as one of our first 10.</p>
+              <Link
+                href="/business/verify"
+                className="shrink-0 px-6 py-3 rounded-full bg-skyblue text-white font-bodyAlt font-bold text-sm hover:bg-skyblue-dim transition-colors"
+              >
+                Learn more
+              </Link>
+            </div>
           </div>
         </div>
-      </Reveal>
-
-      {/* BUSINESS FAQ — right before the ask, so questions are answered before they're asked to commit */}
-      <Reveal>
-        <BusinessFAQ />
       </Reveal>
 
       {/* FOUNDING OFFER */}

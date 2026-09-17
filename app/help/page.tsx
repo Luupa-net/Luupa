@@ -11,11 +11,11 @@ const FAQS = [
   { q: "What do I need to sign up?", a: "Just your business details, a few photos, and the services you offer. Takes about 5 minutes." },
 ];
 
-export default function BusinessFAQ() {
+export default function HelpPage() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section id="help" className="max-w-3xl mx-auto px-5 py-16 sm:py-20">
+    <section className="max-w-3xl mx-auto px-5 py-16 sm:py-20">
       <h2 className="font-displayAlt text-2xl sm:text-3xl font-bold text-ink text-center mb-2">Questions from businesses</h2>
       <p className="text-stone font-bodyAlt text-center mb-10">Everything you'd want to know before listing.</p>
 
