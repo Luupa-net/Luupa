@@ -92,10 +92,7 @@ export default function BookingModal({
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({
-          to: bk.customer_email,
-          businessName,
-          customerName: bk.customer_name,
-          service: bk.service,
+          bookingId: bk.id,
           vehicle,
           amount,
           paymentMethod: method,

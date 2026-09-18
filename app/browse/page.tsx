@@ -18,7 +18,14 @@ export default async function BrowsePage({
 }) {
   // Next.js 15+: searchParams is now a Promise and must be awaited
   const params = await searchParams;
-  let query = supabase.from("businesses").select("*").eq("status", "active");
+  // SECURITY: query the businesses_public VIEW, not the businesses table —
+  // the view already projects down to a public-safe column list and only
+  // ever contains active rows (see supabase/schema.sql), so this is safe
+  // against direct REST access with the anon key, not just against what
+  // this page happens to ask for. No need to re-filter status here.
+  let query = supabase
+    .from("businesses_public")
+    .select("id, name, subcategories, areas, description, verified, verified_until, tier, photos, is_mobile");
 
   // subcategories/areas are arrays now — .contains() checks the array includes this value
   if (params.sub) query = query.contains("subcategories", [params.sub]);
@@ -39,7 +46,11 @@ export default async function BrowsePage({
   const { data, error } = await query
     .order("verified", { ascending: false })
     .order("tier", { ascending: false });
-  const listings = (data ?? []) as Listing[];
+  // `as unknown as` here because the explicit column list above (deliberately
+  // narrower than select("*") — see the SECURITY comment) no longer structurally
+  // matches Listing's `featured` field, which isn't a real businesses column and
+  // was already never populated at runtime even under the old select("*").
+  const listings = (data ?? []) as unknown as Listing[];
 
   return (
     <div className="max-w-6xl mx-auto px-5 py-6 sm:py-10">

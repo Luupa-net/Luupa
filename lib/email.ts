@@ -3,6 +3,25 @@ import { Resend } from "resend";
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM = "Luupa <hello@luupa.net>";
 
+// SECURITY: every value interpolated into an HTML email template must be
+// escaped — even values that come from our own database, since a customer
+// can put arbitrary text (including HTML) into their own name at booking
+// time. Escaping here is defense in depth on top of the server-side lookups
+// in the API routes that call these functions.
+function escapeHtml(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value).replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case "&": return "&amp;";
+      case "<": return "&lt;";
+      case ">": return "&gt;";
+      case "\"": return "&quot;";
+      case "'": return "&#39;";
+      default: return c;
+    }
+  });
+}
+
 // If Resend isn't configured yet (no API key set), these quietly do nothing
 // instead of breaking the approval/verification flow — email is a nice-to-have
 // on top of the core feature, not a dependency of it.
@@ -67,27 +86,36 @@ type InvoiceDetails = {
 export async function sendInvoiceEmail(to: string, details: InvoiceDetails) {
   if (!resend) return { sent: false, reason: "not_configured" };
   try {
+    const businessName = escapeHtml(details.businessName);
+    const customerName = escapeHtml(details.customerName);
+    const service = escapeHtml(details.service);
+    const vehicle = escapeHtml(details.vehicle);
+    const amount = escapeHtml(details.amount);
+    // qrUrl is interpolated into an `src="..."` attribute — escaping at
+    // least the quote character stops it from breaking out of the attribute.
+    const qrUrl = escapeHtml(details.qrUrl);
+
     await resend.emails.send({
       from: FROM,
       to,
-      subject: `Invoice from ${details.businessName}`,
+      subject: `Invoice from ${businessName}`,
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #152A4E;">Invoice from ${details.businessName}</h2>
-          <p>Hi ${details.customerName},</p>
+          <h2 style="color: #152A4E;">Invoice from ${businessName}</h2>
+          <p>Hi ${customerName},</p>
           <table style="width: 100%; margin: 16px 0; font-size: 14px;">
-            ${details.service ? `<tr><td style="color:#6B7280; padding:4px 0;">Service</td><td style="text-align:right; font-weight:600;">${details.service}</td></tr>` : ""}
-            ${details.vehicle ? `<tr><td style="color:#6B7280; padding:4px 0;">Vehicle</td><td style="text-align:right;">${details.vehicle}</td></tr>` : ""}
-            ${details.amount ? `<tr><td style="color:#6B7280; padding:4px 0;">Total</td><td style="text-align:right; font-weight:600;">BHD ${details.amount}</td></tr>` : ""}
+            ${service ? `<tr><td style="color:#6B7280; padding:4px 0;">Service</td><td style="text-align:right; font-weight:600;">${service}</td></tr>` : ""}
+            ${vehicle ? `<tr><td style="color:#6B7280; padding:4px 0;">Vehicle</td><td style="text-align:right;">${vehicle}</td></tr>` : ""}
+            ${amount ? `<tr><td style="color:#6B7280; padding:4px 0;">Total</td><td style="text-align:right; font-weight:600;">BHD ${amount}</td></tr>` : ""}
             <tr><td style="color:#6B7280; padding:4px 0;">Payment</td><td style="text-align:right;">${details.paymentMethod === "cash" ? "Cash" : "Card"}</td></tr>
           </table>
-          ${details.qrUrl ? `
+          ${qrUrl ? `
             <div style="text-align:center; margin: 20px 0; padding: 16px; background:#F7F6F3; border-radius: 12px;">
               <p style="font-size: 13px; color:#6B7280; margin: 0 0 10px 0;">Pay via BenefitPay</p>
-              <img src="${details.qrUrl}" alt="BenefitPay QR code" style="max-width: 160px; border-radius: 8px;" />
+              <img src="${qrUrl}" alt="BenefitPay QR code" style="max-width: 160px; border-radius: 8px;" />
             </div>
           ` : ""}
-          <p style="color:#6B7280; font-size:13px; margin-top:24px;">Thank you for choosing ${details.businessName}, sent via Luupa.</p>
+          <p style="color:#6B7280; font-size:13px; margin-top:24px;">Thank you for choosing ${businessName}, sent via Luupa.</p>
         </div>
       `,
     });

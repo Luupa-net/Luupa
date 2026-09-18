@@ -8,9 +8,15 @@ import BookingForm from "@/components/BookingForm";
 export default async function ListingPage({ params }: { params: Promise<{ id: string }> }) {
   // Next.js 15+: params is now a Promise and must be awaited
   const { id } = await params;
+  // SECURITY: query the businesses_public VIEW, not the businesses table —
+  // the view already projects down to a public-safe column list and only
+  // ever contains active rows (see supabase/schema.sql), so this is safe
+  // against direct REST access with the anon key, not just against what
+  // this page happens to ask for. A non-active/nonexistent id simply isn't
+  // in the view, so this still 404s the same way it did before.
   const { data: listing } = await supabase
-    .from("businesses")
-    .select("*")
+    .from("businesses_public")
+    .select("id, name, logo_url, subcategories, areas, description, phone, whatsapp, hours, services, photos, is_mobile, verified, verified_until")
     .eq("id", id)
     .single();
 

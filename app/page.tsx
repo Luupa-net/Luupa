@@ -14,14 +14,17 @@ import { ArrowUpRight, Check, Search as SearchIcon, MessageCircle, BadgeCheck } 
 export const revalidate = 30;
 
 export default async function HomePage() {
+  // SECURITY: query the businesses_public VIEW, not the businesses table —
+  // it already projects down to a public-safe column list and only ever
+  // contains active rows, so this is safe against direct REST access with
+  // the anon key too, not just against what this page happens to ask for.
   const { data } = await supabase
-    .from("businesses")
-    .select("*")
-    .eq("status", "active")
+    .from("businesses_public")
+    .select("id, name, photos, areas, verified, verified_until, tier")
     .order("verified", { ascending: false })
     .order("tier", { ascending: false })
     .limit(8);
-  const featured = (data ?? []) as Listing[];
+  const featured = (data ?? []) as unknown as Listing[];
 
   return (
     <div className="bg-cream">
