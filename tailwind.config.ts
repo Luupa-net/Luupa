@@ -29,8 +29,8 @@ const config: Config = {
         // Homepage refresh only — a brighter accent pair, used alongside navy/ink,
         // not a replacement for terra/navy elsewhere in the app.
         coral: {
-          DEFAULT: "#FF5A36",
-          dim: "#E24E2D",
+          DEFAULT: "#A32CC4",
+          dim: "#8B25A7",
         },
         skyblue: {
           DEFAULT: "#2D6CDF",

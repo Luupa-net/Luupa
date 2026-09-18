@@ -117,7 +117,7 @@ export default async function HomePage() {
 
       {/* VERIFIED, EXPLAINED — to customers first (what it means for them), then the business pitch */}
       <Reveal>
-        <div className="max-w-3xl mx-auto px-5 pt-4">
+        <div className="max-w-3xl mx-auto px-5 pt-4 pb-16 sm:pb-20">
           <div className="bg-skyblue/10 rounded-2xl px-7 py-9 text-center sm:text-left">
             <div className="flex flex-col sm:flex-row items-center gap-6">
               <div className="w-14 h-14 rounded-2xl bg-skyblue text-white flex items-center justify-center shrink-0">

@@ -23,7 +23,7 @@ export default function BahrainMap() {
              C180 150 175 200 170 250 C165 300 155 350 145 390 C135 420 125 445 110 465
              C95 440 85 405 82 365 C79 325 85 295 80 260 C75 225 85 195 82 165
              C79 135 90 115 100 100 C108 90 120 88 135 85 Z"
-          fill="#FF5A36" opacity="0.15" stroke="#FF5A36" strokeWidth="2.5" strokeLinejoin="round"
+          fill="#A32CC4" opacity="0.15" stroke="#A32CC4" strokeWidth="2.5" strokeLinejoin="round"
         />
         {/* Muharraq — irregular, close to the main island's jagged edge */}
         <path
@@ -33,7 +33,7 @@ export default function BahrainMap() {
         {/* Um Al Naasan */}
         <path
           d="M40 175 C42 165 55 160 62 168 C68 176 65 190 55 193 C45 195 38 185 40 175 Z"
-          fill="#FF5A36" opacity="0.1" stroke="#FF5A36" strokeWidth="1.5"
+          fill="#A32CC4" opacity="0.1" stroke="#A32CC4" strokeWidth="1.5"
         />
       </svg>
 
