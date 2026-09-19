@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { isEffectivelyVerified } from "@/lib/verification";
 import {
   Menu, X, Home, ChevronDown, LayoutDashboard, BadgeCheck, LogOut, Eye,
-  Inbox, CalendarClock, User,
+  Inbox, CalendarClock, User, UserCircle, CalendarCheck,
 } from "lucide-react";
 
 type BusinessSession = {
@@ -159,7 +159,7 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              {customerName && (
+              {customerName ? (
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setDropdownOpen((o) => !o)}
@@ -172,7 +172,12 @@ export default function Navbar() {
                     <ChevronDown size={14} className={`text-stone transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
                   </button>
                   {dropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl border border-stone-line shadow-lg shadow-black/5 py-1.5 animate-[fadeUp_0.15s_ease-out]">
+                    <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl border border-stone-line shadow-lg shadow-black/5 py-1.5 animate-[fadeUp_0.15s_ease-out]">
+                      <div className="px-3.5 py-2.5 border-b border-stone-line">
+                        <p className="text-sm font-medium text-ink truncate">{customerName}</p>
+                      </div>
+                      <DropdownItem href="/account/profile" icon={<UserCircle size={15} />} label="My profile" onClick={() => setDropdownOpen(false)} />
+                      <DropdownItem href="/account/profile?tab=bookings" icon={<CalendarCheck size={15} />} label="My bookings" onClick={() => setDropdownOpen(false)} />
                       <button
                         onClick={handleLogout}
                         className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -182,14 +187,17 @@ export default function Navbar() {
                     </div>
                   )}
                 </div>
+              ) : (
+                <>
+                  <Link href="/business/signup" className="hover:text-ink transition-colors">List your business</Link>
+                  <Link
+                    href="/business/login"
+                    className="px-4 py-2 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim transition-colors"
+                  >
+                    Business login
+                  </Link>
+                </>
               )}
-              <Link href="/business/signup" className="hover:text-ink transition-colors">List your business</Link>
-              <Link
-                href="/business/login"
-                className="px-4 py-2 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim transition-colors"
-              >
-                Business login
-              </Link>
             </>
           )}
 
@@ -262,16 +270,26 @@ export default function Navbar() {
                 Log out
               </button>
             </>
+          ) : customerName ? (
+            <>
+              <div className="flex items-center gap-2 py-3 border-b border-stone-line">
+                <span className="w-8 h-8 rounded-full bg-teal/10 flex items-center justify-center shrink-0">
+                  <User size={16} className="text-teal-dim" />
+                </span>
+                <span className="text-base font-medium text-ink truncate">{customerName}</span>
+              </div>
+              <Link href="/account/profile" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
+                My profile
+              </Link>
+              <Link href="/account/profile?tab=bookings" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
+                My bookings
+              </Link>
+              <button onClick={handleLogout} className="py-3 text-base font-medium text-red-600 text-left">
+                Log out
+              </button>
+            </>
           ) : (
             <>
-              {customerName && (
-                <div className="flex items-center justify-between py-3 border-b border-stone-line">
-                  <span className="flex items-center gap-2 text-base font-medium text-ink">
-                    <User size={16} className="text-teal-dim" /> {customerName.split(" ")[0]}
-                  </span>
-                  <button onClick={handleLogout} className="text-sm font-medium text-red-600">Log out</button>
-                </div>
-              )}
               <Link href="/business/signup" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
                 List your business
               </Link>

@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CheckCircle2, XCircle, Clock, ShieldCheck, LogOut, ExternalLink } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  CheckCircle2, XCircle, Clock, ShieldCheck, LogOut, ExternalLink,
+  LayoutDashboard, Building2, Users, CalendarClock, Search, Eye,
+  AlertCircle, TrendingUp, Star,
+} from "lucide-react";
 import { isEffectivelyVerified, VERIFICATION_DURATIONS, addMonths } from "@/lib/verification";
 
 type Business = {
@@ -27,10 +31,57 @@ type Business = {
   pending_changes: Record<string, any> | null;
 };
 
+type Customer = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  created_at: string;
+};
+
+type Booking = {
+  id: string;
+  business_id: string;
+  customer_name: string;
+  customer_contact: string;
+  customer_email: string | null;
+  service: string | null;
+  preferred_date: string | null;
+  preferred_time: string | null;
+  status: string;
+  source: "luupa" | "manual";
+  vehicle_make: string | null;
+  vehicle_model: string | null;
+  vehicle_plate: string | null;
+  created_at: string;
+  customer_id: string | null;
+  businesses: { name: string } | null;
+  customers: { name: string; email: string | null } | null;
+};
+
 const FIELD_LABELS: Record<string, string> = {
   name: "Name", logo_url: "Logo", subcategories: "Services offered", areas: "Areas served",
   phone: "Phone", whatsapp: "WhatsApp", hours: "Hours", description: "Description",
   services: "Services list", photos: "Photos",
+};
+
+const SECTIONS = [
+  { key: "overview", label: "Overview", icon: LayoutDashboard },
+  { key: "businesses", label: "Businesses", icon: Building2 },
+  { key: "customers", label: "Customers", icon: Users },
+  { key: "bookings", label: "Bookings", icon: CalendarClock },
+] as const;
+type Section = (typeof SECTIONS)[number]["key"];
+
+const BOOKING_STATUS_STYLES: Record<string, string> = {
+  pending: "bg-terra/10 text-terra-dim",
+  confirmed: "bg-teal/10 text-teal-dim",
+  declined: "bg-red-50 text-red-600",
+  arrived: "bg-skyblue/10 text-skyblue-dim",
+  in_progress: "bg-skyblue/10 text-skyblue-dim",
+  completed: "bg-navy/10 text-navy",
+  no_show: "bg-red-50 text-red-600",
+  cancelled: "bg-stone-line text-stone",
 };
 
 function formatFieldValue(key: string, value: any): string {
@@ -46,23 +97,36 @@ export default function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null); // null = checking
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [section, setSection] = useState<Section>("overview");
+
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [tab, setTab] = useState<"pending" | "active" | "suspended">("pending");
-  const [search, setSearch] = useState("");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+
+  const [bizTab, setBizTab] = useState<"pending" | "active" | "suspended">("pending");
+  const [bizSearch, setBizSearch] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [bookingStatusFilter, setBookingStatusFilter] = useState<string>("all");
+  const [bookingSearch, setBookingSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function checkSession() {
-    const res = await fetch("/api/admin/businesses");
-    if (res.ok) {
-      const data = await res.json();
-      setBusinesses(data.businesses);
-      setAuthed(true);
-    } else {
+  async function loadAll() {
+    const [bizRes, custRes, bookRes] = await Promise.all([
+      fetch("/api/admin/businesses"),
+      fetch("/api/admin/customers"),
+      fetch("/api/admin/bookings"),
+    ]);
+    if (!bizRes.ok) {
       setAuthed(false);
+      return;
     }
+    setBusinesses((await bizRes.json()).businesses ?? []);
+    if (custRes.ok) setCustomers((await custRes.json()).customers ?? []);
+    if (bookRes.ok) setBookings((await bookRes.json()).bookings ?? []);
+    setAuthed(true);
   }
 
-  useEffect(() => { checkSession(); }, []);
+  useEffect(() => { loadAll(); }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -73,7 +137,7 @@ export default function AdminPage() {
       body: JSON.stringify({ password }),
     });
     if (res.ok) {
-      checkSession();
+      loadAll();
     } else {
       const data = await res.json();
       setLoginError(data.error || "Login failed.");
@@ -93,7 +157,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ businessId, status, verified, verifiedUntil }),
     });
-    await checkSession();
+    await loadAll();
     setLoading(false);
   }
 
@@ -104,9 +168,43 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ businessId, action }),
     });
-    await checkSession();
+    await loadAll();
     setLoading(false);
   }
+
+  const counts = useMemo(() => ({
+    pending: businesses.filter((b) => b.status === "pending").length,
+    active: businesses.filter((b) => b.status === "active").length,
+    suspended: businesses.filter((b) => b.status === "suspended").length,
+  }), [businesses]);
+  const verifiedCount = businesses.filter((b) => isEffectivelyVerified(b)).length;
+  const pendingChangesCount = businesses.filter((b) => !!b.pending_changes).length;
+  const totalViews = businesses.reduce((sum, b) => sum + (b.view_count || 0), 0);
+  const pendingBookingsCount = bookings.filter((b) => b.status === "pending").length;
+
+  const filteredBusinesses = businesses
+    .filter((b) => b.status === bizTab)
+    .filter((b) => !bizSearch.trim() || b.name.toLowerCase().includes(bizSearch.trim().toLowerCase()));
+
+  const filteredCustomers = customers.filter(
+    (c) =>
+      !customerSearch.trim() ||
+      c.name?.toLowerCase().includes(customerSearch.trim().toLowerCase()) ||
+      c.email?.toLowerCase().includes(customerSearch.trim().toLowerCase()) ||
+      c.phone?.includes(customerSearch.trim())
+  );
+
+  const filteredBookings = bookings
+    .filter((b) => bookingStatusFilter === "all" || b.status === bookingStatusFilter)
+    .filter((b) => {
+      if (!bookingSearch.trim()) return true;
+      const q = bookingSearch.trim().toLowerCase();
+      return (
+        b.customer_name?.toLowerCase().includes(q) ||
+        b.businesses?.name?.toLowerCase().includes(q) ||
+        b.service?.toLowerCase().includes(q)
+      );
+    });
 
   if (authed === null) {
     return <div className="max-w-md mx-auto px-6 py-24 text-center text-stone">Loading…</div>;
@@ -137,67 +235,319 @@ export default function AdminPage() {
     );
   }
 
-  const filtered = businesses
-    .filter((b) => b.status === tab)
-    .filter((b) => !search.trim() || b.name.toLowerCase().includes(search.trim().toLowerCase()));
-  const counts = {
-    pending: businesses.filter((b) => b.status === "pending").length,
-    active: businesses.filter((b) => b.status === "active").length,
-    suspended: businesses.filter((b) => b.status === "suspended").length,
-  };
-  const verifiedCount = businesses.filter((b) => isEffectivelyVerified(b)).length;
-  const pendingChangesCount = businesses.filter((b) => !!b.pending_changes).length;
-  const totalViews = businesses.reduce((sum, b) => sum + (b.view_count || 0), 0);
-
   return (
-    <div className="max-w-4xl mx-auto px-6 py-10">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-3xl font-semibold text-ink">Review businesses</h1>
-        <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm text-stone hover:text-ink">
-          <LogOut size={14} /> Log out
-        </button>
-      </div>
-
-      {/* Overview — at-a-glance counts across everything, not just the current tab */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-6">
-        <OverviewStat label="Total" value={businesses.length} />
-        <OverviewStat label="Verified" value={verifiedCount} tone="navy" />
-        <OverviewStat label="Changes to review" value={pendingChangesCount} tone={pendingChangesCount > 0 ? "terra" : undefined} />
-        <OverviewStat label="Total views" value={totalViews} />
-        <OverviewStat label="Suspended" value={counts.suspended} tone={counts.suspended > 0 ? "red" : undefined} />
-      </div>
-
-      <div className="flex items-center gap-3 mt-6 flex-wrap">
-        <div className="flex gap-2">
-          {(["pending", "active", "suspended"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
-                tab === t ? "bg-navy text-white" : "bg-canvas2 text-ink/70"
-              }`}
-            >
-              {t} ({counts[t]})
-            </button>
-          ))}
+    <div className="min-h-screen flex flex-col md:flex-row bg-canvas2">
+      {/* Sidebar (desktop) / top tab bar (mobile) */}
+      <aside className="md:w-56 shrink-0 bg-navy text-white flex md:flex-col">
+        <div className="hidden md:block px-5 pt-6 pb-4">
+          <span className="font-display text-xl font-semibold tracking-wide">
+            luup<span className="text-teal">a</span> <span className="text-white/50 text-sm font-body font-normal">admin</span>
+          </span>
         </div>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name…"
-          className="input flex-1 min-w-[180px] max-w-xs"
-        />
-      </div>
+        <nav className="flex md:flex-col overflow-x-auto md:overflow-visible px-2 md:px-3 py-2 md:py-2 gap-1 flex-1">
+          {SECTIONS.map((s) => {
+            const Icon = s.icon;
+            const badge = s.key === "businesses" ? counts.pending : s.key === "bookings" ? pendingBookingsCount : 0;
+            return (
+              <button
+                key={s.key}
+                onClick={() => setSection(s.key)}
+                className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                  section === s.key ? "bg-white/15 text-white" : "text-white/65 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <Icon size={16} />
+                {s.label}
+                {badge > 0 && (
+                  <span className="ml-auto text-[10px] font-bold bg-terra text-white px-1.5 py-0.5 rounded-full">{badge}</span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="hidden md:block px-3 pb-4 pt-2 border-t border-white/10 mt-auto">
+          <button onClick={handleLogout} className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-sm font-medium text-white/65 hover:bg-white/10 hover:text-white w-full transition-colors">
+            <LogOut size={16} /> Log out
+          </button>
+        </div>
+      </aside>
 
-      <div className="mt-6 space-y-4">
-        {filtered.length === 0 && (
-          <p className="text-stone text-sm py-10 text-center">Nothing here right now.</p>
-        )}
-        {filtered.map((b) => (
-          <BusinessCard key={b.id} business={b} onUpdate={updateStatus} onReviewChanges={reviewChanges} loading={loading} />
-        ))}
+      <div className="flex-1 min-w-0">
+        <div className="md:hidden flex justify-end px-5 py-2 bg-white border-b border-stone-line">
+          <button onClick={handleLogout} className="flex items-center gap-1.5 text-xs text-stone">
+            <LogOut size={13} /> Log out
+          </button>
+        </div>
+
+        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8">
+          {section === "overview" && (
+            <OverviewSection
+              businesses={businesses}
+              customers={customers}
+              bookings={bookings}
+              counts={counts}
+              verifiedCount={verifiedCount}
+              pendingChangesCount={pendingChangesCount}
+              totalViews={totalViews}
+              pendingBookingsCount={pendingBookingsCount}
+              onJump={setSection}
+              onOpenBusinessTab={(t) => { setBizTab(t); setSection("businesses"); }}
+            />
+          )}
+
+          {section === "businesses" && (
+            <div>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Businesses</h1>
+              </div>
+              <div className="flex items-center gap-3 mt-5 flex-wrap">
+                <div className="flex gap-2">
+                  {(["pending", "active", "suspended"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setBizTab(t)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+                        bizTab === t ? "bg-navy text-white" : "bg-white border border-stone-line text-ink/70"
+                      }`}
+                    >
+                      {t} ({counts[t]})
+                    </button>
+                  ))}
+                </div>
+                <div className="relative flex-1 min-w-[180px] max-w-xs">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone" />
+                  <input
+                    value={bizSearch}
+                    onChange={(e) => setBizSearch(e.target.value)}
+                    placeholder="Search by name…"
+                    className="input pl-8"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                {filteredBusinesses.length === 0 && (
+                  <p className="text-stone text-sm py-10 text-center">Nothing here right now.</p>
+                )}
+                {filteredBusinesses.map((b) => (
+                  <BusinessCard key={b.id} business={b} onUpdate={updateStatus} onReviewChanges={reviewChanges} loading={loading} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {section === "customers" && (
+            <div>
+              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Customers</h1>
+              <p className="text-sm text-stone mt-1">{customers.length} account{customers.length === 1 ? "" : "s"} total</p>
+              <div className="relative mt-5 max-w-xs">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone" />
+                <input
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  placeholder="Search name, email, phone…"
+                  className="input pl-8"
+                />
+              </div>
+              <div className="mt-5 bg-white rounded-xl border border-stone-line overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-stone-line text-left text-xs text-stone uppercase tracking-wide">
+                        <th className="px-4 py-3 font-medium">Name</th>
+                        <th className="px-4 py-3 font-medium">Email</th>
+                        <th className="px-4 py-3 font-medium">Phone</th>
+                        <th className="px-4 py-3 font-medium">Bookings</th>
+                        <th className="px-4 py-3 font-medium">Joined</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCustomers.map((c) => (
+                        <tr key={c.id} className="border-b border-stone-line last:border-0 hover:bg-canvas2/60">
+                          <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">{c.name}</td>
+                          <td className="px-4 py-3 text-ink/80 whitespace-nowrap">{c.email || "—"}</td>
+                          <td className="px-4 py-3 text-ink/80 whitespace-nowrap">{c.phone ? `+${c.phone}` : "—"}</td>
+                          <td className="px-4 py-3 text-ink/80 whitespace-nowrap">
+                            {bookings.filter((bk) => bk.customer_id === c.id).length}
+                          </td>
+                          <td className="px-4 py-3 text-stone whitespace-nowrap">{new Date(c.created_at).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {filteredCustomers.length === 0 && (
+                  <p className="text-stone text-sm py-10 text-center">No customers match.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {section === "bookings" && (
+            <div>
+              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Bookings</h1>
+              <p className="text-sm text-stone mt-1">Across every business on the platform</p>
+              <div className="flex items-center gap-3 mt-5 flex-wrap">
+                <select
+                  value={bookingStatusFilter}
+                  onChange={(e) => setBookingStatusFilter(e.target.value)}
+                  className="input !w-auto"
+                >
+                  <option value="all">All statuses</option>
+                  {["pending", "confirmed", "declined", "arrived", "in_progress", "completed", "no_show", "cancelled"].map((s) => (
+                    <option key={s} value={s}>{s.replace("_", " ")}</option>
+                  ))}
+                </select>
+                <div className="relative flex-1 min-w-[180px] max-w-xs">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone" />
+                  <input
+                    value={bookingSearch}
+                    onChange={(e) => setBookingSearch(e.target.value)}
+                    placeholder="Search customer, business, service…"
+                    className="input pl-8"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-2.5">
+                {filteredBookings.length === 0 && (
+                  <p className="text-stone text-sm py-10 text-center">No bookings match.</p>
+                )}
+                {filteredBookings.map((b) => (
+                  <div key={b.id} className="bg-white rounded-xl border border-stone-line p-4 flex items-start justify-between gap-4 flex-wrap">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-ink">{b.businesses?.name ?? "Unknown business"}</p>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${BOOKING_STATUS_STYLES[b.status] ?? "bg-stone-line text-stone"}`}>
+                          {b.status.replace("_", " ")}
+                        </span>
+                        {b.source === "manual" && (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-stone-line text-stone">Manual entry</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-stone mt-1">
+                        {b.customer_name} · {b.customer_contact}
+                        {b.service ? ` · ${b.service}` : ""}
+                      </p>
+                      {(b.vehicle_make || b.vehicle_model || b.vehicle_plate) && (
+                        <p className="text-xs text-stone mt-0.5">
+                          {[b.vehicle_make, b.vehicle_model, b.vehicle_plate].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right text-xs text-stone shrink-0">
+                      {b.preferred_date && <p>{new Date(b.preferred_date).toLocaleDateString()}{b.preferred_time ? ` · ${b.preferred_time}` : ""}</p>}
+                      <p className="mt-0.5">Booked {new Date(b.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+function OverviewSection({
+  businesses, customers, bookings, counts, verifiedCount, pendingChangesCount, totalViews, pendingBookingsCount, onJump, onOpenBusinessTab,
+}: {
+  businesses: Business[];
+  customers: Customer[];
+  bookings: Booking[];
+  counts: { pending: number; active: number; suspended: number };
+  verifiedCount: number;
+  pendingChangesCount: number;
+  totalViews: number;
+  pendingBookingsCount: number;
+  onJump: (s: Section) => void;
+  onOpenBusinessTab: (t: "pending" | "active" | "suspended") => void;
+}) {
+  const needsAttention = businesses.filter((b) => b.status === "pending" || !!b.pending_changes);
+  const recentBookings = bookings.slice(0, 6);
+
+  return (
+    <div>
+      <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Overview</h1>
+      <p className="text-sm text-stone mt-1">Everything on Luupa, at a glance.</p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+        <StatCard icon={Building2} label="Total businesses" value={businesses.length} onClick={() => onJump("businesses")} />
+        <StatCard icon={AlertCircle} label="Pending review" value={counts.pending} tone={counts.pending > 0 ? "terra" : undefined} onClick={() => onOpenBusinessTab("pending")} />
+        <StatCard icon={ShieldCheck} label="Verified" value={verifiedCount} tone="navy" />
+        <StatCard icon={XCircle} label="Suspended" value={counts.suspended} tone={counts.suspended > 0 ? "red" : undefined} onClick={() => onOpenBusinessTab("suspended")} />
+        <StatCard icon={Users} label="Customer accounts" value={customers.length} onClick={() => onJump("customers")} />
+        <StatCard icon={CalendarClock} label="Bookings, pending" value={pendingBookingsCount} tone={pendingBookingsCount > 0 ? "terra" : undefined} onClick={() => onJump("bookings")} />
+        <StatCard icon={TrendingUp} label="Total profile views" value={totalViews} />
+        <StatCard icon={Star} label="Changes to review" value={pendingChangesCount} tone={pendingChangesCount > 0 ? "terra" : undefined} onClick={() => onJump("businesses")} />
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-5 mt-8">
+        <div className="bg-white rounded-xl border border-stone-line p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display text-lg font-semibold text-ink">Needs your attention</h2>
+            <button onClick={() => onJump("businesses")} className="text-xs font-medium text-navy hover:underline">View all</button>
+          </div>
+          {needsAttention.length === 0 ? (
+            <p className="text-sm text-stone py-6 text-center">Nothing waiting on you — nice.</p>
+          ) : (
+            <div className="space-y-2">
+              {needsAttention.slice(0, 6).map((b) => (
+                <button
+                  key={b.id}
+                  onClick={() => onOpenBusinessTab(b.status === "pending" ? "pending" : "active")}
+                  className="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-canvas2 text-left transition-colors"
+                >
+                  <span className="text-sm font-medium text-ink truncate">{b.name}</span>
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-terra/10 text-terra-dim shrink-0">
+                    {b.status === "pending" ? "New application" : "Pending changes"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-stone-line p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display text-lg font-semibold text-ink">Recent bookings</h2>
+            <button onClick={() => onJump("bookings")} className="text-xs font-medium text-navy hover:underline">View all</button>
+          </div>
+          {recentBookings.length === 0 ? (
+            <p className="text-sm text-stone py-6 text-center">No bookings yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {recentBookings.map((b) => (
+                <div key={b.id} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-ink truncate">{b.businesses?.name ?? "—"}</p>
+                    <p className="text-xs text-stone truncate">{b.customer_name}</p>
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize shrink-0 ${BOOKING_STATUS_STYLES[b.status] ?? "bg-stone-line text-stone"}`}>
+                    {b.status.replace("_", " ")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, tone, onClick }: { icon: any; label: string; value: number; tone?: "navy" | "terra" | "red"; onClick?: () => void }) {
+  const tones = { navy: "text-navy", terra: "text-terra-dim", red: "text-red-600" };
+  const Comp = onClick ? "button" : "div";
+  return (
+    <Comp onClick={onClick} className={`bg-white rounded-xl border border-stone-line px-4 py-3.5 text-left ${onClick ? "hover:border-navy/30 transition-colors" : ""}`}>
+      <div className="flex items-center gap-1.5 text-stone">
+        <Icon size={13} />
+        <p className="text-xs">{label}</p>
+      </div>
+      <p className={`font-display text-2xl font-semibold mt-1 ${tone ? tones[tone] : "text-ink"}`}>{value}</p>
+    </Comp>
   );
 }
 
@@ -224,9 +574,18 @@ function BusinessCard({
   return (
     <div className="border border-stone-line rounded-xl p-5 bg-white">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="font-display text-lg font-semibold text-ink">{b.name}</h3>
-          <p className="text-xs text-stone mt-0.5">{(b.subcategories || []).join(", ")} · {(b.areas || []).join(", ")}</p>
+        <div className="flex items-start gap-3 min-w-0">
+          {b.logo_url ? (
+            <img src={b.logo_url} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0 border border-stone-line" />
+          ) : (
+            <div className="w-11 h-11 rounded-lg bg-navy/10 text-navy flex items-center justify-center shrink-0 font-display font-semibold">
+              {b.name?.[0]?.toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0">
+            <h3 className="font-display text-lg font-semibold text-ink truncate">{b.name}</h3>
+            <p className="text-xs text-stone mt-0.5 truncate">{(b.subcategories || []).join(", ")} · {(b.areas || []).join(", ")}</p>
+          </div>
         </div>
         <StatusPill status={b.status} />
       </div>
@@ -258,8 +617,9 @@ function BusinessCard({
         <p className="text-sm text-stone mt-3 italic">"{b.applicant_note}"</p>
       )}
 
-      <p className="text-xs text-stone mt-3">
-        Applied {new Date(b.created_at).toLocaleDateString()} · {b.view_count} views
+      <p className="text-xs text-stone mt-3 flex items-center gap-1.5 flex-wrap">
+        Applied {new Date(b.created_at).toLocaleDateString()}
+        <span className="flex items-center gap-1"><Eye size={11} /> {b.view_count} views</span>
         {b.verified && (
           <> · {effectivelyVerified
             ? (b.verified_until ? `Verified until ${new Date(b.verified_until).toLocaleDateString()}` : "Verified (no expiry)")
@@ -278,7 +638,7 @@ function BusinessCard({
                 value,
                 changed: formatFieldValue(key, value) !== formatFieldValue(key, (business as any)[key]),
               }))
-              .sort((a, b) => Number(b.changed) - Number(a.changed)) // changed fields first
+              .sort((a, b) => Number(b.changed) - Number(a.changed))
               .map(({ key, value, changed }) => (
                 <div
                   key={key}
@@ -379,27 +739,13 @@ function BusinessCard({
   );
 }
 
-function OverviewStat({ label, value, tone }: { label: string; value: number; tone?: "navy" | "terra" | "red" }) {
-  const tones = {
-    navy: "text-navy",
-    terra: "text-terra-dim",
-    red: "text-red-600",
-  };
-  return (
-    <div className="rounded-lg bg-canvas2 px-3.5 py-3">
-      <p className={`font-display text-xl font-semibold ${tone ? tones[tone] : "text-ink"}`}>{value}</p>
-      <p className="text-xs text-stone mt-0.5">{label}</p>
-    </div>
-  );
-}
-
 function StatusPill({ status }: { status: string }) {
   const styles = {
     pending: "bg-terra/10 text-terra-dim",
     active: "bg-navy/10 text-navy",
     suspended: "bg-red-50 text-red-600",
   }[status] ?? "bg-stone-line text-stone";
-  return <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${styles}`}>{status}</span>;
+  return <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize shrink-0 ${styles}`}>{status}</span>;
 }
 
 function Info({ label, value, link }: { label: string; value: string; link?: string }) {

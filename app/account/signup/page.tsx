@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { safeNextPath } from "@/lib/validation";
 import PhoneInput from "@/components/PhoneInput";
+import GoogleAuthButton from "@/components/GoogleAuthButton";
 
 function AccountSignupForm() {
   const [name, setName] = useState("");
@@ -56,7 +57,16 @@ function AccountSignupForm() {
         One account to book with any business on Luupa — no retyping your details every time.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+      <div className="mt-8">
+        <GoogleAuthButton next={next} label="Sign up with Google" />
+      </div>
+      <div className="flex items-center gap-3 my-6">
+        <div className="h-px bg-stone-line flex-1" />
+        <span className="text-xs text-stone">or</span>
+        <div className="h-px bg-stone-line flex-1" />
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
           <span className="text-sm font-medium text-ink">Full name</span>
           <input required value={name} onChange={(e) => setName(e.target.value)} className="input mt-1" />

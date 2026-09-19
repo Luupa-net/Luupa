@@ -4,13 +4,33 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
-export default function HeroSearch() {
+export default function HeroSearch({ compact = false }: { compact?: boolean }) {
   const [query, setQuery] = useState("");
   const router = useRouter();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     router.push(`/browse?q=${encodeURIComponent(query)}`);
+  }
+
+  if (compact) {
+    return (
+      <form onSubmit={handleSubmit} className="relative w-full max-w-md mx-auto">
+        <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Ceramic coating in Riffa…"
+          className="w-full h-[52px] rounded-full bg-white border border-stone-line text-ink placeholder:text-stone pl-11 pr-28 font-bodyAlt text-[15px] shadow-sm focus:outline-none focus:ring-2 focus:ring-teal/40 focus:border-teal/40 transition-shadow"
+        />
+        <button
+          type="submit"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 h-10 px-5 rounded-full bg-navy text-white font-bodyAlt font-semibold text-sm hover:bg-navy-light active:scale-[0.97] transition-all"
+        >
+          Search
+        </button>
+      </form>
+    );
   }
 
   return (

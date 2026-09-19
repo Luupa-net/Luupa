@@ -3,7 +3,6 @@ import HeroSearch from "@/components/HeroSearch";
 import SlidingPrompts from "@/components/SlidingPrompts";
 import ComingSoon from "@/components/ComingSoon";
 import FeaturedCard from "@/components/FeaturedCard";
-import BahrainMap from "@/components/BahrainMap";
 import Reveal from "@/components/Reveal";
 import type { Listing } from "@/components/ListingCard";
 import { supabase } from "@/lib/supabase";
@@ -47,28 +46,71 @@ export default async function HomePage() {
 
   return (
     <div className="bg-cream">
-      {/* HERO — side by side: search left, Bahrain map right */}
-      <section className="max-w-6xl mx-auto px-5 pt-16 sm:pt-24 pb-14 sm:pb-20">
-        <div className="flex flex-col lg:flex-row items-center gap-12">
-          <div className="flex-1 max-w-xl">
+      {/* HERO — a calm, centered moment: mark, categories, one small search bar.
+          No competing hero image/map; the category grid itself is the visual. */}
+      <section className="relative overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute -top-24 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full bg-navy/[0.06] blur-3xl drift-slow pointer-events-none"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none opacity-[0.4]"
+          style={{
+            backgroundImage: "radial-gradient(circle, rgba(20,24,31,0.08) 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+            maskImage: "radial-gradient(ellipse 70% 60% at 50% 20%, black, transparent)",
+            WebkitMaskImage: "radial-gradient(ellipse 70% 60% at 50% 20%, black, transparent)",
+          }}
+        />
+
+        <div className="relative max-w-4xl mx-auto px-5 pt-16 sm:pt-24 pb-6 text-center">
+          <Reveal>
             <span className="inline-flex items-center gap-2 bg-ink text-cream text-xs font-bodyAlt font-semibold px-4 py-2 rounded-full mb-7">
               Now onboarding founding businesses in Bahrain
             </span>
-            <h1 className="font-displayAlt text-4xl sm:text-5xl lg:text-[64px] leading-[0.98] font-bold tracking-tight text-ink mb-6">
+          </Reveal>
+          <Reveal delay={80}>
+            <h1 className="font-displayAlt text-4xl sm:text-5xl lg:text-6xl leading-[1.02] font-bold tracking-tight text-ink mb-4">
               Everything car care,<br />in one <span className="text-teal">place.</span>
             </h1>
-            <p className="font-bodyAlt text-lg text-stone mb-9 leading-relaxed">
-              Find a real, reviewed detailing shop, tinting studio or ceramic coating pro near you — no more guessing from a random Instagram post.
+          </Reveal>
+          <Reveal delay={140}>
+            <p className="font-bodyAlt text-base sm:text-lg text-stone mb-10 max-w-xl mx-auto leading-relaxed">
+              Real, reviewed detailing shops, tinting studios and ceramic coating pros — no more guessing from a random Instagram post.
             </p>
-            <HeroSearch />
-          </div>
-
-          <BahrainMap />
+          </Reveal>
         </div>
+
+        {/* CATEGORIES — the primary way in, front and center */}
+        <Reveal delay={180} className="relative max-w-4xl mx-auto px-5">
+          <div className="grid grid-cols-4 gap-2.5 sm:gap-4">
+            {SUBCATEGORIES.map((name) => {
+              const Icon = CATEGORY_ICONS[name] || Sparkles;
+              return (
+                <Link
+                  key={name}
+                  href={`/browse?sub=${encodeURIComponent(name)}`}
+                  className="group flex flex-col items-center text-center gap-2 sm:gap-3 bg-white/80 backdrop-blur-sm border border-stone-line rounded-2xl px-2 py-4 sm:px-4 sm:py-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-teal/40"
+                >
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-teal/10 text-teal-dim flex items-center justify-center group-hover:bg-teal group-hover:text-white transition-colors">
+                    <Icon size={20} />
+                  </div>
+                  <span className="font-bodyAlt text-[11px] sm:text-sm font-semibold text-ink leading-tight">{name}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </Reveal>
+
+        {/* SEARCH — one small, centered bar under the categories */}
+        <Reveal delay={240} className="relative max-w-4xl mx-auto px-5 pt-8 pb-16 sm:pb-20">
+          <HeroSearch compact />
+        </Reveal>
       </section>
 
       {/* TRUST STRIP */}
-      <section className="max-w-6xl mx-auto px-5 pb-16 sm:pb-20 flex flex-wrap gap-x-10 gap-y-3 font-bodyAlt">
+      <section className="max-w-6xl mx-auto px-5 pb-16 sm:pb-20 flex flex-wrap justify-center gap-x-10 gap-y-3 font-bodyAlt">
         {["Free to list, always", "Every listing personally reviewed", "Built in Bahrain, for Bahrain"].map((t, i) => (
           <Reveal key={t} delay={i * 150}>
             <div className="flex items-center gap-2 text-sm font-semibold text-ink">
@@ -78,28 +120,6 @@ export default async function HomePage() {
           </Reveal>
         ))}
       </section>
-
-      {/* CATEGORIES — browse by what you need, not by scrolling everything */}
-      <Reveal className="max-w-6xl mx-auto px-5 pb-16 sm:pb-20">
-        <h2 className="font-displayAlt text-xl sm:text-2xl font-bold text-ink mb-5">Browse by category</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          {SUBCATEGORIES.map((name) => {
-            const Icon = CATEGORY_ICONS[name] || Sparkles;
-            return (
-              <Link
-                key={name}
-                href={`/browse?sub=${encodeURIComponent(name)}`}
-                className="group flex flex-col items-center text-center gap-3 bg-white border border-stone-line rounded-2xl px-4 py-7 transition-all duration-200 hover:-translate-y-1 hover:scale-[1.04] hover:shadow-lg hover:border-teal/40"
-              >
-                <div className="w-12 h-12 rounded-xl bg-teal/10 text-teal-dim flex items-center justify-center group-hover:bg-teal group-hover:text-white transition-colors">
-                  <Icon size={22} />
-                </div>
-                <span className="font-bodyAlt text-sm font-semibold text-ink leading-tight">{name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </Reveal>
 
       <div className="max-w-6xl mx-auto px-5">
         {/* TWO PANELS */}

@@ -31,6 +31,21 @@ const COUNTRIES = [
   { code: "1", name: "US / Canada", flag: "🇺🇸" },
 ];
 
+// Country codes have no fixed length (Bahrain's is 3 digits, the US's is 1),
+// and the stored value is just the digits concatenated with no delimiter —
+// so splitting it back into code + local number means matching against the
+// known list of codes, longest first, rather than blindly slicing off a
+// fixed number of digits (which silently ate real digits off the front of
+// the local number whenever the code wasn't exactly 4 digits long).
+const CODES_BY_LENGTH_DESC = [...COUNTRIES].sort((a, b) => b.code.length - a.code.length);
+
+function splitStoredNumber(value: string): { code: string; local: string } {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return { code: "973", local: "" };
+  const match = CODES_BY_LENGTH_DESC.find((c) => digits.startsWith(c.code));
+  return match ? { code: match.code, local: digits.slice(match.code.length) } : { code: "973", local: digits };
+}
+
 export default function PhoneInput({
   value,
   onChange,
@@ -40,8 +55,9 @@ export default function PhoneInput({
   onChange: (fullNumber: string) => void;
   placeholder?: string;
 }) {
-  const [countryCode, setCountryCode] = useState("973");
-  const [localNumber, setLocalNumber] = useState(value.replace(/^\+?\d{1,4}/, "")); // rough strip on first mount
+  const initial = splitStoredNumber(value);
+  const [countryCode, setCountryCode] = useState(initial.code);
+  const [localNumber, setLocalNumber] = useState(initial.local);
 
   function update(code: string, local: string) {
     setCountryCode(code);
@@ -51,10 +67,14 @@ export default function PhoneInput({
 
   return (
     <div className="flex gap-2">
+      {/* !w-* is required here: the global .input class sets width:100% and
+          wins the cascade over a plain w-[…] utility (same specificity,
+          later in source order), which used to blow this select up to fill
+          the row and squeeze the number field down to almost nothing. */}
       <select
         value={countryCode}
         onChange={(e) => update(e.target.value, localNumber)}
-        className="input w-[92px] shrink-0 px-2"
+        className="input !w-[104px] shrink-0 px-2"
       >
         {COUNTRIES.map((c) => (
           <option key={c.code} value={c.code}>{c.flag} +{c.code}</option>
@@ -64,7 +84,7 @@ export default function PhoneInput({
         placeholder={placeholder}
         value={localNumber}
         onChange={(e) => update(countryCode, e.target.value)}
-        className="input flex-1"
+        className="input flex-1 min-w-0"
       />
     </div>
   );

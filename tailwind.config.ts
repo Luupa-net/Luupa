@@ -8,11 +8,16 @@ const config: Config = {
         canvas: "#FFFFFF",
         canvas2: "#F7F6F3",
         ink: "#14181F",
-        // Navy: the primary brand color — modern, trustworthy, premium. Used generously.
+        // Racing green: the primary brand color — deep, automotive, premium.
+        // Chosen over navy to give Luupa a distinct identity in a market where
+        // competitors already own red (Dubizzle) and blue (most GCC tech/fintech).
+        // Kept under the "navy" token name since it fills the same role
+        // everywhere (primary buttons, headings, dashboard chrome) — only the
+        // hue changed, not what it's used for.
         navy: {
-          DEFAULT: "#152A4E",
-          light: "#1F3A66",
-          dim: "#0D1B33",
+          DEFAULT: "#0F3D2E",
+          light: "#1B5745",
+          dim: "#06251C",
         },
         // Terracotta: sparse accent, only for key actions — never a full section wash.
         terra: {
@@ -26,11 +31,13 @@ const config: Config = {
           line: "#E7E5E0",
         },
         graphite: "#14181F",
-        // Homepage refresh only — a brighter accent pair, used alongside navy/ink,
-        // not a replacement for terra/navy elsewhere in the app.
+        // Bright accent green — the "racing green" family's lighter half.
+        // Deliberately Tailwind's emerald-600, not a neon/lime green: it holds
+        // WCAG AA contrast as small text on white (nav logo, links) without
+        // being harsh on the eyes next to a white background.
         teal: {
-          DEFAULT: "#0D9488",
-          dim: "#0B7A70",
+          DEFAULT: "#059669",
+          dim: "#047857",
         },
         skyblue: {
           DEFAULT: "#2D6CDF",
