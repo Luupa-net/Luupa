@@ -27,7 +27,7 @@ export default function ComingSoon() {
           <span
             key={c}
             className={`text-xs px-3.5 py-2 rounded-full font-bodyAlt font-semibold transition-all duration-500 ${
-              i === active ? "bg-coral text-white scale-105" : "bg-white/10 text-white"
+              i === active ? "bg-teal text-white scale-105" : "bg-white/10 text-white"
             }`}
           >
             {c}

@@ -1,8 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { isEffectivelyVerified } from "@/lib/verification";
-import { BadgeCheck, Phone, MapPin, Clock, Car } from "lucide-react";
+import { BadgeCheck, Phone, MapPin, Clock, Car, MessageCircle } from "lucide-react";
 import { notFound } from "next/navigation";
-import RequestQuoteForm from "@/components/RequestQuoteForm";
 import BookingForm from "@/components/BookingForm";
 
 export default async function ListingPage({ params }: { params: Promise<{ id: string }> }) {
@@ -76,17 +75,18 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
               <p className="flex items-center gap-2 text-stone"><Clock size={15}/> {listing.hours}</p>
             )}
           </div>
-          {listing.whatsapp && (
-            <a
-              href={`https://wa.me/${listing.whatsapp}?text=${waMessage}`}
-              target="_blank"
-              className="inline-block mt-5 px-6 py-3 rounded-full bg-terra text-white font-semibold hover:bg-terra-dim active:scale-95 transition-colors"
-            >
-              Message on WhatsApp
-            </a>
-          )}
-          <RequestQuoteForm businessId={listing.id} />
-          <BookingForm businessId={listing.id} services={listing.services} />
+          <div className="flex flex-col sm:flex-row gap-3 mt-5">
+            {listing.whatsapp && (
+              <a
+                href={`https://wa.me/${listing.whatsapp}?text=${waMessage}`}
+                target="_blank"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border-2 border-terra text-terra-dim font-semibold hover:bg-terra/5 active:scale-95 transition-colors"
+              >
+                <MessageCircle size={16} /> Message on WhatsApp
+              </a>
+            )}
+            <BookingForm businessId={listing.id} services={listing.services} />
+          </div>
         </div>
 
         {listing.services && listing.services.length > 0 && (

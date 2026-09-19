@@ -287,15 +287,68 @@ create table bookings (
 
 alter table bookings enable row level security;
 
-create policy "Anyone can submit a booking request"
+-- Customer accounts — lets a customer reuse their name/phone/email across
+-- every business they book with, instead of retyping it each time.
+create table customers (
+  id uuid primary key references auth.users(id) on delete cascade,
+  name text not null,
+  email text,
+  phone text,
+  created_at timestamptz default now()
+);
+
+alter table customers enable row level security;
+
+create policy "Customers can view their own profile"
+  on customers for select
+  using (auth.uid() = id);
+
+create policy "Customers can create their own profile"
+  on customers for insert
+  with check (auth.uid() = id);
+
+create policy "Customers can update their own profile"
+  on customers for update
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
+
+-- Links a booking back to the customer account that made it (nullable — a
+-- business's own manually-entered walk-ins/phone bookings have no customer
+-- account behind them).
+alter table bookings add column customer_id uuid references customers(id);
+
+-- SECURITY: a `with check (true)` insert policy here would let anyone with
+-- the anon key create a booking directly via the REST API for any
+-- business_id, with any status (including 'confirmed', skipping the
+-- business's review step), with no auth required. These two policies
+-- instead require a real authenticated customer for customer-initiated
+-- bookings, and require the caller to actually own the business for
+-- manual/walk-in bookings.
+create policy "Customers can submit a booking request"
   on bookings for insert
-  with check (true);
+  with check (
+    source = 'luupa'
+    and status = 'pending'
+    and auth.uid() is not null
+    and customer_id = auth.uid()
+  );
+
+create policy "Business owners can log a manual booking"
+  on bookings for insert
+  with check (
+    source = 'manual'
+    and business_id in (select id from businesses where owner_id = auth.uid())
+  );
 
 create policy "Owners can view their own bookings"
   on bookings for select
   using (
     business_id in (select id from businesses where owner_id = auth.uid())
   );
+
+create policy "Customers can view their own bookings"
+  on bookings for select
+  using (auth.uid() = customer_id);
 
 create policy "Owners can update their own bookings"
   on bookings for update

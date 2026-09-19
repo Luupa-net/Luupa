@@ -21,12 +21,12 @@ export default function HeroSearch() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Ceramic coating in Riffa…"
-          className="w-full h-16 rounded-2xl bg-white border-2 border-ink text-ink placeholder:text-stone pl-12 pr-4 font-bodyAlt text-[16px] focus:outline-none focus:ring-2 focus:ring-coral transition-shadow"
+          className="w-full h-16 rounded-2xl bg-white border-2 border-ink text-ink placeholder:text-stone pl-12 pr-4 font-bodyAlt text-[16px] focus:outline-none focus:ring-2 focus:ring-teal transition-shadow"
         />
       </div>
       <button
         type="submit"
-        className="h-16 px-9 rounded-2xl bg-coral text-white font-bodyAlt font-bold text-[16px] hover:bg-coral-dim active:scale-[0.98] transition-all shrink-0"
+        className="h-16 px-9 rounded-2xl bg-teal text-white font-bodyAlt font-bold text-[16px] hover:bg-teal-dim active:scale-[0.98] transition-all shrink-0"
       >
         Search
       </button>

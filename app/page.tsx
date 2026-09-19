@@ -7,7 +7,26 @@ import BahrainMap from "@/components/BahrainMap";
 import Reveal from "@/components/Reveal";
 import type { Listing } from "@/components/ListingCard";
 import { supabase } from "@/lib/supabase";
-import { ArrowUpRight, Check, Search as SearchIcon, MessageCircle, BadgeCheck } from "lucide-react";
+import { SUBCATEGORIES } from "@/lib/taxonomy";
+import {
+  ArrowUpRight, Check, Search as SearchIcon, MessageCircle, BadgeCheck,
+  Sparkles, Blinds, ShieldCheck, Droplets, Palette, Paintbrush2, Wrench, Car,
+  type LucideIcon,
+} from "lucide-react";
+
+// Keyed off lib/taxonomy's SUBCATEGORIES (the source of truth used for
+// filtering /browse?sub=...) rather than a separate hardcoded list, so the
+// homepage grid can't silently drift out of sync with the real categories.
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  "Detailing": Sparkles,
+  "Window Tinting": Blinds,
+  "Ceramic Coating & PPF": ShieldCheck,
+  "Car Wash": Droplets,
+  "Wraps & Vinyl": Palette,
+  "Paint Correction": Paintbrush2,
+  "Engine Detailing": Wrench,
+  "Mobile Detailing": Car,
+};
 
 // Real database read on every visit, refreshed at most every 30s — see git
 // history for why this specific value matters (fixed a real slowness bug).
@@ -36,7 +55,7 @@ export default async function HomePage() {
               Now onboarding founding businesses in Bahrain
             </span>
             <h1 className="font-displayAlt text-4xl sm:text-5xl lg:text-[64px] leading-[0.98] font-bold tracking-tight text-ink mb-6">
-              Everything car care,<br />in one <span className="text-coral">place.</span>
+              Everything car care,<br />in one <span className="text-teal">place.</span>
             </h1>
             <p className="font-bodyAlt text-lg text-stone mb-9 leading-relaxed">
               Find a real, reviewed detailing shop, tinting studio or ceramic coating pro near you — no more guessing from a random Instagram post.
@@ -53,12 +72,34 @@ export default async function HomePage() {
         {["Free to list, always", "Every listing personally reviewed", "Built in Bahrain, for Bahrain"].map((t, i) => (
           <Reveal key={t} delay={i * 150}>
             <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <Check size={18} className="text-coral" strokeWidth={3} />
+              <Check size={18} className="text-teal" strokeWidth={3} />
               {t}
             </div>
           </Reveal>
         ))}
       </section>
+
+      {/* CATEGORIES — browse by what you need, not by scrolling everything */}
+      <Reveal className="max-w-6xl mx-auto px-5 pb-16 sm:pb-20">
+        <h2 className="font-displayAlt text-xl sm:text-2xl font-bold text-ink mb-5">Browse by category</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          {SUBCATEGORIES.map((name) => {
+            const Icon = CATEGORY_ICONS[name] || Sparkles;
+            return (
+              <Link
+                key={name}
+                href={`/browse?sub=${encodeURIComponent(name)}`}
+                className="group flex flex-col items-center text-center gap-3 bg-white border border-stone-line rounded-2xl px-4 py-7 transition-all duration-200 hover:-translate-y-1 hover:scale-[1.04] hover:shadow-lg hover:border-teal/40"
+              >
+                <div className="w-12 h-12 rounded-xl bg-teal/10 text-teal-dim flex items-center justify-center group-hover:bg-teal group-hover:text-white transition-colors">
+                  <Icon size={22} />
+                </div>
+                <span className="font-bodyAlt text-sm font-semibold text-ink leading-tight">{name}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </Reveal>
 
       <div className="max-w-6xl mx-auto px-5">
         {/* TWO PANELS */}
@@ -75,14 +116,14 @@ export default async function HomePage() {
         <Reveal className="py-14 sm:py-16">
           <div className="flex items-baseline justify-between mb-5">
             <h2 className="font-displayAlt text-xl sm:text-2xl font-bold text-ink">Featured this week</h2>
-            <Link href="/browse" className="text-sm text-coral font-bodyAlt font-bold flex items-center gap-0.5 hover:gap-1.5 transition-all">
+            <Link href="/browse" className="text-sm text-teal font-bodyAlt font-bold flex items-center gap-0.5 hover:gap-1.5 transition-all">
               Browse all <ArrowUpRight size={14} />
             </Link>
           </div>
           {featured.length === 0 ? (
             <div className="rounded-xl border border-dashed border-stone-line p-10 text-center">
               <p className="text-stone text-sm">No businesses featured yet — the first ones to join get seen first.</p>
-              <Link href="/business/signup" className="text-coral font-bodyAlt font-bold text-sm mt-1.5 inline-block">
+              <Link href="/business/signup" className="text-teal font-bodyAlt font-bold text-sm mt-1.5 inline-block">
                 List yours first →
               </Link>
             </div>
@@ -108,7 +149,7 @@ export default async function HomePage() {
             { icon: MessageCircle, title: "Message on WhatsApp", body: "Straight to the business, no middleman." },
           ].map((step, i) => (
             <div key={step.title}>
-              <div className="w-14 h-14 rounded-2xl bg-coral text-white font-displayAlt font-bold text-xl flex items-center justify-center mx-auto mb-5">
+              <div className="w-14 h-14 rounded-2xl bg-teal text-white font-displayAlt font-bold text-xl flex items-center justify-center mx-auto mb-5">
                 {i + 1}
               </div>
               <p className="font-displayAlt text-lg font-bold text-ink mb-1.5">{step.title}</p>
@@ -149,7 +190,7 @@ export default async function HomePage() {
       {/* FOUNDING OFFER */}
       <Reveal className="px-5 pb-20 sm:pb-24">
         <div className="max-w-6xl mx-auto relative bg-ink rounded-[32px] px-8 py-14 sm:px-16 sm:py-20 text-center overflow-hidden">
-          <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full bg-coral/25 blur-2xl" />
+          <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full bg-teal/25 blur-2xl" />
           <div className="absolute -bottom-20 -right-10 w-64 h-64 rounded-full bg-skyblue/20 blur-2xl" />
 
           <div className="relative">
@@ -164,7 +205,7 @@ export default async function HomePage() {
             </p>
             <Link
               href="/business/signup"
-              className="inline-block mt-8 px-9 py-4 rounded-full bg-coral text-white font-bodyAlt font-bold hover:bg-coral-dim active:scale-[0.98] transition-all"
+              className="inline-block mt-8 px-9 py-4 rounded-full bg-teal text-white font-bodyAlt font-bold hover:bg-teal-dim active:scale-[0.98] transition-all"
             >
               List your business
             </Link>

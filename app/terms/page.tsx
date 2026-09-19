@@ -27,7 +27,7 @@ export default function TermsPage() {
         </section>
         <section>
           <h2 className="font-bodyAlt font-bold text-ink mb-2">6. Contact</h2>
-          <p>Questions about these terms can be sent to <a href="mailto:luupa.net@gmail.com" className="text-coral font-semibold">luupa.net@gmail.com</a>.</p>
+          <p>Questions about these terms can be sent to <a href="mailto:luupa.net@gmail.com" className="text-teal font-semibold">luupa.net@gmail.com</a>.</p>
         </section>
       </div>
     </div>

@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { isEffectivelyVerified } from "@/lib/verification";
 import {
   Menu, X, Home, ChevronDown, LayoutDashboard, BadgeCheck, LogOut, Eye,
-  Inbox, CalendarClock,
+  Inbox, CalendarClock, User,
 } from "lucide-react";
 
 type BusinessSession = {
@@ -22,6 +22,7 @@ type BusinessSession = {
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [business, setBusiness] = useState<BusinessSession | null>(null);
+  const [customerName, setCustomerName] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [checked, setChecked] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -33,6 +34,7 @@ export default function Navbar() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
       setBusiness(null);
+      setCustomerName(null);
       setChecked(true);
       return;
     }
@@ -45,6 +47,7 @@ export default function Navbar() {
     setChecked(true);
 
     if (data) {
+      setCustomerName(null);
       // Both counts run at the same time, not one after another
       const [{ count: unread }, { count: pending }] = await Promise.all([
         supabase.from("inquiries").select("*", { count: "exact", head: true }).eq("business_id", data.id).eq("read", false),
@@ -52,6 +55,14 @@ export default function Navbar() {
       ]);
       setUnreadCount(unread || 0);
       setPendingBookingsCount(pending || 0);
+    } else {
+      // Not a business owner — check whether this session belongs to a customer account instead.
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("name")
+        .eq("id", session.user.id)
+        .single();
+      setCustomerName(customer?.name ?? null);
     }
   }
 
@@ -90,7 +101,7 @@ export default function Navbar() {
       <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
           <span className="font-display text-2xl font-semibold text-ink tracking-wide">
-            luup<span className="text-coral">a</span>
+            luup<span className="text-teal">a</span>
           </span>
         </Link>
 
@@ -148,6 +159,30 @@ export default function Navbar() {
             </>
           ) : (
             <>
+              {customerName && (
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() => setDropdownOpen((o) => !o)}
+                    className="flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full border border-stone-line hover:border-teal/30 transition-colors"
+                  >
+                    <span className="w-7 h-7 rounded-full bg-teal/10 flex items-center justify-center shrink-0">
+                      <User size={14} className="text-teal-dim" />
+                    </span>
+                    <span className="text-ink font-medium max-w-[120px] truncate">{customerName.split(" ")[0]}</span>
+                    <ChevronDown size={14} className={`text-stone transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {dropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl border border-stone-line shadow-lg shadow-black/5 py-1.5 animate-[fadeUp_0.15s_ease-out]">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <LogOut size={15} /> Log out
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               <Link href="/business/signup" className="hover:text-ink transition-colors">List your business</Link>
               <Link
                 href="/business/login"
@@ -229,6 +264,14 @@ export default function Navbar() {
             </>
           ) : (
             <>
+              {customerName && (
+                <div className="flex items-center justify-between py-3 border-b border-stone-line">
+                  <span className="flex items-center gap-2 text-base font-medium text-ink">
+                    <User size={16} className="text-teal-dim" /> {customerName.split(" ")[0]}
+                  </span>
+                  <button onClick={handleLogout} className="text-sm font-medium text-red-600">Log out</button>
+                </div>
+              )}
               <Link href="/business/signup" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
                 List your business
               </Link>

@@ -39,7 +39,7 @@ export default function BahrainMap() {
 
       {STOPS.map((s) => (
         <div key={s.name} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ top: `${s.top}%`, left: `${s.left}%` }}>
-          <span className="w-2 h-2 rounded-full bg-coral/40 block" />
+          <span className="w-2 h-2 rounded-full bg-teal/40 block" />
           <span className="absolute top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-bold bg-white px-2.5 py-1 rounded-full shadow-sm">
             {s.name}
           </span>
@@ -47,7 +47,7 @@ export default function BahrainMap() {
       ))}
 
       {/* Magnifying glass, looping between stops — "searching" the map */}
-      <div className="search-loop absolute -translate-x-1/2 -translate-y-1/2 z-10 bg-coral rounded-full p-1.5" style={{ filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.2))" }}>
+      <div className="search-loop absolute -translate-x-1/2 -translate-y-1/2 z-10 bg-teal rounded-full p-1.5" style={{ filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.2))" }}>
         <Search size={16} color="white" strokeWidth={2.5} />
       </div>
 

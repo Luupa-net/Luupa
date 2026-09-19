@@ -41,7 +41,7 @@ export default function HelpPage() {
 
       <p className="text-center text-sm text-stone font-bodyAlt mt-8">
         Still have a question?{" "}
-        <a href="mailto:luupa.net@gmail.com" className="text-coral font-bold">luupa.net@gmail.com</a>
+        <a href="mailto:luupa.net@gmail.com" className="text-teal font-bold">luupa.net@gmail.com</a>
       </p>
     </section>
   );

@@ -30,3 +30,33 @@ export function normalizeWhatsAppNumber(raw: string): string {
   if (digits.length === 8) return `973${digits}`; // bare local number
   return digits; // already has a country code (or something unusual) — leave it
 }
+
+/**
+ * SECURITY: a `?next=` query param controls where login/signup redirect
+ * after success. Without this check, someone could craft a link like
+ * `/account/login?next=https://evil.com` and, after a real Luupa login,
+ * silently bounce the customer to an attacker's site (open redirect) — a
+ * classic phishing setup.
+ *
+ * A plain `startsWith("/") && !startsWith("//")` string check is NOT enough:
+ * Next.js's router resolves `next` with `new URL(next, location.href)`
+ * before deciding whether a navigation is external, and the WHATWG URL
+ * parser normalizes backslashes to forward slashes for http(s) — so
+ * `/\evil.com` looks same-site as a string but resolves to the
+ * protocol-relative `//evil.com`, a different origin, and Next.js will
+ * genuinely `location.assign()` the browser there. Resolving `next` through
+ * the same URL parser here (against an arbitrary fixed base) and checking
+ * the resulting origin closes that off, instead of trying to blocklist
+ * individual characters.
+ */
+export function safeNextPath(next: string | null | undefined): string {
+  if (!next) return "/";
+  const base = "http://luupa.invalid";
+  try {
+    const resolved = new URL(next, base);
+    if (resolved.origin !== base) return "/";
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  } catch {
+    return "/";
+  }
+}

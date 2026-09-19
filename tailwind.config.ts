@@ -28,9 +28,9 @@ const config: Config = {
         graphite: "#14181F",
         // Homepage refresh only — a brighter accent pair, used alongside navy/ink,
         // not a replacement for terra/navy elsewhere in the app.
-        coral: {
-          DEFAULT: "#A32CC4",
-          dim: "#8B25A7",
+        teal: {
+          DEFAULT: "#0D9488",
+          dim: "#0B7A70",
         },
         skyblue: {
           DEFAULT: "#2D6CDF",

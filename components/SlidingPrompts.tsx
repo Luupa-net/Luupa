@@ -22,7 +22,7 @@ export default function SlidingPrompts() {
   }, []);
 
   return (
-    <div className="bg-coral rounded-[22px] p-8 flex flex-col h-full text-white">
+    <div className="bg-teal rounded-[22px] p-8 flex flex-col h-full text-white">
       <div className="flex items-center gap-2 mb-4 opacity-80">
         <Sparkles size={16} />
         <span className="text-xs uppercase tracking-wide font-bodyAlt font-bold">Not sure what you need?</span>
@@ -48,7 +48,7 @@ export default function SlidingPrompts() {
         </div>
       </button>
 
-      <span className="inline-flex items-center gap-1.5 text-sm font-bodyAlt font-bold bg-white text-coral px-4 py-2 rounded-full mt-4 self-start">
+      <span className="inline-flex items-center gap-1.5 text-sm font-bodyAlt font-bold bg-white text-teal px-4 py-2 rounded-full mt-4 self-start">
         See who can help <ArrowRight size={14} />
       </span>
     </div>
