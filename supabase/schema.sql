@@ -358,3 +358,31 @@ create policy "Owners can update their own bookings"
   with check (
     business_id in (select id from businesses where owner_id = auth.uid())
   );
+
+-- SECURITY: the policy above only ever constrained business_id, never
+-- customer_id — so without this, a business owner could UPDATE their own
+-- booking rows and reassign customer_id to an arbitrary UUID, which,
+-- combined with "Customers can view their own bookings" above (using
+-- auth.uid() = customer_id), would make a fabricated booking appear in a
+-- stranger's own booking list. RLS's WITH CHECK can't reference the old
+-- value of a column, so this pins customer_id via trigger instead — the
+-- same pattern used for businesses (see protect_admin_controlled_fields()
+-- below) — without touching any other column a business legitimately needs
+-- to update (status, payment info, notes, vehicle details, etc).
+create or replace function lock_booking_customer_id()
+returns trigger as $$
+begin
+  if auth.role() != 'service_role' then
+    new.customer_id := old.customer_id;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer
+set search_path = public, pg_temp;
+
+revoke execute on function lock_booking_customer_id() from public;
+revoke execute on function lock_booking_customer_id() from anon, authenticated;
+
+create trigger enforce_booking_customer_id_immutable
+  before update on bookings
+  for each row execute function lock_booking_customer_id();
