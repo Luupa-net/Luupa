@@ -24,7 +24,7 @@ export default function ListingCard({ listing }: { listing: Listing }) {
     <Link
       href={`/listing/${listing.id}`}
       className={`block rounded-xl border-2 bg-white overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] ${
-        verified ? "border-navy/50 shadow-md shadow-navy/5" : listing.featured ? "border-terra/40 shadow-md shadow-terra/5" : "border-stone-line"
+        verified ? "border-navy/50 shadow-md shadow-navy/5" : listing.featured ? "border-teal/40 shadow-md shadow-teal/5" : "border-stone-line"
       }`}
     >
       {thumbnail && (

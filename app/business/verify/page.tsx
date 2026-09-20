@@ -52,7 +52,7 @@ export default function VerifyPage() {
         <a
           href="https://wa.me/97300000000?text=Hi%2C%20I%27d%20like%20to%20get%20verified%20on%20Luupa"
           target="_blank"
-          className="inline-block mt-4 px-6 py-3 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim active:scale-[0.98] transition-all"
+          className="inline-block mt-4 px-6 py-3 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim active:scale-[0.98] transition-all"
         >
           Message us to pay
         </a>
@@ -80,7 +80,7 @@ function Benefit({ icon, title, text }: { icon: React.ReactNode; title: string; 
 function PriceTier({ length, price, best }: { length: string; price: string; best?: boolean }) {
   return (
     <div className={`rounded-xl p-3.5 text-center ${best ? "bg-navy" : "bg-white border border-stone-line"}`}>
-      {best && <p className="text-[10px] uppercase tracking-wide text-terra-light font-semibold mb-1">Best value</p>}
+      {best && <p className="text-[10px] uppercase tracking-wide text-teal-light font-semibold mb-1">Best value</p>}
       <p className={`font-display text-2xl font-semibold ${best ? "text-white" : "text-ink"}`}>BHD {price}</p>
       <p className={`text-xs mt-0.5 ${best ? "text-white/70" : "text-stone"}`}>{length}</p>
     </div>

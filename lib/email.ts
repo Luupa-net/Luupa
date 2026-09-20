@@ -35,10 +35,10 @@ export async function sendApprovalEmail(to: string, businessName: string) {
       subject: "You're live on Luupa 🎉",
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #152A4E;">You're live on Luupa!</h2>
+          <h2 style="color: #0F3D2E;">You're live on Luupa!</h2>
           <p>Hi ${businessName},</p>
           <p>Good news — your listing has been reviewed and approved. Customers searching Luupa can now find and contact you directly.</p>
-          <p><a href="https://luupa.net/business/dashboard" style="display:inline-block; background:#C4633B; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; margin-top:12px;">View your dashboard</a></p>
+          <p><a href="https://luupa.net/business/dashboard" style="display:inline-block; background:#059669; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; margin-top:12px;">View your dashboard</a></p>
           <p style="color:#6B7280; font-size:13px; margin-top:24px;">— The Luupa team</p>
         </div>
       `,
@@ -60,10 +60,10 @@ export async function sendVerifiedEmail(to: string, businessName: string, verifi
       subject: "You're verified on Luupa ✓",
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #152A4E;">You're verified!</h2>
+          <h2 style="color: #0F3D2E;">You're verified!</h2>
           <p>Hi ${businessName},</p>
           <p>Your business now has the verified badge on Luupa${untilText} — it'll show next to your name everywhere customers see you.</p>
-          <p><a href="https://luupa.net/business/dashboard" style="display:inline-block; background:#C4633B; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; margin-top:12px;">View your dashboard</a></p>
+          <p><a href="https://luupa.net/business/dashboard" style="display:inline-block; background:#059669; color:white; padding:12px 24px; border-radius:8px; text-decoration:none; margin-top:12px;">View your dashboard</a></p>
           <p style="color:#6B7280; font-size:13px; margin-top:24px;">— The Luupa team</p>
         </div>
       `,
@@ -101,7 +101,7 @@ export async function sendInvoiceEmail(to: string, details: InvoiceDetails) {
       subject: `Invoice from ${businessName}`,
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #152A4E;">Invoice from ${businessName}</h2>
+          <h2 style="color: #0F3D2E;">Invoice from ${businessName}</h2>
           <p>Hi ${customerName},</p>
           <table style="width: 100%; margin: 16px 0; font-size: 14px;">
             ${service ? `<tr><td style="color:#6B7280; padding:4px 0;">Service</td><td style="text-align:right; font-weight:600;">${service}</td></tr>` : ""}

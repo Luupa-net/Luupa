@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import ListingCard, { Listing } from "@/components/ListingCard";
+import HeroSearch from "@/components/HeroSearch";
 import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
 import { BadgeCheck, Car } from "lucide-react";
 
@@ -61,6 +62,12 @@ export default async function BrowsePage({
         {listings.length} {listings.length === 1 ? "business" : "businesses"} found
       </p>
 
+      {/* Know exactly who you're looking for? Small, low-key search — not a
+          replacement for the category browse below, just a shortcut past it. */}
+      <div className="mt-5 max-w-sm">
+        <HeroSearch compact defaultValue={params.q ?? ""} placeholder="Search by business name…" />
+      </div>
+
       {/* Mobile: horizontal scrolling filter chips. Desktop: sidebar (below) */}
       <div className="md:hidden mt-4 -mx-5 px-5 flex gap-2 overflow-x-auto no-scrollbar">
         <Link
@@ -89,7 +96,7 @@ export default async function BrowsePage({
             href={`/browse?sub=${encodeURIComponent(s)}`}
             className={`shrink-0 text-sm px-4 py-2 rounded-full border-2 whitespace-nowrap ${
               params.sub === s
-                ? "bg-terra border-terra text-white font-semibold"
+                ? "bg-teal border-teal text-white font-semibold"
                 : "bg-white border-stone-line text-ink/70"
             }`}
           >
@@ -124,7 +131,7 @@ export default async function BrowsePage({
             <ul className="space-y-2 text-sm text-stone">
               {SUBCATEGORIES.map((s) => (
                 <li key={s}>
-                  <Link href={`/browse?sub=${encodeURIComponent(s)}`} className="hover:text-terra-dim">{s}</Link>
+                  <Link href={`/browse?sub=${encodeURIComponent(s)}`} className="hover:text-teal-dim">{s}</Link>
                 </li>
               ))}
             </ul>
@@ -134,7 +141,7 @@ export default async function BrowsePage({
             <ul className="space-y-2 text-sm text-stone">
               {AREAS.map((a) => (
                 <li key={a}>
-                  <Link href={`/browse?area=${encodeURIComponent(a)}`} className="hover:text-terra-dim">{a}</Link>
+                  <Link href={`/browse?area=${encodeURIComponent(a)}`} className="hover:text-teal-dim">{a}</Link>
                 </li>
               ))}
             </ul>
@@ -151,7 +158,7 @@ export default async function BrowsePage({
           {!error && listings.length === 0 && (
             <div className="col-span-2 text-center py-16 border-2 border-dashed border-stone-line rounded-xl bg-white">
               <p className="text-stone">No businesses match yet. Be the first to get listed.</p>
-              <Link href="/business/signup" className="text-terra-dim font-semibold mt-2 inline-block">
+              <Link href="/business/signup" className="text-teal-dim font-semibold mt-2 inline-block">
                 List your business →
               </Link>
             </div>

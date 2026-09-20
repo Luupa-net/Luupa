@@ -74,7 +74,7 @@ const SECTIONS = [
 type Section = (typeof SECTIONS)[number]["key"];
 
 const BOOKING_STATUS_STYLES: Record<string, string> = {
-  pending: "bg-terra/10 text-terra-dim",
+  pending: "bg-teal/10 text-teal-dim",
   confirmed: "bg-teal/10 text-teal-dim",
   declined: "bg-red-50 text-red-600",
   arrived: "bg-skyblue/10 text-skyblue-dim",
@@ -259,7 +259,7 @@ export default function AdminPage() {
                 <Icon size={16} />
                 {s.label}
                 {badge > 0 && (
-                  <span className="ml-auto text-[10px] font-bold bg-terra text-white px-1.5 py-0.5 rounded-full">{badge}</span>
+                  <span className="ml-auto text-[10px] font-bold bg-teal text-white px-1.5 py-0.5 rounded-full">{badge}</span>
                 )}
               </button>
             );
@@ -474,13 +474,13 @@ function OverviewSection({
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
         <StatCard icon={Building2} label="Total businesses" value={businesses.length} onClick={() => onJump("businesses")} />
-        <StatCard icon={AlertCircle} label="Pending review" value={counts.pending} tone={counts.pending > 0 ? "terra" : undefined} onClick={() => onOpenBusinessTab("pending")} />
+        <StatCard icon={AlertCircle} label="Pending review" value={counts.pending} tone={counts.pending > 0 ? "teal" : undefined} onClick={() => onOpenBusinessTab("pending")} />
         <StatCard icon={ShieldCheck} label="Verified" value={verifiedCount} tone="navy" />
         <StatCard icon={XCircle} label="Suspended" value={counts.suspended} tone={counts.suspended > 0 ? "red" : undefined} onClick={() => onOpenBusinessTab("suspended")} />
         <StatCard icon={Users} label="Customer accounts" value={customers.length} onClick={() => onJump("customers")} />
-        <StatCard icon={CalendarClock} label="Bookings, pending" value={pendingBookingsCount} tone={pendingBookingsCount > 0 ? "terra" : undefined} onClick={() => onJump("bookings")} />
+        <StatCard icon={CalendarClock} label="Bookings, pending" value={pendingBookingsCount} tone={pendingBookingsCount > 0 ? "teal" : undefined} onClick={() => onJump("bookings")} />
         <StatCard icon={TrendingUp} label="Total profile views" value={totalViews} />
-        <StatCard icon={Star} label="Changes to review" value={pendingChangesCount} tone={pendingChangesCount > 0 ? "terra" : undefined} onClick={() => onJump("businesses")} />
+        <StatCard icon={Star} label="Changes to review" value={pendingChangesCount} tone={pendingChangesCount > 0 ? "teal" : undefined} onClick={() => onJump("businesses")} />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-5 mt-8">
@@ -500,7 +500,7 @@ function OverviewSection({
                   className="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-canvas2 text-left transition-colors"
                 >
                   <span className="text-sm font-medium text-ink truncate">{b.name}</span>
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-terra/10 text-terra-dim shrink-0">
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-teal/10 text-teal-dim shrink-0">
                     {b.status === "pending" ? "New application" : "Pending changes"}
                   </span>
                 </button>
@@ -537,8 +537,8 @@ function OverviewSection({
   );
 }
 
-function StatCard({ icon: Icon, label, value, tone, onClick }: { icon: any; label: string; value: number; tone?: "navy" | "terra" | "red"; onClick?: () => void }) {
-  const tones = { navy: "text-navy", terra: "text-terra-dim", red: "text-red-600" };
+function StatCard({ icon: Icon, label, value, tone, onClick }: { icon: any; label: string; value: number; tone?: "navy" | "teal" | "red"; onClick?: () => void }) {
+  const tones = { navy: "text-navy", teal: "text-teal-dim", red: "text-red-600" };
   const Comp = onClick ? "button" : "div";
   return (
     <Comp onClick={onClick} className={`bg-white rounded-xl border border-stone-line px-4 py-3.5 text-left ${onClick ? "hover:border-navy/30 transition-colors" : ""}`}>
@@ -629,8 +629,8 @@ function BusinessCard({
       </p>
 
       {business.pending_changes && (
-        <div className="mt-4 rounded-lg bg-terra/5 border border-terra/20 p-4">
-          <p className="text-sm font-semibold text-terra-dim mb-2">Pending changes — not yet visible to customers</p>
+        <div className="mt-4 rounded-lg bg-teal/5 border border-teal/20 p-4">
+          <p className="text-sm font-semibold text-teal-dim mb-2">Pending changes — not yet visible to customers</p>
           <div className="space-y-1 text-sm">
             {Object.entries(business.pending_changes)
               .map(([key, value]) => ({
@@ -642,9 +642,9 @@ function BusinessCard({
               .map(({ key, value, changed }) => (
                 <div
                   key={key}
-                  className={`flex justify-between gap-3 rounded-md px-2 -mx-2 py-1 ${changed ? "bg-terra/10" : ""}`}
+                  className={`flex justify-between gap-3 rounded-md px-2 -mx-2 py-1 ${changed ? "bg-teal/10" : ""}`}
                 >
-                  <span className={changed ? "text-terra-dim font-medium" : "text-stone"}>
+                  <span className={changed ? "text-teal-dim font-medium" : "text-stone"}>
                     {changed && "● "}{FIELD_LABELS[key] || key}
                   </span>
                   <span className={`text-right ${changed ? "text-ink font-semibold" : "text-stone"}`}>
@@ -741,7 +741,7 @@ function BusinessCard({
 
 function StatusPill({ status }: { status: string }) {
   const styles = {
-    pending: "bg-terra/10 text-terra-dim",
+    pending: "bg-teal/10 text-teal-dim",
     active: "bg-navy/10 text-navy",
     suspended: "bg-red-50 text-red-600",
   }[status] ?? "bg-stone-line text-stone";

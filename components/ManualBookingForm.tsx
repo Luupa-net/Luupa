@@ -79,7 +79,7 @@ export default function ManualBookingForm({
           <PlateInput value={vehiclePlate} onChange={setVehiclePlate} />
           <button
             disabled={saving}
-            className="w-full h-11 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim transition-colors disabled:opacity-60"
+            className="w-full h-11 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim transition-colors disabled:opacity-60"
           >
             {saving ? "Adding…" : "Add booking"}
           </button>

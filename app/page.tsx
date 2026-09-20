@@ -1,5 +1,4 @@
 import Link from "next/link";
-import HeroSearch from "@/components/HeroSearch";
 import SlidingPrompts from "@/components/SlidingPrompts";
 import ComingSoon from "@/components/ComingSoon";
 import FeaturedCard from "@/components/FeaturedCard";
@@ -103,10 +102,7 @@ export default async function HomePage() {
           </div>
         </Reveal>
 
-        {/* SEARCH — one small, centered bar under the categories */}
-        <Reveal delay={240} className="relative max-w-4xl mx-auto px-5 pt-8 pb-16 sm:pb-20">
-          <HeroSearch compact />
-        </Reveal>
+        <div className="pb-16 sm:pb-20" />
       </section>
 
       {/* TRUST STRIP */}

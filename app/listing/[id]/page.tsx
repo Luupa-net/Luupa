@@ -80,7 +80,7 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
               <a
                 href={`https://wa.me/${listing.whatsapp}?text=${waMessage}`}
                 target="_blank"
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border-2 border-terra text-terra-dim font-semibold hover:bg-terra/5 active:scale-95 transition-colors"
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border-2 border-teal text-teal-dim font-semibold hover:bg-teal/5 active:scale-95 transition-colors"
               >
                 <MessageCircle size={16} /> Message on WhatsApp
               </a>

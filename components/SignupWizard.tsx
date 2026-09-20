@@ -138,7 +138,7 @@ export default function SignupWizard() {
         </p>
         <button
           onClick={() => router.push("/business/dashboard")}
-          className="mt-6 px-6 py-3 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim transition-colors"
+          className="mt-6 px-6 py-3 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim transition-colors"
         >
           Go to dashboard
         </button>
@@ -152,7 +152,7 @@ export default function SignupWizard() {
       <div className="flex items-center gap-1.5 mb-7">
         {STEPS.map((label, i) => (
           <div key={label} className="flex-1">
-            <div className={`h-1 rounded-full ${i <= step ? "bg-terra" : "bg-stone-line"}`} />
+            <div className={`h-1 rounded-full ${i <= step ? "bg-teal" : "bg-stone-line"}`} />
           </div>
         ))}
       </div>
@@ -298,7 +298,7 @@ export default function SignupWizard() {
         {step < STEPS.length - 1 ? (
           <button
             onClick={next}
-            className="px-6 py-3 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim active:scale-[0.98] transition-all"
+            className="px-6 py-3 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim active:scale-[0.98] transition-all"
           >
             Continue
           </button>
@@ -306,7 +306,7 @@ export default function SignupWizard() {
           <button
             onClick={handleFinalSubmit}
             disabled={loading}
-            className="px-6 py-3 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim active:scale-[0.98] transition-all disabled:opacity-60"
+            className="px-6 py-3 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim active:scale-[0.98] transition-all disabled:opacity-60"
           >
             {loading ? "Submitting…" : "Submit for review"}
           </button>
@@ -347,7 +347,7 @@ function ReviewRow({ label, value, onEdit }: { label: string; value: string; onE
         <p className="text-xs text-stone">{label}</p>
         <p className="text-ink font-medium mt-0.5">{value}</p>
       </div>
-      <button onClick={onEdit} className="text-terra-dim text-xs font-medium shrink-0">Edit</button>
+      <button onClick={onEdit} className="text-teal-dim text-xs font-medium shrink-0">Edit</button>
     </div>
   );
 }

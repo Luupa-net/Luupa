@@ -8,10 +8,14 @@ import PlateInput from "@/components/PlateInput";
 import PhoneInput from "@/components/PhoneInput";
 import {
   X, UserCheck, Wrench, CheckCircle2, CircleDollarSign, Car,
-  Mail, MessageCircle, Loader2, Check,
+  Mail, MessageCircle, Loader2, Check, Ban, UserX, CalendarClock,
 } from "lucide-react";
 
-export default function BookingModal({
+// The old BookingModal popped up as a centered overlay, hiding the calendar
+// behind it. This renders the same detail view either as a sticky column
+// beside the calendar (desktop — see app/business/bookings/page.tsx) or as a
+// bottom sheet (mobile, where there's no room for two columns side by side).
+export default function BookingPanel({
   booking,
   businessName,
   paymentQrUrl,
@@ -107,17 +111,40 @@ export default function BookingModal({
     setSendingEmail(false);
   }
 
-  const btn = "flex items-center gap-1.5 text-sm font-medium px-4 py-2.5 rounded-lg transition-colors";
+  const btnPrimary = "flex items-center justify-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl bg-navy text-white shadow-sm hover:bg-navy-light hover:shadow-md active:scale-[0.97] transition-all";
+  const btnGhost = "flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2.5 rounded-xl bg-canvas2 text-ink hover:bg-stone-line/60 active:scale-[0.97] transition-all";
+  const btnDanger = "flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.97] transition-all";
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92vh] overflow-y-auto">
-        <div className="sticky top-0 bg-navy px-6 py-5 rounded-t-2xl sm:rounded-t-2xl">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-xl font-semibold text-white">{bk.customer_name}</h3>
-            <button onClick={onClose} aria-label="Close"><X size={18} className="text-white/70 hover:text-white" /></button>
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center
+                 lg:static lg:inset-auto lg:z-auto lg:bg-transparent lg:block lg:h-full"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="panel-in bg-white rounded-t-2xl lg:rounded-2xl w-full max-h-[92vh]
+                   lg:max-h-[calc(100vh-112px)] lg:sticky lg:top-24 overflow-y-auto
+                   border-0 lg:border lg:border-stone-line shadow-2xl lg:shadow-sm"
+      >
+        <div className="sticky top-0 z-10 bg-gradient-to-br from-navy to-navy-dim px-6 py-5 rounded-t-2xl">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide text-white/50 font-semibold flex items-center gap-1.5">
+                <CalendarClock size={11} />
+                {bk.preferred_date ? new Date(bk.preferred_date).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Booking"}
+                {bk.preferred_time ? ` · ${bk.preferred_time}` : ""}
+              </p>
+              <h3 className="font-display text-xl font-semibold text-white truncate">{bk.customer_name}</h3>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="shrink-0 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+            >
+              <X size={16} className="text-white" />
+            </button>
           </div>
-          <div className="mt-4">
+          <div className="mt-4 bg-white/5 rounded-xl px-3 py-3">
             <BookingStepper status={bk.status} />
           </div>
         </div>
@@ -129,7 +156,7 @@ export default function BookingModal({
             <PhoneInput value={bk.customer_contact || ""} onChange={(v) => setBk({ ...bk, customer_contact: v })} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-2 gap-3 text-sm bg-canvas2 rounded-xl p-3.5">
             <Info label="Service" value={bk.service || "—"} />
             <Info label="Date" value={bk.preferred_date ? new Date(bk.preferred_date).toLocaleDateString() : "—"} />
             <Info label="Time" value={bk.preferred_time || "—"} />
@@ -170,7 +197,7 @@ export default function BookingModal({
             />
           </div>
 
-          <button onClick={saveDetails} disabled={saving} className="text-sm font-medium text-navy disabled:opacity-60">
+          <button onClick={saveDetails} disabled={saving} className="text-sm font-semibold text-teal-dim hover:text-teal disabled:opacity-60 transition-colors">
             {saving ? "Saving…" : "Save details"}
           </button>
 
@@ -182,22 +209,22 @@ export default function BookingModal({
             <div className="flex flex-wrap gap-2">
               {bk.status === "pending" && (
                 <>
-                  <button onClick={() => apply({ status: "confirmed" })} className={`${btn} bg-navy text-white`}>Confirm</button>
-                  <button onClick={() => apply({ status: "declined" })} className={`${btn} border border-red-200 text-red-600`}>Decline</button>
+                  <button onClick={() => apply({ status: "confirmed" })} className={btnPrimary}><Check size={14} /> Confirm</button>
+                  <button onClick={() => apply({ status: "declined" })} className={btnDanger}><Ban size={14} /> Decline</button>
                 </>
               )}
               {bk.status === "confirmed" && (
                 <>
-                  <button onClick={() => apply({ status: "arrived" })} className={`${btn} bg-navy text-white`}><UserCheck size={14} /> Customer arrived</button>
-                  <button onClick={() => apply({ status: "no_show" })} className={`${btn} border border-stone-line text-stone`}>No-show</button>
-                  <button onClick={() => apply({ status: "cancelled" })} className={`${btn} border border-red-200 text-red-600`}>Cancel</button>
+                  <button onClick={() => apply({ status: "arrived" })} className={btnPrimary}><UserCheck size={14} /> Customer arrived</button>
+                  <button onClick={() => apply({ status: "no_show" })} className={btnGhost}><UserX size={14} /> No-show</button>
+                  <button onClick={() => apply({ status: "cancelled" })} className={btnDanger}><Ban size={14} /> Cancel</button>
                 </>
               )}
               {bk.status === "arrived" && (
-                <button onClick={() => apply({ status: "in_progress" })} className={`${btn} bg-navy text-white`}><Wrench size={14} /> Car left with us</button>
+                <button onClick={() => apply({ status: "in_progress" })} className={btnPrimary}><Wrench size={14} /> Car left with us</button>
               )}
               {bk.status === "in_progress" && (
-                <button onClick={() => apply({ status: "completed" })} className={`${btn} bg-navy text-white`}><CheckCircle2 size={14} /> Mark completed</button>
+                <button onClick={() => apply({ status: "completed" })} className={btnPrimary}><CheckCircle2 size={14} /> Mark completed</button>
               )}
               {["declined", "no_show", "cancelled", "completed"].includes(bk.status) && (
                 <span className="text-xs text-stone self-center">Nothing further to do here.</span>
@@ -209,9 +236,9 @@ export default function BookingModal({
           {["arrived", "in_progress", "completed"].includes(bk.status) && (
             <>
               <div className="h-px bg-stone-line" />
-              <div>
-                <p className="flex items-center gap-1.5 text-sm font-medium text-ink mb-2">
-                  <CircleDollarSign size={14} /> Payment {bk.paid && <span className="text-emerald-600 text-xs">· Paid ({bk.payment_method})</span>}
+              <div className="bg-canvas2 rounded-xl p-4">
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-ink mb-2">
+                  <CircleDollarSign size={14} /> Payment {bk.paid && <span className="text-teal-dim text-xs font-medium">· Paid ({bk.payment_method})</span>}
                 </p>
                 {paymentQrUrl && (
                   <p className="text-xs text-navy mb-2">Your BenefitPay QR code will be included automatically.</p>
@@ -220,13 +247,13 @@ export default function BookingModal({
                   placeholder="Amount (BHD, optional)"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="input mb-3"
+                  className="input mb-3 bg-white"
                 />
 
                 <p className="text-xs text-stone mb-1.5 flex items-center gap-1"><MessageCircle size={11} /> Send invoice via WhatsApp</p>
                 <div className="flex gap-2 mb-3">
-                  <button onClick={() => sendWhatsAppInvoice("cash")} className={`${btn} bg-canvas2 text-ink flex-1 justify-center`}>Cash</button>
-                  <button onClick={() => sendWhatsAppInvoice("card")} className={`${btn} bg-canvas2 text-ink flex-1 justify-center`}>Card</button>
+                  <button onClick={() => sendWhatsAppInvoice("cash")} className={`${btnGhost} flex-1 bg-white`}>Cash</button>
+                  <button onClick={() => sendWhatsAppInvoice("card")} className={`${btnGhost} flex-1 bg-white`}>Card</button>
                 </div>
 
                 <p className="text-xs text-stone mb-1.5 flex items-center gap-1"><Mail size={11} /> Or send by email</p>
@@ -234,24 +261,24 @@ export default function BookingModal({
                   <button
                     onClick={() => sendEmailInvoice("cash")}
                     disabled={!bk.customer_email || sendingEmail}
-                    className={`${btn} bg-canvas2 text-ink flex-1 justify-center disabled:opacity-40`}
+                    className={`${btnGhost} flex-1 bg-white disabled:opacity-40`}
                   >
                     {sendingEmail ? <Loader2 size={14} className="animate-spin" /> : "Cash"}
                   </button>
                   <button
                     onClick={() => sendEmailInvoice("card")}
                     disabled={!bk.customer_email || sendingEmail}
-                    className={`${btn} bg-canvas2 text-ink flex-1 justify-center disabled:opacity-40`}
+                    className={`${btnGhost} flex-1 bg-white disabled:opacity-40`}
                   >
                     {sendingEmail ? <Loader2 size={14} className="animate-spin" /> : "Card"}
                   </button>
                 </div>
                 {!bk.customer_email && <p className="text-xs text-stone mt-1.5">Add a customer email above to enable this.</p>}
                 {emailResult === "sent" && (
-                  <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1"><Check size={12} /> Email sent.</p>
+                  <p className="text-xs text-teal-dim mt-1.5 flex items-center gap-1"><Check size={12} /> Email sent.</p>
                 )}
                 {emailResult === "not_configured" && (
-                  <p className="text-xs text-terra-dim mt-1.5">Email sending isn't set up yet on this account.</p>
+                  <p className="text-xs text-stone mt-1.5">Email sending isn't set up yet on this account.</p>
                 )}
                 {emailResult === "failed" && (
                   <p className="text-xs text-red-600 mt-1.5">Couldn't send that email — try WhatsApp instead for now.</p>

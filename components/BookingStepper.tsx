@@ -8,7 +8,7 @@ const STAGES = [
 
 const EXCEPTION_STATES: Record<string, { label: string; color: string }> = {
   declined: { label: "Declined", color: "bg-stone-line text-stone" },
-  no_show: { label: "No-show", color: "bg-amber-100 text-amber-700" },
+  no_show: { label: "No-show", color: "bg-gray-100 text-gray-600" },
   cancelled: { label: "Cancelled", color: "bg-red-50 text-red-600" },
 };
 
@@ -34,12 +34,12 @@ export default function BookingStepper({ status }: { status: string }) {
             <div className="flex flex-col items-center gap-1">
               <div
                 className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${
-                  done ? "bg-navy text-white" : current ? "bg-terra text-white ring-4 ring-terra/20" : "bg-canvas2 text-stone-dim"
+                  done ? "bg-navy text-white" : current ? "bg-teal text-white ring-4 ring-teal/20" : "bg-canvas2 text-stone-dim"
                 }`}
               >
                 {done ? "✓" : i + 1}
               </div>
-              <span className={`text-[9px] whitespace-nowrap ${current ? "text-terra-dim font-semibold" : "text-stone"}`}>
+              <span className={`text-[9px] whitespace-nowrap ${current ? "text-teal-dim font-semibold" : "text-stone"}`}>
                 {stage.label}
               </span>
             </div>

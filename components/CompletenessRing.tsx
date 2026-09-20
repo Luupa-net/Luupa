@@ -27,7 +27,7 @@ export default function CompletenessRing({ percent }: { percent: number }) {
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          className="text-terra transition-all duration-700 ease-out"
+          className="text-teal transition-all duration-700 ease-out"
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">

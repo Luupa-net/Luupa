@@ -7,7 +7,7 @@ import Link from "next/link";
 import { periodComparison } from "@/lib/bookingPeriods";
 import { getMonthGrid, getWeekDays, addDays, addMonths, toKey, isSameDay, WEEKDAY_LABELS } from "@/lib/calendarGrid";
 import ManualBookingForm from "@/components/ManualBookingForm";
-import BookingModal from "@/components/BookingModal";
+import BookingPanel from "@/components/BookingPanel";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Plus, TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
@@ -77,7 +77,7 @@ export default function BookingsPage() {
 
   return (
     <div className="bg-canvas2 min-h-screen">
-      <div className="max-w-4xl mx-auto px-5 sm:px-6 py-8 sm:py-10">
+      <div className="max-w-6xl mx-auto px-5 sm:px-6 py-8 sm:py-10">
         <Link href="/business/dashboard" className="flex items-center gap-1.5 text-sm text-stone hover:text-ink mb-4">
           <ArrowLeft size={14} /> Back to dashboard
         </Link>
@@ -86,21 +86,24 @@ export default function BookingsPage() {
           <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Bookings</h1>
           <button
             onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-1.5 text-sm font-medium px-4 py-2.5 rounded-lg bg-terra text-white hover:bg-terra-dim transition-colors"
+            className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl bg-teal text-white shadow-sm hover:bg-teal-dim hover:shadow-md active:scale-[0.97] transition-all"
           >
             <Plus size={15} /> Add booking
           </button>
         </div>
 
         {/* Analytics — clickable, jumps the calendar to that view */}
-        <div className="grid grid-cols-3 gap-3 mt-6">
+        <div className="grid grid-cols-3 gap-3 mt-6 max-w-3xl">
           <AnalyticsCard label="Today" data={today} onClick={() => jumpTo("day")} />
           <AnalyticsCard label="This week" data={week} compareLabel="vs last week" onClick={() => jumpTo("week")} />
           <AnalyticsCard label="This month" data={month} compareLabel="vs last month" onClick={() => jumpTo("month")} />
         </div>
 
-        {/* Calendar */}
-        <div className="mt-6 bg-white rounded-2xl border border-stone-line overflow-hidden">
+        {/* Calendar + booking detail — the panel opens beside the calendar on
+            desktop (a real split view, nothing hidden), and as a bottom sheet
+            on mobile where there's no room for two columns. */}
+        <div className="mt-6 lg:flex lg:items-start lg:gap-6">
+        <div className="flex-1 min-w-0 bg-white rounded-2xl border border-stone-line shadow-sm overflow-hidden">
           <div className="flex items-center justify-between p-4 border-b border-stone-line relative">
             <button
               onClick={() => setShowDatePicker((s) => !s)}
@@ -182,6 +185,19 @@ export default function BookingsPage() {
             <DayList anchor={anchor} bookingsOn={bookingsOn} onSelectBooking={setSelected} />
           )}
         </div>
+
+        {selected && (
+          <div className="mt-6 lg:mt-0 lg:w-[400px] lg:shrink-0">
+            <BookingPanel
+              booking={selected}
+              businessName={business.name}
+              paymentQrUrl={business.payment_qr_url}
+              onUpdate={updateBooking}
+              onClose={() => setSelected(null)}
+            />
+          </div>
+        )}
+        </div>
       </div>
 
       {showAddForm && (
@@ -189,16 +205,6 @@ export default function BookingsPage() {
           businessId={business.id}
           onAdded={(b) => setBookings((prev) => [b, ...prev])}
           onClose={() => setShowAddForm(false)}
-        />
-      )}
-
-      {selected && (
-        <BookingModal
-          booking={selected}
-          businessName={business.name}
-          paymentQrUrl={business.payment_qr_url}
-          onUpdate={updateBooking}
-          onClose={() => setSelected(null)}
         />
       )}
     </div>
@@ -242,13 +248,13 @@ function MonthGrid({ anchor, bookingsOn, onSelectDay }: { anchor: Date; bookings
                 i % 7 === 6 ? "border-r" : ""
               } ${!inMonth ? "text-stone-dim bg-canvas2/40" : "text-ink"}`}
             >
-              <span className={`text-xs ${isSameDay(day, today) ? "bg-terra text-white rounded-full w-5 h-5 inline-flex items-center justify-center" : ""}`}>
+              <span className={`text-xs ${isSameDay(day, today) ? "bg-teal text-white rounded-full w-5 h-5 inline-flex items-center justify-center" : ""}`}>
                 {day.getDate()}
               </span>
               {dayBookings.length > 0 && (
                 <div className="mt-1 flex flex-wrap gap-0.5">
                   {dayBookings.slice(0, 3).map((b) => (
-                    <span key={b.id} className={`w-1.5 h-1.5 rounded-full ${b.status === "pending" ? "bg-terra" : "bg-navy"}`} />
+                    <span key={b.id} className={`w-1.5 h-1.5 rounded-full ${b.status === "pending" ? "bg-teal" : "bg-navy"}`} />
                   ))}
                   {dayBookings.length > 3 && <span className="text-[9px] text-stone">+{dayBookings.length - 3}</span>}
                 </div>
@@ -275,14 +281,14 @@ function WeekGrid({ anchor, bookingsOn, onSelectBooking, onSelectDay }: { anchor
               className="w-full text-center py-2 border-b border-stone-line hover:bg-canvas2 transition-colors"
             >
               <p className="text-[10px] text-stone uppercase">{day.toLocaleDateString(undefined, { weekday: "short" })}</p>
-              <p className={`text-sm font-medium ${isSameDay(day, today) ? "text-terra" : "text-ink"}`}>{day.getDate()}</p>
+              <p className={`text-sm font-medium ${isSameDay(day, today) ? "text-teal" : "text-ink"}`}>{day.getDate()}</p>
             </button>
             <div className="p-1.5 space-y-1">
               {dayBookings.map((b) => (
                 <button
                   key={b.id}
                   onClick={() => onSelectBooking(b)}
-                  className={`w-full text-left text-[10px] rounded px-1.5 py-1 truncate ${b.status === "pending" ? "bg-terra/15 text-terra-dim" : "bg-navy/10 text-navy"}`}
+                  className={`w-full text-left text-[10px] rounded px-1.5 py-1 truncate ${b.status === "pending" ? "bg-teal/15 text-teal-dim" : "bg-navy/10 text-navy"}`}
                 >
                   {b.preferred_time && <span className="font-medium">{b.preferred_time} </span>}
                   {b.customer_name}
@@ -308,7 +314,7 @@ function DayList({ anchor, bookingsOn, onSelectBooking }: { anchor: Date; bookin
           key={b.id}
           onClick={() => onSelectBooking(b)}
           className={`w-full text-left rounded-lg border p-3.5 hover:border-navy/30 transition-colors ${
-            b.status === "pending" ? "border-terra/30 bg-terra/5" : "border-stone-line bg-white"
+            b.status === "pending" ? "border-teal/30 bg-teal/5" : "border-stone-line bg-white"
           }`}
         >
           <div className="flex items-center justify-between gap-3">

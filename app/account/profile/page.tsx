@@ -24,7 +24,7 @@ type Booking = {
 type BusinessLite = { id: string; name: string; areas: string[] };
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-terra/10 text-terra-dim",
+  pending: "bg-teal/10 text-teal-dim",
   confirmed: "bg-teal/10 text-teal-dim",
   declined: "bg-red-50 text-red-600",
   arrived: "bg-skyblue/10 text-skyblue-dim",

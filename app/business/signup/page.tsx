@@ -7,7 +7,7 @@ export default function BusinessSignup() {
     <div className="max-w-5xl mx-auto px-6 py-16 grid lg:grid-cols-2 gap-14">
       {/* Pitch — belongs here, in business context, not on the customer-facing homepage */}
       <div>
-        <span className="inline-block text-xs uppercase tracking-wide font-medium text-terra-dim bg-terra/10 px-3 py-1.5 rounded-full mb-4">
+        <span className="inline-block text-xs uppercase tracking-wide font-medium text-teal-dim bg-teal/10 px-3 py-1.5 rounded-full mb-4">
           Founding partner offer — first 10 businesses
         </span>
         <h1 className="font-display text-3xl sm:text-4xl font-semibold text-ink leading-tight">
@@ -36,7 +36,7 @@ export default function BusinessSignup() {
         </div>
 
         <p className="text-sm text-stone mt-10">
-          Already listed? <Link href="/business/login" className="text-terra-dim font-medium">Log in</Link>
+          Already listed? <Link href="/business/login" className="text-teal-dim font-medium">Log in</Link>
         </p>
       </div>
 

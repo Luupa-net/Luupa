@@ -19,24 +19,22 @@ const config: Config = {
           light: "#1B5745",
           dim: "#06251C",
         },
-        // Terracotta: sparse accent, only for key actions — never a full section wash.
-        terra: {
-          DEFAULT: "#C4633B",
-          light: "#D67C52",
-          dim: "#A3512E",
-        },
         stone: {
           DEFAULT: "#6B7280",
           dim: "#9CA3AF",
           line: "#E7E5E0",
         },
         graphite: "#14181F",
-        // Bright accent green — the "racing green" family's lighter half.
+        // Bright accent green — the "racing green" family's lighter half, and
+        // now the site's ONLY accent color for key actions (nav logo, links,
+        // CTA buttons, status highlights). Replaces the old terracotta accent
+        // so nothing on the site reads as orange anymore.
         // Deliberately Tailwind's emerald-600, not a neon/lime green: it holds
         // WCAG AA contrast as small text on white (nav logo, links) without
         // being harsh on the eyes next to a white background.
         teal: {
           DEFAULT: "#059669",
+          light: "#10B981",
           dim: "#047857",
         },
         skyblue: {

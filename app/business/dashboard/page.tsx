@@ -131,7 +131,7 @@ export default function Dashboard() {
       <div className="max-w-4xl mx-auto px-5 sm:px-6 py-8 sm:py-10">
         {/* Gradient header — identity, status, and completeness at a glance */}
         <div className="relative rounded-2xl bg-gradient-to-br from-navy to-navy-dim px-6 sm:px-8 py-7 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-terra/15 blur-3xl" />
+          <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-teal/15 blur-3xl" />
           <div className="relative flex items-start justify-between flex-wrap gap-6">
             <div className="flex items-center gap-4">
               <div className="relative w-16 h-16 rounded-full bg-white/10 border-2 border-white/20 overflow-hidden flex items-center justify-center shrink-0">
@@ -141,7 +141,7 @@ export default function Dashboard() {
                   <span className="text-white font-display text-xl font-semibold">{liveRow.name?.[0]?.toUpperCase()}</span>
                 )}
                 {verified && (
-                  <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-terra ring-2 ring-navy flex items-center justify-center">
+                  <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-teal ring-2 ring-navy flex items-center justify-center">
                     <BadgeCheck size={11} className="text-white" />
                   </span>
                 )}
@@ -186,7 +186,7 @@ export default function Dashboard() {
         )}
 
         {hasPendingChanges && (
-          <Banner tone="terra" icon={<FolderClock size={18} />} title="Changes awaiting approval">
+          <Banner tone="teal" icon={<FolderClock size={18} />} title="Changes awaiting approval">
             Customers still see your previously approved version while we review what you just submitted —
             usually within a day.
           </Banner>
@@ -197,7 +197,7 @@ export default function Dashboard() {
           <StatCard icon={<Eye size={16} />} tint="navy" label="Profile views" value={liveRow.view_count ?? 0} />
           <StatCard icon={<Wrench size={16} />} tint="stone" label="Services" value={(form.services || []).length} />
           <StatCard icon={<ImageIcon size={16} />} tint="emerald" label="Photos" value={(form.photos || []).length} />
-          <StatCard icon={<Inbox size={16} />} tint="terra" label="Inquiries" value={inquiriesCount} />
+          <StatCard icon={<Inbox size={16} />} tint="teal" label="Inquiries" value={inquiriesCount} />
         </div>
 
         {/* Getting-started checklist — replaces the flat progress bar with something actionable */}
@@ -345,7 +345,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-3 pt-7 mt-6 border-t border-stone-line">
                 <button
                   disabled={saving}
-                  className="px-6 py-3 rounded-lg bg-terra text-white font-semibold hover:bg-terra-dim active:scale-95 transition-colors disabled:opacity-60"
+                  className="px-6 py-3 rounded-lg bg-teal text-white font-semibold hover:bg-teal-dim active:scale-95 transition-colors disabled:opacity-60"
                 >
                   {saving ? "Saving…" : liveRow.status === "active" ? "Submit for approval" : "Save changes"}
                 </button>
@@ -373,10 +373,10 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function StatCard({ icon, label, value, tint }: { icon: React.ReactNode; label: string; value: string | number; tint: "navy" | "terra" | "emerald" | "stone" }) {
+function StatCard({ icon, label, value, tint }: { icon: React.ReactNode; label: string; value: string | number; tint: "navy" | "teal" | "emerald" | "stone" }) {
   const tints = {
     navy: "bg-navy/10 text-navy",
-    terra: "bg-terra/10 text-terra-dim",
+    teal: "bg-teal/10 text-teal-dim",
     emerald: "bg-emerald-100 text-emerald-700",
     stone: "bg-stone-line text-stone",
   }[tint];
@@ -389,10 +389,10 @@ function StatCard({ icon, label, value, tint }: { icon: React.ReactNode; label: 
   );
 }
 
-function Banner({ tone, icon, title, children }: { tone: "red" | "terra"; icon: React.ReactNode; title: string; children: React.ReactNode }) {
+function Banner({ tone, icon, title, children }: { tone: "red" | "teal"; icon: React.ReactNode; title: string; children: React.ReactNode }) {
   const tones = {
     red: "bg-red-50 border-red-200 text-red-700",
-    terra: "bg-terra/10 border-terra/20 text-terra-dim",
+    teal: "bg-teal/10 border-teal/20 text-teal-dim",
   }[tone];
   return (
     <div className={`mt-6 rounded-2xl border px-5 py-4 flex items-start gap-3 ${tones}`}>

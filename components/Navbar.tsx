@@ -92,7 +92,7 @@ export default function Navbar() {
   }
 
   const statusRing = business?.status === "active" ? "ring-emerald-400"
-    : business?.status === "pending" ? "ring-terra"
+    : business?.status === "pending" ? "ring-teal"
     : "ring-red-400";
   const verified = business ? isEffectivelyVerified(business) : false;
 
@@ -189,10 +189,15 @@ export default function Navbar() {
                 </div>
               ) : (
                 <>
-                  <Link href="/business/signup" className="hover:text-ink transition-colors">List your business</Link>
+                  <Link
+                    href="/business/signup"
+                    className="rounded-lg px-3 py-1.5 -mx-3 -my-1.5 text-ink/80 hover:text-ink hover:bg-canvas2 transition-colors"
+                  >
+                    List your business
+                  </Link>
                   <Link
                     href="/business/login"
-                    className="px-4 py-2 rounded-lg bg-terra text-white font-medium hover:bg-terra-dim transition-colors"
+                    className="px-4 py-2 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim transition-colors"
                   >
                     Business login
                   </Link>
@@ -253,10 +258,10 @@ export default function Navbar() {
                 </div>
               </div>
               <Link href="/business/inbox" className="py-3 text-base font-medium text-ink border-b border-stone-line flex items-center justify-between" onClick={() => setOpen(false)}>
-                Inbox {unreadCount > 0 && <span className="text-xs font-bold bg-terra text-white px-2 py-0.5 rounded-full">{unreadCount}</span>}
+                Inbox {unreadCount > 0 && <span className="text-xs font-bold bg-teal text-white px-2 py-0.5 rounded-full">{unreadCount}</span>}
               </Link>
               <Link href="/business/bookings" className="py-3 text-base font-medium text-ink border-b border-stone-line flex items-center justify-between" onClick={() => setOpen(false)}>
-                Bookings {pendingBookingsCount > 0 && <span className="text-xs font-bold bg-terra text-white px-2 py-0.5 rounded-full">{pendingBookingsCount}</span>}
+                Bookings {pendingBookingsCount > 0 && <span className="text-xs font-bold bg-teal text-white px-2 py-0.5 rounded-full">{pendingBookingsCount}</span>}
               </Link>
               <Link href="/business/dashboard" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
                 Dashboard
@@ -295,7 +300,7 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/business/login"
-                className="mt-3 text-center py-3 rounded-lg bg-terra text-white font-medium"
+                className="mt-3 text-center py-3 rounded-lg bg-teal text-white font-medium"
                 onClick={() => setOpen(false)}
               >
                 Business login
@@ -313,7 +318,7 @@ function NavIconLink({ href, icon, count, label }: { href: string; icon: React.R
     <Link href={href} aria-label={label} className="relative w-9 h-9 rounded-lg flex items-center justify-center text-ink/60 hover:text-ink hover:bg-canvas2 transition-colors">
       {icon}
       {count > 0 && (
-        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-terra text-white text-[10px] font-bold flex items-center justify-center">
+        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-teal text-white text-[10px] font-bold flex items-center justify-center">
           {count > 9 ? "9+" : count}
         </span>
       )}

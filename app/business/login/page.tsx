@@ -69,7 +69,7 @@ export default function BusinessLogin() {
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button
               disabled={loading}
-              className="w-full h-12 rounded-full bg-terra text-white font-semibold hover:bg-terra-dim active:scale-95 transition-colors disabled:opacity-60"
+              className="w-full h-12 rounded-full bg-teal text-white font-semibold hover:bg-teal-dim active:scale-95 transition-colors disabled:opacity-60"
             >
               {loading ? "Sending…" : "Send reset link"}
             </button>
@@ -101,7 +101,7 @@ export default function BusinessLogin() {
 
         <button
           disabled={loading}
-          className="w-full h-12 rounded-full bg-terra text-white font-semibold hover:bg-terra-dim active:scale-95 transition-colors disabled:opacity-60"
+          className="w-full h-12 rounded-full bg-teal text-white font-semibold hover:bg-teal-dim active:scale-95 transition-colors disabled:opacity-60"
         >
           {loading ? "Logging in…" : "Log in"}
         </button>
@@ -112,7 +112,7 @@ export default function BusinessLogin() {
       </button>
 
       <p className="text-sm text-stone mt-6">
-        New here? <Link href="/business/signup" className="text-terra-dim font-medium">List your business</Link>
+        New here? <Link href="/business/signup" className="text-teal-dim font-medium">List your business</Link>
       </p>
     </div>
   );

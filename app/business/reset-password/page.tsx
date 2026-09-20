@@ -81,7 +81,7 @@ export default function ResetPassword() {
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           disabled={saving}
-          className="w-full h-12 rounded-full bg-terra text-white font-semibold hover:bg-terra-dim active:scale-95 transition-colors disabled:opacity-60"
+          className="w-full h-12 rounded-full bg-teal text-white font-semibold hover:bg-teal-dim active:scale-95 transition-colors disabled:opacity-60"
         >
           {saving ? "Saving…" : "Set new password"}
         </button>

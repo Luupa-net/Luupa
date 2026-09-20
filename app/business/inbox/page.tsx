@@ -81,7 +81,7 @@ export default function InboxPage() {
             <p className="text-xs text-stone mt-0.5">Total</p>
           </div>
           <div className="rounded-xl bg-white border border-stone-line px-4 py-3.5">
-            <p className="font-display text-2xl font-semibold text-terra-dim">{unreadCount}</p>
+            <p className="font-display text-2xl font-semibold text-teal-dim">{unreadCount}</p>
             <p className="text-xs text-stone mt-0.5">Unread</p>
           </div>
           <div className="rounded-xl bg-white border border-stone-line px-4 py-3.5">
@@ -162,7 +162,7 @@ function InquiryCard({
   inquiry: any; onMarkRead: () => void; onArchive: () => void; onReply: () => void; onConvert: () => void;
 }) {
   return (
-    <div className={`rounded-lg border p-4 ${inq.read ? "border-stone-line bg-white" : "border-terra/30 bg-terra/5"}`}>
+    <div className={`rounded-lg border p-4 ${inq.read ? "border-stone-line bg-white" : "border-teal/30 bg-teal/5"}`}>
       <div className="flex items-start gap-3">
         <div className="w-9 h-9 rounded-full bg-navy/10 text-navy font-semibold text-sm flex items-center justify-center shrink-0">
           {inq.customer_name?.[0]?.toUpperCase() || "?"}

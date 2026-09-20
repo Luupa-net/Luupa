@@ -4,8 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
-export default function HeroSearch({ compact = false }: { compact?: boolean }) {
-  const [query, setQuery] = useState("");
+export default function HeroSearch({
+  compact = false,
+  defaultValue = "",
+  placeholder = "Ceramic coating in Riffa…",
+}: {
+  compact?: boolean;
+  defaultValue?: string;
+  placeholder?: string;
+}) {
+  const [query, setQuery] = useState(defaultValue);
   const router = useRouter();
 
   function handleSubmit(e: React.FormEvent) {
@@ -20,7 +28,7 @@ export default function HeroSearch({ compact = false }: { compact?: boolean }) {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ceramic coating in Riffa…"
+          placeholder={placeholder}
           className="w-full h-[52px] rounded-full bg-white border border-stone-line text-ink placeholder:text-stone pl-11 pr-28 font-bodyAlt text-[15px] shadow-sm focus:outline-none focus:ring-2 focus:ring-teal/40 focus:border-teal/40 transition-shadow"
         />
         <button
@@ -40,7 +48,7 @@ export default function HeroSearch({ compact = false }: { compact?: boolean }) {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ceramic coating in Riffa…"
+          placeholder={placeholder}
           className="w-full h-16 rounded-2xl bg-white border-2 border-ink text-ink placeholder:text-stone pl-12 pr-4 font-bodyAlt text-[16px] focus:outline-none focus:ring-2 focus:ring-teal transition-shadow"
         />
       </div>

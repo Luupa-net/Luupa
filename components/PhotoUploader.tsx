@@ -74,7 +74,7 @@ export default function PhotoUploader({
         ))}
 
         {photos.length < 6 && (
-          <label className="aspect-square rounded-lg border-2 border-dashed border-stone-line flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-terra transition-colors">
+          <label className="aspect-square rounded-lg border-2 border-dashed border-stone-line flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-teal transition-colors">
             {uploading ? (
               <Loader2 size={20} className="text-stone animate-spin" />
             ) : (
