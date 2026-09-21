@@ -7,7 +7,7 @@ import Link from "next/link";
 import { periodComparison, getPeriodBounds } from "@/lib/bookingPeriods";
 import { getMonthGrid, getWeekDays, addDays, addMonths, toKey, isSameDay, WEEKDAY_LABELS } from "@/lib/calendarGrid";
 import ManualBookingForm from "@/components/ManualBookingForm";
-import BookingPanel from "@/components/BookingPanel";
+import BookingDrawer from "@/components/BookingDrawer";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Plus, TrendingUp, TrendingDown, Minus,
   Search, X, CalendarDays, LayoutGrid, ListChecks, MousePointerClick, SlidersHorizontal,
@@ -296,17 +296,12 @@ export default function BookingsPage() {
           )}
         </div>
 
-        <div className="mt-6 lg:mt-0 lg:w-[400px] lg:shrink-0">
-          {selected ? (
-            <BookingPanel
-              key={selected.id}
-              booking={selected}
-              businessName={business.name}
-              paymentQrUrl={business.payment_qr_url}
-              onUpdate={updateBooking}
-              onClose={() => setSelected(null)}
-            />
-          ) : (
+        {/* Reserved-width spacer so the calendar column doesn't reflow when
+            the drawer opens/closes — the drawer itself renders separately
+            below since it's fixed-positioned on desktop, not part of this
+            column's box. */}
+        <div className="mt-6 lg:mt-0 lg:w-[460px] lg:shrink-0">
+          {!selected && (
             <div className="hidden lg:flex lg:flex-col lg:items-center lg:justify-center lg:h-[calc(100vh-260px)] lg:min-h-[360px] rounded-2xl border border-dashed border-stone-line bg-white/60 text-center px-8">
               <div className="w-14 h-14 rounded-full bg-navy/5 flex items-center justify-center mb-4">
                 <MousePointerClick size={22} className="text-navy/50" />
@@ -320,6 +315,17 @@ export default function BookingsPage() {
         </div>
         </div>
       </div>
+
+      {selected && (
+        <BookingDrawer
+          booking={selected}
+          business={business}
+          businessName={business.name}
+          paymentQrUrl={business.payment_qr_url}
+          onUpdate={updateBooking}
+          onClose={() => setSelected(null)}
+        />
+      )}
 
       {showAddForm && (
         <ManualBookingForm
