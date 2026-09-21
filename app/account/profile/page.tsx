@@ -5,8 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import PhoneInput from "@/components/PhoneInput";
+import PlateInput from "@/components/PlateInput";
+import BookingStepper from "@/components/BookingStepper";
+import { useRealtimeBookings } from "@/lib/useRealtimeBookings";
 import {
-  User, Check, Loader2, CalendarClock, MapPin, Car, ChevronRight,
+  User, Check, Loader2, CalendarClock, MapPin, Car, ChevronRight, Pencil, Trash2,
 } from "lucide-react";
 
 type Customer = { id: string; name: string; email: string | null; phone: string | null };
@@ -22,22 +25,22 @@ type Booking = {
   created_at: string;
 };
 type BusinessLite = { id: string; name: string; areas: string[] };
-
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-teal/10 text-teal-dim",
-  confirmed: "bg-teal/10 text-teal-dim",
-  declined: "bg-red-50 text-red-600",
-  arrived: "bg-skyblue/10 text-skyblue-dim",
-  in_progress: "bg-skyblue/10 text-skyblue-dim",
-  completed: "bg-navy/10 text-navy",
-  no_show: "bg-red-50 text-red-600",
-  cancelled: "bg-stone-line text-stone",
+type Vehicle = {
+  id: string;
+  customer_id: string;
+  make: string | null;
+  model: string | null;
+  plate: string | null;
+  nickname: string | null;
+  created_at: string;
 };
 
 function ProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<"profile" | "bookings">(searchParams.get("tab") === "bookings" ? "bookings" : "profile");
+  const [tab, setTab] = useState<"profile" | "bookings" | "vehicles">(
+    searchParams.get("tab") === "bookings" ? "bookings" : searchParams.get("tab") === "vehicles" ? "vehicles" : "profile"
+  );
 
   const [loading, setLoading] = useState(true);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -57,6 +60,21 @@ function ProfileContent() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [businesses, setBusinesses] = useState<Record<string, BusinessLite>>({});
   const [bookingsLoading, setBookingsLoading] = useState(true);
+
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehiclesLoading, setVehiclesLoading] = useState(true);
+  const [newMake, setNewMake] = useState("");
+  const [newModel, setNewModel] = useState("");
+  const [newPlate, setNewPlate] = useState("");
+  const [newNickname, setNewNickname] = useState("");
+  const [addingVehicle, setAddingVehicle] = useState(false);
+  const [vehicleError, setVehicleError] = useState<string | null>(null);
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
+  const [editMake, setEditMake] = useState("");
+  const [editModel, setEditModel] = useState("");
+  const [editPlate, setEditPlate] = useState("");
+  const [editNickname, setEditNickname] = useState("");
+  const [savingVehicleEdit, setSavingVehicleEdit] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -96,9 +114,33 @@ function ProfileContent() {
         setBusinesses(map);
       }
       setBookingsLoading(false);
+
+      const { data: vehicleRows } = await supabase
+        .from("vehicles")
+        .select("*")
+        .eq("customer_id", session.user.id)
+        .order("created_at");
+      setVehicles((vehicleRows ?? []) as Vehicle[]);
+      setVehiclesLoading(false);
     }
     load();
   }, [router]);
+
+  // Live updates from Realtime so a status change made on the business side
+  // (or from this same customer on another tab/device) shows up here without
+  // a manual refresh. No optimistic-insert path exists on this page today,
+  // so INSERT still needs the same "don't duplicate" guard as the business
+  // side for consistency/future-proofing, even though nothing here currently
+  // creates a booking from this tab itself.
+  useRealtimeBookings("customer_id", customer?.id, ({ eventType, new: newRow, old: oldRow }) => {
+    if (eventType === "INSERT") {
+      setBookings((prev) => (prev.some((b) => b.id === newRow.id) ? prev : [newRow, ...prev]));
+    } else if (eventType === "UPDATE") {
+      setBookings((prev) => prev.map((b) => (b.id === newRow.id ? newRow : b)));
+    } else if (eventType === "DELETE") {
+      setBookings((prev) => prev.filter((b) => b.id !== oldRow.id));
+    }
+  });
 
   async function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -164,6 +206,75 @@ function ProfileContent() {
     setTimeout(() => setPasswordSaved(false), 2500);
   }
 
+  async function handleAddVehicle(e: React.FormEvent) {
+    e.preventDefault();
+    if (!customer) return;
+    setAddingVehicle(true);
+    setVehicleError(null);
+    const { data, error } = await supabase
+      .from("vehicles")
+      .insert({
+        customer_id: customer.id,
+        make: newMake || null,
+        model: newModel || null,
+        plate: newPlate || null,
+        nickname: newNickname || null,
+      })
+      .select()
+      .single();
+    setAddingVehicle(false);
+    if (error) {
+      setVehicleError(error.message);
+      return;
+    }
+    setVehicles((prev) => [...prev, data as Vehicle]);
+    setNewMake("");
+    setNewModel("");
+    setNewPlate("");
+    setNewNickname("");
+  }
+
+  function startEditVehicle(v: Vehicle) {
+    setEditingVehicleId(v.id);
+    setEditMake(v.make || "");
+    setEditModel(v.model || "");
+    setEditPlate(v.plate || "");
+    setEditNickname(v.nickname || "");
+    setVehicleError(null);
+  }
+
+  async function handleSaveVehicleEdit(id: string) {
+    setSavingVehicleEdit(true);
+    setVehicleError(null);
+    const { data, error } = await supabase
+      .from("vehicles")
+      .update({
+        make: editMake || null,
+        model: editModel || null,
+        plate: editPlate || null,
+        nickname: editNickname || null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+    setSavingVehicleEdit(false);
+    if (error) {
+      setVehicleError(error.message);
+      return;
+    }
+    setVehicles((prev) => prev.map((v) => (v.id === id ? (data as Vehicle) : v)));
+    setEditingVehicleId(null);
+  }
+
+  async function handleDeleteVehicle(vehicle: Vehicle) {
+    const label = vehicle.nickname || [vehicle.make, vehicle.model].filter(Boolean).join(" ") || "this vehicle";
+    if (!window.confirm(`Remove ${label}?`)) return;
+    const previous = vehicles;
+    setVehicles((prev) => prev.filter((v) => v.id !== vehicle.id));
+    const { error } = await supabase.from("vehicles").delete().eq("id", vehicle.id);
+    if (error) setVehicles(previous);
+  }
+
   if (loading) {
     return <div className="max-w-2xl mx-auto px-6 py-24 text-center text-stone">Loading…</div>;
   }
@@ -184,7 +295,7 @@ function ProfileContent() {
       </div>
 
       <div className="flex gap-2 border-b border-stone-line mb-8">
-        {(["profile", "bookings"] as const).map((t) => (
+        {(["profile", "bookings", "vehicles"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -192,7 +303,11 @@ function ProfileContent() {
               tab === t ? "border-teal text-ink" : "border-transparent text-stone hover:text-ink"
             }`}
           >
-            {t === "profile" ? "My profile" : `My bookings${bookings.length ? ` (${bookings.length})` : ""}`}
+            {t === "profile"
+              ? "My profile"
+              : t === "bookings"
+              ? `My bookings${bookings.length ? ` (${bookings.length})` : ""}`
+              : `My vehicles${vehicles.length ? ` (${vehicles.length})` : ""}`}
           </button>
         ))}
       </div>
@@ -265,7 +380,7 @@ function ProfileContent() {
             </form>
           </section>
         </div>
-      ) : (
+      ) : tab === "bookings" ? (
         <div className="space-y-3">
           {bookingsLoading ? (
             <p className="text-stone text-sm py-10 text-center">Loading your bookings…</p>
@@ -286,12 +401,7 @@ function ProfileContent() {
                   className="flex items-center justify-between gap-4 rounded-xl border border-stone-line p-4 hover:border-teal/40 hover:shadow-sm transition-all bg-white"
                 >
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-ink truncate">{biz?.name ?? "Business"}</p>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${STATUS_STYLES[b.status] ?? "bg-stone-line text-stone"}`}>
-                        {b.status.replace("_", " ")}
-                      </span>
-                    </div>
+                    <p className="font-medium text-ink truncate">{biz?.name ?? "Business"}</p>
                     <p className="text-sm text-stone mt-0.5 truncate">{b.service || "Service not specified"}</p>
                     <div className="flex items-center gap-3 text-xs text-stone mt-1.5 flex-wrap">
                       {b.preferred_date && (
@@ -304,12 +414,137 @@ function ProfileContent() {
                         <span className="flex items-center gap-1"><Car size={12} /> {[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ")}</span>
                       )}
                     </div>
+                    {/* BookingStepper hardcodes white text/translucent fills — it
+                        was designed to sit on the navy gradient drawer header
+                        (see BookingDrawer.tsx's bg-white/5 wrapper), not on a
+                        plain white card. Reusing that same dark-background
+                        treatment here so labels stay legible, without touching
+                        the component itself. It also still renders at drawer
+                        width/scale — a bit dense/tight for this compact list
+                        row — but no size variant exists on it yet and it's used
+                        unchanged elsewhere, so left as-is rather than risking
+                        that other usage. */}
+                    <div className="mt-2 rounded-lg bg-navy px-3 py-2.5">
+                      <BookingStepper status={b.status} />
+                    </div>
                   </div>
                   <ChevronRight size={18} className="text-stone shrink-0" />
                 </Link>
               );
             })
           )}
+        </div>
+      ) : (
+        <div className="space-y-10">
+          <section>
+            <h2 className="font-display text-lg font-semibold text-ink mb-4">Add a vehicle</h2>
+            <form onSubmit={handleAddVehicle} className="space-y-2.5 max-w-md">
+              <div className="grid grid-cols-2 gap-2.5">
+                <input placeholder="Make" value={newMake} onChange={(e) => setNewMake(e.target.value)} className="input" />
+                <input placeholder="Model" value={newModel} onChange={(e) => setNewModel(e.target.value)} className="input" />
+              </div>
+              <PlateInput value={newPlate} onChange={setNewPlate} />
+              <input
+                placeholder='Nickname (optional, e.g. "My car")'
+                value={newNickname}
+                onChange={(e) => setNewNickname(e.target.value)}
+                className="input"
+              />
+              {vehicleError && !editingVehicleId && <p className="text-sm text-red-600">{vehicleError}</p>}
+              <button
+                disabled={addingVehicle}
+                className="px-6 h-11 rounded-full bg-teal text-white font-semibold hover:bg-teal-dim active:scale-95 transition-colors disabled:opacity-60 flex items-center gap-2"
+              >
+                {addingVehicle && <Loader2 size={15} className="animate-spin" />}
+                {addingVehicle ? "Adding…" : "Add vehicle"}
+              </button>
+            </form>
+          </section>
+
+          <div className="h-px bg-stone-line" />
+
+          <section>
+            <h2 className="font-display text-lg font-semibold text-ink mb-4">Saved vehicles</h2>
+            {vehiclesLoading ? (
+              <p className="text-stone text-sm py-10 text-center">Loading your vehicles…</p>
+            ) : vehicles.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-stone-line p-10 text-center">
+                <p className="text-stone text-sm">No saved vehicles yet — add one so it's ready to pick next time you book.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {vehicles.map((v) =>
+                  editingVehicleId === v.id ? (
+                    <div key={v.id} className="rounded-xl border border-stone-line p-4 bg-white space-y-2.5">
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <input placeholder="Make" value={editMake} onChange={(e) => setEditMake(e.target.value)} className="input" />
+                        <input placeholder="Model" value={editModel} onChange={(e) => setEditModel(e.target.value)} className="input" />
+                      </div>
+                      <PlateInput value={editPlate} onChange={setEditPlate} />
+                      <input
+                        placeholder="Nickname (optional)"
+                        value={editNickname}
+                        onChange={(e) => setEditNickname(e.target.value)}
+                        className="input"
+                      />
+                      {vehicleError && <p className="text-sm text-red-600">{vehicleError}</p>}
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveVehicleEdit(v.id)}
+                          disabled={savingVehicleEdit}
+                          className="px-5 h-9 rounded-full bg-teal text-white text-sm font-semibold hover:bg-teal-dim active:scale-95 transition-colors disabled:opacity-60 flex items-center gap-2"
+                        >
+                          {savingVehicleEdit && <Loader2 size={14} className="animate-spin" />}
+                          {savingVehicleEdit ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setEditingVehicleId(null); setVehicleError(null); }}
+                          className="text-sm text-stone hover:text-ink transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={v.id} className="flex items-center justify-between gap-4 rounded-xl border border-stone-line p-4 bg-white">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-10 h-10 rounded-full bg-teal/10 flex items-center justify-center shrink-0">
+                          <Car size={16} className="text-teal-dim" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-medium text-ink truncate">
+                            {v.nickname ? `${v.nickname} — ` : ""}
+                            {[v.make, v.model].filter(Boolean).join(" ") || "Vehicle"}
+                          </p>
+                          <p className="text-sm text-stone mt-0.5 truncate">{v.plate || "No plate on file"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => startEditVehicle(v)}
+                          aria-label="Edit vehicle"
+                          className="text-stone hover:text-ink transition-colors p-1.5"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteVehicle(v)}
+                          aria-label="Remove vehicle"
+                          className="text-stone hover:text-red-600 transition-colors p-1.5"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </section>
         </div>
       )}
     </div>

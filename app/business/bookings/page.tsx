@@ -7,7 +7,8 @@ import Link from "next/link";
 import { periodComparison, getPeriodBounds } from "@/lib/bookingPeriods";
 import { getMonthGrid, getWeekDays, addDays, addMonths, toKey, isSameDay, WEEKDAY_LABELS } from "@/lib/calendarGrid";
 import ManualBookingForm from "@/components/ManualBookingForm";
-import BookingPanel from "@/components/BookingPanel";
+import BookingDrawer from "@/components/BookingDrawer";
+import { useRealtimeBookings } from "@/lib/useRealtimeBookings";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Plus, TrendingUp, TrendingDown, Minus,
   Search, X, CalendarDays, LayoutGrid, ListChecks, MousePointerClick, SlidersHorizontal,
@@ -63,6 +64,23 @@ export default function BookingsPage() {
     }
     load();
   }, [router]);
+
+  // Live updates from Realtime: another tab/device changing a booking (or a
+  // customer's own action on their side) shows up here without a refresh.
+  // `ManualBookingForm` already does its own optimistic prepend on submit —
+  // this tab is also subscribed to its own writes, so the same INSERT will
+  // arrive again here moments later; guard against double-inserting it.
+  useRealtimeBookings("business_id", business?.id, ({ eventType, new: newRow, old: oldRow }) => {
+    if (eventType === "INSERT") {
+      setBookings((prev) => (prev.some((b) => b.id === newRow.id) ? prev : [newRow, ...prev]));
+    } else if (eventType === "UPDATE") {
+      setBookings((prev) => prev.map((b) => (b.id === newRow.id ? newRow : b)));
+      setSelected((prev: any) => (prev?.id === newRow.id ? newRow : prev));
+    } else if (eventType === "DELETE") {
+      setBookings((prev) => prev.filter((b) => b.id !== oldRow.id));
+      setSelected((prev: any) => (prev?.id === oldRow.id ? null : prev));
+    }
+  });
 
   async function updateBooking(id: string, changes: Record<string, any>) {
     const previous = bookings.find((b) => b.id === id);
@@ -296,17 +314,12 @@ export default function BookingsPage() {
           )}
         </div>
 
-        <div className="mt-6 lg:mt-0 lg:w-[400px] lg:shrink-0">
-          {selected ? (
-            <BookingPanel
-              key={selected.id}
-              booking={selected}
-              businessName={business.name}
-              paymentQrUrl={business.payment_qr_url}
-              onUpdate={updateBooking}
-              onClose={() => setSelected(null)}
-            />
-          ) : (
+        {/* Reserved-width spacer so the calendar column doesn't reflow when
+            the drawer opens/closes — the drawer itself renders separately
+            below since it's fixed-positioned on desktop, not part of this
+            column's box. */}
+        <div className="mt-6 lg:mt-0 lg:w-[460px] lg:shrink-0">
+          {!selected && (
             <div className="hidden lg:flex lg:flex-col lg:items-center lg:justify-center lg:h-[calc(100vh-260px)] lg:min-h-[360px] rounded-2xl border border-dashed border-stone-line bg-white/60 text-center px-8">
               <div className="w-14 h-14 rounded-full bg-navy/5 flex items-center justify-center mb-4">
                 <MousePointerClick size={22} className="text-navy/50" />
@@ -320,6 +333,17 @@ export default function BookingsPage() {
         </div>
         </div>
       </div>
+
+      {selected && (
+        <BookingDrawer
+          booking={selected}
+          business={business}
+          businessName={business.name}
+          paymentQrUrl={business.payment_qr_url}
+          onUpdate={updateBooking}
+          onClose={() => setSelected(null)}
+        />
+      )}
 
       {showAddForm && (
         <ManualBookingForm

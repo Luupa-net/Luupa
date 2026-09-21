@@ -125,3 +125,46 @@ export async function sendInvoiceEmail(to: string, details: InvoiceDetails) {
     return { sent: false, reason: "send_failed" };
   }
 }
+
+type ReminderDetails = {
+  businessName: string;
+  customerName: string;
+  service?: string | null;
+  // Pre-formatted, human-readable strings (e.g. "Tuesday, 23 September 2026"
+  // and "2:30 PM") — the caller owns date/time math, this just renders them.
+  date: string;
+  time: string;
+  whatsapp?: string | null;
+  phone?: string | null;
+};
+
+export async function sendReminderEmail(to: string, details: ReminderDetails) {
+  if (!resend) return { sent: false, reason: "not_configured" };
+  try {
+    const businessName = escapeHtml(details.businessName);
+    const customerName = escapeHtml(details.customerName);
+    const service = escapeHtml(details.service);
+    const date = escapeHtml(details.date);
+    const time = escapeHtml(details.time);
+    const contact = escapeHtml(details.whatsapp || details.phone);
+
+    await resend.emails.send({
+      from: FROM,
+      to,
+      subject: `Reminder: your booking with ${businessName} is coming up`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #0F3D2E;">Your booking is coming up</h2>
+          <p>Hi ${customerName},</p>
+          <p>Just a reminder — your booking with <strong>${businessName}</strong>${service ? ` for ${service}` : ""} is coming up on <strong>${date}</strong> at <strong>${time}</strong>.</p>
+          ${contact ? `<p style="color:#6B7280; font-size:13px;">Need to reach them beforehand? ${contact}</p>` : ""}
+          <p style="color:#6B7280; font-size:13px; margin-top:24px;">— The Luupa team</p>
+        </div>
+      `,
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error("Failed to send reminder email:", err);
+    return { sent: false, reason: "send_failed" };
+  }
+}
