@@ -4,8 +4,21 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { CalendarPlus, Check, X, Loader2 } from "lucide-react";
 import PhoneInput from "@/components/PhoneInput";
+import PlateInput from "@/components/PlateInput";
 
 type Customer = { id: string; name: string; email: string | null; phone: string | null };
+type Vehicle = {
+  id: string;
+  customer_id: string;
+  make: string | null;
+  model: string | null;
+  plate: string | null;
+  nickname: string | null;
+};
+
+// Sentinel option value for "enter a different vehicle" in the saved-vehicle
+// picker — distinct from any real vehicle id.
+const MANUAL_VEHICLE = "manual";
 
 export default function BookingForm({
   businessId,
@@ -18,6 +31,12 @@ export default function BookingForm({
   const [checking, setChecking] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
+
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>(MANUAL_VEHICLE);
+  const [vehicleMake, setVehicleMake] = useState("");
+  const [vehicleModel, setVehicleModel] = useState("");
+  const [vehiclePlate, setVehiclePlate] = useState("");
 
   // "Complete your profile" step — covers a brand-new signup whose profile
   // insert failed, and a business owner's own account booking as a customer
@@ -41,6 +60,8 @@ export default function BookingForm({
     if (!session?.user) {
       setUserId(null);
       setCustomer(null);
+      setVehicles([]);
+      setSelectedVehicleId(MANUAL_VEHICLE);
       setChecking(false);
       return;
     }
@@ -52,6 +73,21 @@ export default function BookingForm({
       .eq("id", session.user.id)
       .single();
     setCustomer(data ?? null);
+
+    if (data) {
+      const { data: vehicleRows } = await supabase
+        .from("vehicles")
+        .select("*")
+        .eq("customer_id", data.id);
+      const rows = (vehicleRows ?? []) as Vehicle[];
+      setVehicles(rows);
+      // Default to the first saved vehicle so it's one click to book —
+      // "Enter a different vehicle" (MANUAL_VEHICLE) falls back to free text.
+      setSelectedVehicleId(rows.length > 0 ? rows[0].id : MANUAL_VEHICLE);
+    } else {
+      setVehicles([]);
+      setSelectedVehicleId(MANUAL_VEHICLE);
+    }
     setChecking(false);
   }
 
@@ -88,6 +124,15 @@ export default function BookingForm({
     if (!customer) return;
     setSending(true);
     setBookingError(null);
+
+    // A saved vehicle is "active" only when the picker is shown (>=1 saved)
+    // and the customer hasn't chosen to enter a different one — otherwise
+    // fall back to whatever's in the free-text fields, same as before.
+    const savedVehicle =
+      vehicles.length > 0 && selectedVehicleId !== MANUAL_VEHICLE
+        ? vehicles.find((v) => v.id === selectedVehicleId)
+        : undefined;
+
     const { error } = await supabase.from("bookings").insert({
       business_id: businessId,
       customer_id: customer.id,
@@ -97,6 +142,9 @@ export default function BookingForm({
       service: service || null,
       preferred_date: date || null,
       preferred_time: time || null,
+      vehicle_make: savedVehicle ? savedVehicle.make : (vehicleMake || null),
+      vehicle_model: savedVehicle ? savedVehicle.model : (vehicleModel || null),
+      vehicle_plate: savedVehicle ? savedVehicle.plate : (vehiclePlate || null),
       note,
       source: "luupa",
       status: "pending",
@@ -200,6 +248,34 @@ export default function BookingForm({
                   <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" />
                   <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="input" />
                 </div>
+
+                {vehicles.length > 0 && (
+                  <select
+                    value={selectedVehicleId}
+                    onChange={(e) => setSelectedVehicleId(e.target.value)}
+                    className="input"
+                  >
+                    {vehicles.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.nickname ? `${v.nickname} — ` : ""}
+                        {[v.make, v.model].filter(Boolean).join(" ")}
+                        {v.plate ? ` (${v.plate})` : ""}
+                      </option>
+                    ))}
+                    <option value={MANUAL_VEHICLE}>Enter a different vehicle</option>
+                  </select>
+                )}
+
+                {(vehicles.length === 0 || selectedVehicleId === MANUAL_VEHICLE) && (
+                  <>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <input placeholder="Vehicle make" value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} className="input" />
+                      <input placeholder="Vehicle model" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} className="input" />
+                    </div>
+                    <PlateInput value={vehiclePlate} onChange={setVehiclePlate} />
+                  </>
+                )}
+
                 <textarea
                   placeholder="Anything else? (optional)"
                   value={note}
