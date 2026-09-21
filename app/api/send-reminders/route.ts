@@ -8,11 +8,11 @@ import { sendReminderEmail } from "@/lib/email";
 // offset — no timezone library needed.
 const BAHRAIN_OFFSET_HOURS = 3;
 
-// The cron runs hourly (see vercel.json), so a 2-hour-wide window guarantees
-// every booking gets at least one run where it falls inside it, even if a run
-// is skipped or delayed by a few minutes.
-const WINDOW_MIN_HOURS = 23;
-const WINDOW_MAX_HOURS = 25;
+// Vercel's Hobby plan only allows a cron to run once per day (see vercel.json —
+// this runs once daily at 06:00 UTC / 09:00 Bahrain), so reminders are sent by
+// calendar date rather than a precise "N hours before" window: every booking
+// whose preferred_date is tomorrow (Bahrain-local) gets exactly one reminder
+// on today's run, regardless of what time of day the appointment itself is.
 
 // Vercel attaches `Authorization: Bearer $CRON_SECRET` to its own scheduled
 // calls when a CRON_SECRET env var exists on the project — this is what
@@ -41,19 +41,6 @@ function isAuthorized(req: NextRequest): boolean {
 function bahrainDateKey(d: Date): string {
   const shifted = new Date(d.getTime() + BAHRAIN_OFFSET_HOURS * 60 * 60 * 1000);
   return shifted.toISOString().slice(0, 10);
-}
-
-// preferred_date is a plain SQL date (YYYY-MM-DD) and preferred_time is
-// always "HH:MM" — combine them as Bahrain local time and convert to the
-// real UTC instant they represent.
-function bookingMomentUTC(preferredDate: string, preferredTime: string): Date | null {
-  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(preferredDate);
-  const timeMatch = /^(\d{2}):(\d{2})/.exec(preferredTime);
-  if (!dateMatch || !timeMatch) return null;
-
-  const [, y, mo, d] = dateMatch;
-  const [, h, mi] = timeMatch;
-  return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h) - BAHRAIN_OFFSET_HOURS, Number(mi)));
 }
 
 function formatDateHuman(preferredDate: string): string {
@@ -86,22 +73,15 @@ export async function GET(req: NextRequest) {
   }
 
   const now = new Date();
-
-  // Cheap SQL-side narrowing: preferred_date has to fall somewhere between
-  // today and (now + WINDOW_MAX_HOURS)'s Bahrain calendar date — usually a
-  // 2-day span ("today"/"tomorrow"), occasionally 3 near local midnight.
-  // The precise hour math happens below, in JS.
-  const startKey = bahrainDateKey(now);
-  const endKey = bahrainDateKey(new Date(now.getTime() + WINDOW_MAX_HOURS * 60 * 60 * 1000));
+  const tomorrowKey = bahrainDateKey(new Date(now.getTime() + 24 * 60 * 60 * 1000));
 
   const { data: candidates, error } = await supabaseAdmin
     .from("bookings")
     .select("id, customer_name, customer_email, service, preferred_date, preferred_time, businesses(name, phone, whatsapp)")
     .eq("status", "confirmed")
+    .eq("preferred_date", tomorrowKey)
     .is("reminder_sent_at", null)
-    .not("customer_email", "is", null)
-    .gte("preferred_date", startKey)
-    .lte("preferred_date", endKey);
+    .not("customer_email", "is", null);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -114,13 +94,7 @@ export async function GET(req: NextRequest) {
   for (const booking of candidates || []) {
     checked++;
 
-    if (!booking.preferred_date || !booking.preferred_time || !booking.customer_email) continue;
-
-    const moment = bookingMomentUTC(booking.preferred_date, booking.preferred_time);
-    if (!moment) continue;
-
-    const hoursUntil = (moment.getTime() - now.getTime()) / (1000 * 60 * 60);
-    if (hoursUntil < WINDOW_MIN_HOURS || hoursUntil > WINDOW_MAX_HOURS) continue;
+    if (!booking.preferred_date || !booking.customer_email) continue;
 
     try {
       // Conditional claim: only proceed if this invocation is the one that
@@ -147,7 +121,7 @@ export async function GET(req: NextRequest) {
         customerName: booking.customer_name,
         service: booking.service,
         date: formatDateHuman(booking.preferred_date),
-        time: formatTimeHuman(booking.preferred_time),
+        time: booking.preferred_time ? formatTimeHuman(booking.preferred_time) : "the scheduled time",
         whatsapp: business?.whatsapp,
         phone: business?.phone,
       });
