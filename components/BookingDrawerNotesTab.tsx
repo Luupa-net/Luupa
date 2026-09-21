@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { StickyNote } from "lucide-react";
+import Link from "next/link";
+import { StickyNote, User } from "lucide-react";
+import { normalizeWhatsAppNumber } from "@/lib/validation";
 
 const cardCls = "rounded-2xl bg-white border border-stone-line p-4 transition-shadow hover:shadow-sm";
 const sectionTitle = "flex items-center gap-1.5 text-sm font-semibold text-ink mb-3";
@@ -24,6 +26,18 @@ export default function BookingDrawerNotesTab({
 
   return (
     <>
+      {/* Booking-level notes above are specific to this one visit — this
+          links out to the customer's full profile (tags, lifetime stats,
+          every past booking) instead of duplicating any of that here. */}
+      {booking.customer_contact && (
+        <Link
+          href={`/business/customers/${normalizeWhatsAppNumber(booking.customer_contact)}`}
+          className="flex items-center gap-1.5 text-sm font-medium text-navy hover:text-navy-light transition-colors w-fit"
+        >
+          <User size={14} /> View customer profile
+        </Link>
+      )}
+
       <div className={cardCls}>
         <p className={sectionTitle}><StickyNote size={14} /> Notes</p>
         <textarea
