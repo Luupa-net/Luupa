@@ -8,6 +8,7 @@ import { periodComparison, getPeriodBounds } from "@/lib/bookingPeriods";
 import { getMonthGrid, getWeekDays, addDays, addMonths, toKey, isSameDay, WEEKDAY_LABELS } from "@/lib/calendarGrid";
 import ManualBookingForm from "@/components/ManualBookingForm";
 import BookingDrawer from "@/components/BookingDrawer";
+import { useRealtimeBookings } from "@/lib/useRealtimeBookings";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Plus, TrendingUp, TrendingDown, Minus,
   Search, X, CalendarDays, LayoutGrid, ListChecks, MousePointerClick, SlidersHorizontal,
@@ -63,6 +64,23 @@ export default function BookingsPage() {
     }
     load();
   }, [router]);
+
+  // Live updates from Realtime: another tab/device changing a booking (or a
+  // customer's own action on their side) shows up here without a refresh.
+  // `ManualBookingForm` already does its own optimistic prepend on submit —
+  // this tab is also subscribed to its own writes, so the same INSERT will
+  // arrive again here moments later; guard against double-inserting it.
+  useRealtimeBookings("business_id", business?.id, ({ eventType, new: newRow, old: oldRow }) => {
+    if (eventType === "INSERT") {
+      setBookings((prev) => (prev.some((b) => b.id === newRow.id) ? prev : [newRow, ...prev]));
+    } else if (eventType === "UPDATE") {
+      setBookings((prev) => prev.map((b) => (b.id === newRow.id ? newRow : b)));
+      setSelected((prev: any) => (prev?.id === newRow.id ? newRow : prev));
+    } else if (eventType === "DELETE") {
+      setBookings((prev) => prev.filter((b) => b.id !== oldRow.id));
+      setSelected((prev: any) => (prev?.id === oldRow.id ? null : prev));
+    }
+  });
 
   async function updateBooking(id: string, changes: Record<string, any>) {
     const previous = bookings.find((b) => b.id === id);

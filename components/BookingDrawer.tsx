@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
+import { useBookingKeyboardShortcuts } from "@/lib/useBookingKeyboardShortcuts";
 import BookingStepper from "@/components/BookingStepper";
 import BookingDrawerDetailsTab from "@/components/BookingDrawerDetailsTab";
 import BookingDrawerPaymentTab from "@/components/BookingDrawerPaymentTab";
@@ -50,6 +51,20 @@ export default function BookingDrawer({
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
+
+  // Bound here in the chrome layer (not per-tab) so shortcuts keep working
+  // regardless of which tab is active. Fires the same onUpdate prop every
+  // status button in the History tab already calls — see
+  // lib/useBookingKeyboardShortcuts.ts for the full key mapping.
+  useBookingKeyboardShortcuts(booking.status, {
+    onConfirm: () => onUpdate(booking.id, { status: "confirmed" }),
+    onDecline: () => onUpdate(booking.id, { status: "declined" }),
+    onArrived: () => onUpdate(booking.id, { status: "arrived" }),
+    onNoShow: () => onUpdate(booking.id, { status: "no_show" }),
+    onCancel: () => onUpdate(booking.id, { status: "cancelled" }),
+    onInProgress: () => onUpdate(booking.id, { status: "in_progress" }),
+    onComplete: () => onUpdate(booking.id, { status: "completed" }),
+  });
 
   function copyContact() {
     if (!booking.customer_contact) return;

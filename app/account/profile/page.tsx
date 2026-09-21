@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import PhoneInput from "@/components/PhoneInput";
+import BookingStepper from "@/components/BookingStepper";
+import { useRealtimeBookings } from "@/lib/useRealtimeBookings";
 import {
   User, Check, Loader2, CalendarClock, MapPin, Car, ChevronRight,
 } from "lucide-react";
@@ -22,17 +24,6 @@ type Booking = {
   created_at: string;
 };
 type BusinessLite = { id: string; name: string; areas: string[] };
-
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-teal/10 text-teal-dim",
-  confirmed: "bg-teal/10 text-teal-dim",
-  declined: "bg-red-50 text-red-600",
-  arrived: "bg-skyblue/10 text-skyblue-dim",
-  in_progress: "bg-skyblue/10 text-skyblue-dim",
-  completed: "bg-navy/10 text-navy",
-  no_show: "bg-red-50 text-red-600",
-  cancelled: "bg-stone-line text-stone",
-};
 
 function ProfileContent() {
   const router = useRouter();
@@ -99,6 +90,22 @@ function ProfileContent() {
     }
     load();
   }, [router]);
+
+  // Live updates from Realtime so a status change made on the business side
+  // (or from this same customer on another tab/device) shows up here without
+  // a manual refresh. No optimistic-insert path exists on this page today,
+  // so INSERT still needs the same "don't duplicate" guard as the business
+  // side for consistency/future-proofing, even though nothing here currently
+  // creates a booking from this tab itself.
+  useRealtimeBookings("customer_id", customer?.id, ({ eventType, new: newRow, old: oldRow }) => {
+    if (eventType === "INSERT") {
+      setBookings((prev) => (prev.some((b) => b.id === newRow.id) ? prev : [newRow, ...prev]));
+    } else if (eventType === "UPDATE") {
+      setBookings((prev) => prev.map((b) => (b.id === newRow.id ? newRow : b)));
+    } else if (eventType === "DELETE") {
+      setBookings((prev) => prev.filter((b) => b.id !== oldRow.id));
+    }
+  });
 
   async function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -286,12 +293,7 @@ function ProfileContent() {
                   className="flex items-center justify-between gap-4 rounded-xl border border-stone-line p-4 hover:border-teal/40 hover:shadow-sm transition-all bg-white"
                 >
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-ink truncate">{biz?.name ?? "Business"}</p>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${STATUS_STYLES[b.status] ?? "bg-stone-line text-stone"}`}>
-                        {b.status.replace("_", " ")}
-                      </span>
-                    </div>
+                    <p className="font-medium text-ink truncate">{biz?.name ?? "Business"}</p>
                     <p className="text-sm text-stone mt-0.5 truncate">{b.service || "Service not specified"}</p>
                     <div className="flex items-center gap-3 text-xs text-stone mt-1.5 flex-wrap">
                       {b.preferred_date && (
@@ -303,6 +305,19 @@ function ProfileContent() {
                       {(b.vehicle_make || b.vehicle_model) && (
                         <span className="flex items-center gap-1"><Car size={12} /> {[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ")}</span>
                       )}
+                    </div>
+                    {/* BookingStepper hardcodes white text/translucent fills — it
+                        was designed to sit on the navy gradient drawer header
+                        (see BookingDrawer.tsx's bg-white/5 wrapper), not on a
+                        plain white card. Reusing that same dark-background
+                        treatment here so labels stay legible, without touching
+                        the component itself. It also still renders at drawer
+                        width/scale — a bit dense/tight for this compact list
+                        row — but no size variant exists on it yet and it's used
+                        unchanged elsewhere, so left as-is rather than risking
+                        that other usage. */}
+                    <div className="mt-2 rounded-lg bg-navy px-3 py-2.5">
+                      <BookingStepper status={b.status} />
                     </div>
                   </div>
                   <ChevronRight size={18} className="text-stone shrink-0" />
