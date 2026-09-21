@@ -26,6 +26,36 @@ const STRUCTURE: Record<string, "numbers-only" | "letters-and-numbers" | "code-a
   Oman: "code-and-numbers",
 };
 
+const ABBREV_TO_COUNTRY: Record<string, string> = {
+  BH: "Bahrain", SA: "Saudi Arabia", KW: "Kuwait", QA: "Qatar", OM: "Oman",
+};
+const EMIRATE_NAMES = [...EMIRATES.map((e) => e.name)].sort((a, b) => b.length - a.length);
+
+// Reverses emit()'s formatting so a plate already on file (e.g. an existing
+// booking's vehicle_plate) actually shows up instead of rendering blank —
+// same "parse the stored value back into fields" idea as PhoneInput.
+function parseStoredPlate(value: string): { country: string; emirate: string; code: string; numbers: string } {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return { country: "Bahrain", emirate: "Dubai", code: "", numbers: "" };
+
+  if (trimmed.startsWith("UAE-")) {
+    const rest = trimmed.slice(4);
+    const emirate = EMIRATE_NAMES.find((name) => rest.startsWith(name)) || "Dubai";
+    const parts = rest.slice(emirate.length).trim().split(/\s+/).filter(Boolean);
+    const code = parts.length > 1 ? parts[0] : "";
+    const numbers = parts.length > 1 ? parts.slice(1).join(" ") : (parts[0] || "");
+    return { country: "UAE", emirate, code, numbers };
+  }
+
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  const country = ABBREV_TO_COUNTRY[parts[0]] || "Bahrain";
+  const rest = parts.slice(1);
+  if (STRUCTURE[country] === "numbers-only") {
+    return { country, emirate: "Dubai", code: "", numbers: rest.join(" ") };
+  }
+  return { country, emirate: "Dubai", code: rest[0] || "", numbers: rest.slice(1).join(" ") };
+}
+
 export default function PlateInput({
   value,
   onChange,
@@ -33,10 +63,11 @@ export default function PlateInput({
   value: string;
   onChange: (formatted: string) => void;
 }) {
-  const [country, setCountry] = useState("Bahrain");
-  const [emirate, setEmirate] = useState("Dubai");
-  const [code, setCode] = useState("");
-  const [numbers, setNumbers] = useState("");
+  const initial = parseStoredPlate(value);
+  const [country, setCountry] = useState(initial.country);
+  const [emirate, setEmirate] = useState(initial.emirate);
+  const [code, setCode] = useState(initial.code);
+  const [numbers, setNumbers] = useState(initial.numbers);
 
   function emit(nextCountry: string, nextEmirate: string, nextCode: string, nextNumbers: string) {
     setCountry(nextCountry);

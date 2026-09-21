@@ -3,7 +3,11 @@
 
 create table businesses (
   id uuid primary key default gen_random_uuid(),
-  owner_id uuid references auth.users(id) not null,
+  -- One listing per owner — enforced here, not just assumed by the app's
+  -- insert flow, so a duplicate/retried signup can't silently create a
+  -- second row for the same owner (which would break every `.single()`
+  -- lookup the dashboard and bookings pages do by owner_id).
+  owner_id uuid references auth.users(id) unique not null,
   name text not null,
   logo_url text,
   subcategory text,
@@ -41,6 +45,8 @@ create table inquiries (
   created_at timestamptz default now()
 );
 
+create index idx_inquiries_business_id on inquiries(business_id);
+
 -- Row Level Security: enforced at the database level, not just in app code
 alter table businesses enable row level security;
 alter table inquiries enable row level security;
@@ -67,10 +73,12 @@ create view businesses_public as
 
 grant select on businesses_public to anon, authenticated;
 
--- A business owner can view and edit only their own listing, regardless of status
+-- A business owner can view and edit only their own listing, regardless of status.
+-- auth.uid() is wrapped in a `select` so Postgres evaluates it once per
+-- statement instead of once per row (see the Supabase RLS performance docs).
 create policy "Owners can view their own listing"
   on businesses for select
-  using (auth.uid() = owner_id);
+  using ((select auth.uid()) = owner_id);
 
 -- WITH CHECK is spelled out explicitly (rather than relying on Postgres's
 -- implicit reuse of USING for UPDATE policies) so the "owner can only touch
@@ -78,8 +86,8 @@ create policy "Owners can view their own listing"
 -- without having to know that implicit-reuse rule.
 create policy "Owners can update their own listing"
   on businesses for update
-  using (auth.uid() = owner_id)
-  with check (auth.uid() = owner_id);
+  using ((select auth.uid()) = owner_id)
+  with check ((select auth.uid()) = owner_id);
 
 -- SECURITY: without this, a business could edit their own row directly (via browser
 -- dev tools) and set verified=true, status='active', or tier='featured' themselves.
@@ -237,15 +245,16 @@ set file_size_limit = 5242880,
 where id = 'business-photos';
 
 -- A newly signed-up user can create exactly one listing tied to themselves
+-- (also enforced by the unique constraint on businesses.owner_id above).
 create policy "Users can insert their own business"
   on businesses for insert
-  with check (auth.uid() = owner_id);
+  with check ((select auth.uid()) = owner_id);
 
 -- Inquiries: only the business owner can read inquiries sent to them
 create policy "Owners can view their own inquiries"
   on inquiries for select
   using (
-    business_id in (select id from businesses where owner_id = auth.uid())
+    business_id in (select id from businesses where owner_id = (select auth.uid()))
   );
 
 -- Anyone (even anonymous customers) can submit an inquiry
@@ -257,10 +266,10 @@ create policy "Anyone can submit an inquiry"
 create policy "Owners can update their own inquiries"
   on inquiries for update
   using (
-    business_id in (select id from businesses where owner_id = auth.uid())
+    business_id in (select id from businesses where owner_id = (select auth.uid()))
   )
   with check (
-    business_id in (select id from businesses where owner_id = auth.uid())
+    business_id in (select id from businesses where owner_id = (select auth.uid()))
   );
 
 -- Booking requests — customer requests a date/time, business confirms or
@@ -277,6 +286,7 @@ create table bookings (
   note text,
   status text default 'pending' check (status in ('pending', 'confirmed', 'declined', 'arrived', 'in_progress', 'completed', 'no_show', 'cancelled')),
   paid boolean default false,
+  amount numeric(10,2),
   source text default 'luupa' check (source in ('luupa', 'manual')),
   vehicle_make text,
   vehicle_model text,
@@ -286,6 +296,8 @@ create table bookings (
 );
 
 alter table bookings enable row level security;
+
+create index idx_bookings_business_id on bookings(business_id);
 
 -- Customer accounts — lets a customer reuse their name/phone/email across
 -- every business they book with, instead of retyping it each time.
@@ -301,71 +313,73 @@ alter table customers enable row level security;
 
 create policy "Customers can view their own profile"
   on customers for select
-  using (auth.uid() = id);
+  using ((select auth.uid()) = id);
 
 create policy "Customers can create their own profile"
   on customers for insert
-  with check (auth.uid() = id);
+  with check ((select auth.uid()) = id);
 
 create policy "Customers can update their own profile"
   on customers for update
-  using (auth.uid() = id)
-  with check (auth.uid() = id);
+  using ((select auth.uid()) = id)
+  with check ((select auth.uid()) = id);
 
 -- Links a booking back to the customer account that made it (nullable — a
 -- business's own manually-entered walk-ins/phone bookings have no customer
 -- account behind them).
 alter table bookings add column customer_id uuid references customers(id);
+create index idx_bookings_customer_id on bookings(customer_id);
 
 -- SECURITY: a `with check (true)` insert policy here would let anyone with
 -- the anon key create a booking directly via the REST API for any
 -- business_id, with any status (including 'confirmed', skipping the
--- business's review step), with no auth required. These two policies
--- instead require a real authenticated customer for customer-initiated
--- bookings, and require the caller to actually own the business for
--- manual/walk-in bookings.
-create policy "Customers can submit a booking request"
+-- business's review step), with no auth required. This requires either a
+-- real authenticated customer inserting their own pending request, or the
+-- caller actually owning the business for a manual/walk-in entry — merged
+-- into one policy (rather than two) since the two conditions are mutually
+-- exclusive on `source` and Postgres otherwise evaluates every permissive
+-- policy on a table for every insert.
+create policy "Owners and customers can insert their own bookings"
   on bookings for insert
   with check (
-    source = 'luupa'
-    and status = 'pending'
-    and auth.uid() is not null
-    and customer_id = auth.uid()
+    (
+      source = 'luupa'
+      and status = 'pending'
+      and (select auth.uid()) is not null
+      and customer_id = (select auth.uid())
+    )
+    or (
+      source = 'manual'
+      and business_id in (select id from businesses where owner_id = (select auth.uid()))
+    )
   );
 
-create policy "Business owners can log a manual booking"
-  on bookings for insert
-  with check (
-    source = 'manual'
-    and business_id in (select id from businesses where owner_id = auth.uid())
-  );
-
-create policy "Owners can view their own bookings"
+-- Same merge for SELECT: a business sees its own bookings, a customer sees
+-- bookings they made — one OR'd policy instead of two always-evaluated ones.
+create policy "Owners and customers can view relevant bookings"
   on bookings for select
   using (
-    business_id in (select id from businesses where owner_id = auth.uid())
+    business_id in (select id from businesses where owner_id = (select auth.uid()))
+    or (select auth.uid()) = customer_id
   );
-
-create policy "Customers can view their own bookings"
-  on bookings for select
-  using (auth.uid() = customer_id);
 
 create policy "Owners can update their own bookings"
   on bookings for update
   using (
-    business_id in (select id from businesses where owner_id = auth.uid())
+    business_id in (select id from businesses where owner_id = (select auth.uid()))
   )
   with check (
-    business_id in (select id from businesses where owner_id = auth.uid())
+    business_id in (select id from businesses where owner_id = (select auth.uid()))
   );
 
 -- SECURITY: the policy above only ever constrained business_id, never
 -- customer_id — so without this, a business owner could UPDATE their own
 -- booking rows and reassign customer_id to an arbitrary UUID, which,
--- combined with "Customers can view their own bookings" above (using
--- auth.uid() = customer_id), would make a fabricated booking appear in a
--- stranger's own booking list. RLS's WITH CHECK can't reference the old
--- value of a column, so this pins customer_id via trigger instead — the
+-- combined with "Owners and customers can view relevant bookings" above
+-- (whose customer half uses auth.uid() = customer_id), would make a
+-- fabricated booking appear in a stranger's own booking list. RLS's WITH
+-- CHECK can't reference the old value of a column, so this pins customer_id
+-- via trigger instead — the
 -- same pattern used for businesses (see protect_admin_controlled_fields()
 -- below) — without touching any other column a business legitimately needs
 -- to update (status, payment info, notes, vehicle details, etc).

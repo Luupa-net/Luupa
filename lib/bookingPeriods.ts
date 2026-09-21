@@ -1,17 +1,20 @@
 // All native Date math — deliberately no new date library added, so this
 // doesn't depend on an npm install that couldn't be verified this session.
 
+import { startOfWeekSat } from "./calendarGrid";
+
 function startOfDay(d: Date) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
 }
 
+// Reuses calendarGrid's Saturday-first week start (Gulf convention) — this
+// used to compute its own Sunday-first boundary, so the "This week" stat
+// card and the Week calendar view it jumps to (getWeekDays, also Sat-first)
+// disagreed on which bookings counted as "this week".
 function startOfWeek(d: Date) {
-  const x = startOfDay(d);
-  const day = x.getDay(); // 0 = Sunday
-  x.setDate(x.getDate() - day);
-  return x;
+  return startOfWeekSat(d);
 }
 
 function startOfMonth(d: Date) {

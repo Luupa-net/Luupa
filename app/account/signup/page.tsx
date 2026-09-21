@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { safeNextPath } from "@/lib/validation";
+import { useGoogleOAuthCompletion } from "@/lib/useGoogleOAuthCompletion";
 import PhoneInput from "@/components/PhoneInput";
 import GoogleAuthButton from "@/components/GoogleAuthButton";
+import { AlertCircle } from "lucide-react";
 
 function AccountSignupForm() {
   const [name, setName] = useState("");
@@ -18,6 +20,7 @@ function AccountSignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next"));
+  const { oauthError, setOauthError, completingOAuth } = useGoogleOAuthCompletion(next);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,6 +53,12 @@ function AccountSignupForm() {
     router.push(next);
   }
 
+  if (completingOAuth) {
+    return (
+      <div className="max-w-md mx-auto px-6 py-24 text-center text-stone">Finishing sign-in…</div>
+    );
+  }
+
   return (
     <div className="max-w-md mx-auto px-6 py-16">
       <h1 className="font-display text-3xl font-semibold text-ink">Create your account</h1>
@@ -57,8 +66,15 @@ function AccountSignupForm() {
         One account to book with any business on Luupa — no retyping your details every time.
       </p>
 
+      {oauthError && (
+        <div className="mt-6 flex items-start gap-2.5 rounded-lg bg-red-50 px-4 py-3.5">
+          <AlertCircle size={18} className="text-red-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700">{oauthError}</p>
+        </div>
+      )}
+
       <div className="mt-8">
-        <GoogleAuthButton next={next} label="Sign up with Google" />
+        <GoogleAuthButton next={next} label="Sign up with Google" onError={(msg) => setOauthError(msg || null)} />
       </div>
       <div className="flex items-center gap-3 my-6">
         <div className="h-px bg-stone-line flex-1" />

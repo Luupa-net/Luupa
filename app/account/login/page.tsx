@@ -1,13 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { safeNextPath } from "@/lib/validation";
-import { ensureCustomerAccount } from "@/lib/ensureCustomerAccount";
+import { useGoogleOAuthCompletion } from "@/lib/useGoogleOAuthCompletion";
 import GoogleAuthButton from "@/components/GoogleAuthButton";
-import { Check } from "lucide-react";
+import { Check, AlertCircle } from "lucide-react";
 
 function AccountLoginForm() {
   const [email, setEmail] = useState("");
@@ -16,28 +16,10 @@ function AccountLoginForm() {
   const [loading, setLoading] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
-  const [completingOAuth, setCompletingOAuth] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next"));
-
-  useEffect(() => {
-    // Lands here after a Google redirect too — supabase-js picks the session
-    // up from the URL on its own, this just finishes the app-side part
-    // (making sure a `customers` row exists) before moving on to `next`.
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event !== "SIGNED_IN" || !session?.user) return;
-      const provider = session.user.app_metadata?.provider;
-      if (provider !== "google") return;
-      setCompletingOAuth(true);
-      await ensureCustomerAccount(session.user.id, {
-        email: session.user.email,
-        name: (session.user.user_metadata?.full_name as string) || (session.user.user_metadata?.name as string) || null,
-      });
-      router.push(next);
-    });
-    return () => listener.subscription.unsubscribe();
-  }, [next, router]);
+  const { oauthError, setOauthError, completingOAuth } = useGoogleOAuthCompletion(next);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -113,8 +95,15 @@ function AccountLoginForm() {
     <div className="max-w-md mx-auto px-6 py-16">
       <h1 className="font-display text-3xl font-semibold text-ink">Log in</h1>
 
+      {oauthError && (
+        <div className="mt-6 flex items-start gap-2.5 rounded-lg bg-red-50 px-4 py-3.5">
+          <AlertCircle size={18} className="text-red-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700">{oauthError}</p>
+        </div>
+      )}
+
       <div className="mt-8">
-        <GoogleAuthButton next={next} label="Continue with Google" />
+        <GoogleAuthButton next={next} label="Continue with Google" onError={(msg) => setOauthError(msg || null)} />
       </div>
       <div className="flex items-center gap-3 my-6">
         <div className="h-px bg-stone-line flex-1" />

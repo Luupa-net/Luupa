@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { isEffectivelyVerified } from "@/lib/verification";
 import {
   Menu, X, Home, ChevronDown, LayoutDashboard, BadgeCheck, LogOut, Eye,
-  Inbox, CalendarClock, User, UserCircle, CalendarCheck,
+  CalendarClock, User, UserCircle, CalendarCheck,
 } from "lucide-react";
 
 type BusinessSession = {
@@ -25,7 +25,6 @@ export default function Navbar() {
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [checked, setChecked] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [pendingBookingsCount, setPendingBookingsCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -48,12 +47,11 @@ export default function Navbar() {
 
     if (data) {
       setCustomerName(null);
-      // Both counts run at the same time, not one after another
-      const [{ count: unread }, { count: pending }] = await Promise.all([
-        supabase.from("inquiries").select("*", { count: "exact", head: true }).eq("business_id", data.id).eq("read", false),
-        supabase.from("bookings").select("*", { count: "exact", head: true }).eq("business_id", data.id).eq("status", "pending"),
-      ]);
-      setUnreadCount(unread || 0);
+      const { count: pending } = await supabase
+        .from("bookings")
+        .select("*", { count: "exact", head: true })
+        .eq("business_id", data.id)
+        .eq("status", "pending");
       setPendingBookingsCount(pending || 0);
     } else {
       // Not a business owner — check whether this session belongs to a customer account instead.
@@ -111,7 +109,6 @@ export default function Navbar() {
 
           {!checked ? null : business ? (
             <>
-              <NavIconLink href="/business/inbox" icon={<Inbox size={18} />} count={unreadCount} label="Inbox" />
               <NavIconLink href="/business/bookings" icon={<CalendarClock size={18} />} count={pendingBookingsCount} label="Bookings" />
             <div className="relative" ref={dropdownRef}>
               <button
@@ -257,9 +254,6 @@ export default function Navbar() {
                   <p className="text-xs text-stone capitalize">{business.status}{verified ? " · Verified" : ""}</p>
                 </div>
               </div>
-              <Link href="/business/inbox" className="py-3 text-base font-medium text-ink border-b border-stone-line flex items-center justify-between" onClick={() => setOpen(false)}>
-                Inbox {unreadCount > 0 && <span className="text-xs font-bold bg-teal text-white px-2 py-0.5 rounded-full">{unreadCount}</span>}
-              </Link>
               <Link href="/business/bookings" className="py-3 text-base font-medium text-ink border-b border-stone-line flex items-center justify-between" onClick={() => setOpen(false)}>
                 Bookings {pendingBookingsCount > 0 && <span className="text-xs font-bold bg-teal text-white px-2 py-0.5 rounded-full">{pendingBookingsCount}</span>}
               </Link>
