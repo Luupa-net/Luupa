@@ -292,7 +292,12 @@ create table bookings (
   vehicle_model text,
   vehicle_plate text,
   payment_method text check (payment_method in ('cash', 'card')),
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  discount_amount numeric(10,2) default 0,
+  discount_note text,
+  reminder_sent_at timestamptz
+  -- assigned_staff_id is added further down, via alter table, once the
+  -- staff table it references has been created — see the "v21" block below.
 );
 
 alter table bookings enable row level security;
@@ -400,3 +405,297 @@ revoke execute on function lock_booking_customer_id() from anon, authenticated;
 create trigger enforce_booking_customer_id_immutable
   before update on bookings
   for each row execute function lock_booking_customer_id();
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- v21: business-side ERP — staff, line-item services, a payment ledger, a
+-- per-business customer-notes layer, saved customer vehicles, and a status
+-- audit trail. See migration-v21.sql for the idempotent version actually
+-- run against the live database; this is the consolidated/from-scratch form.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Audit trail of every status change on a booking. Populated only by the
+-- trigger below (security definer) — no insert/update/delete policy is
+-- granted to anon/authenticated, so the trail can't be forged or edited via
+-- the REST API even by the booking's own owner.
+create table booking_status_history (
+  id uuid primary key default gen_random_uuid(),
+  booking_id uuid references bookings(id) not null,
+  business_id uuid references businesses(id) not null,
+  old_status text,
+  new_status text not null,
+  changed_by uuid references auth.users(id),
+  changed_at timestamptz default now()
+);
+
+alter table booking_status_history enable row level security;
+
+create index idx_booking_status_history_booking_id on booking_status_history(booking_id);
+create index idx_booking_status_history_business_id on booking_status_history(business_id);
+create index idx_booking_status_history_changed_by on booking_status_history(changed_by);
+
+create policy "Owners can view their own booking status history"
+  on booking_status_history for select
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+create or replace function log_booking_status_change()
+returns trigger as $$
+begin
+  if tg_op = 'INSERT' then
+    insert into booking_status_history (booking_id, business_id, old_status, new_status, changed_by)
+    values (new.id, new.business_id, null, new.status, auth.uid());
+  elsif new.status is distinct from old.status then
+    insert into booking_status_history (booking_id, business_id, old_status, new_status, changed_by)
+    values (new.id, new.business_id, old.status, new.status, auth.uid());
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer
+set search_path = public, pg_temp;
+
+revoke execute on function log_booking_status_change() from public;
+revoke execute on function log_booking_status_change() from anon, authenticated;
+
+create trigger log_booking_status_change_trigger
+  after insert or update on bookings
+  for each row execute function log_booking_status_change();
+
+-- Per-business staff/technician roster.
+create table staff (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid references businesses(id) not null,
+  name text not null,
+  phone text,
+  role text,
+  active boolean default true,
+  created_at timestamptz default now()
+);
+
+alter table staff enable row level security;
+
+create index idx_staff_business_id on staff(business_id);
+
+create policy "Owners can view their own staff"
+  on staff for select
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+create policy "Owners can insert their own staff"
+  on staff for insert
+  with check (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+create policy "Owners can update their own staff"
+  on staff for update
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())))
+  with check (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+create policy "Owners can delete their own staff"
+  on staff for delete
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+-- Who's servicing a booking. staff.id is an existence-only FK, and an owner
+-- already has full column-level UPDATE rights on their own booking rows, so
+-- the trigger below stops assigned_staff_id from ever pointing at another
+-- business's staff row (WITH CHECK alone can't validate cross-table
+-- ownership consistency).
+alter table bookings add column assigned_staff_id uuid references staff(id);
+create index idx_bookings_assigned_staff_id on bookings(assigned_staff_id);
+
+create or replace function validate_booking_staff_assignment()
+returns trigger as $$
+begin
+  if new.assigned_staff_id is not null and not exists (
+    select 1 from staff where id = new.assigned_staff_id and business_id = new.business_id
+  ) then
+    raise exception 'assigned_staff_id must belong to the same business as the booking';
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer
+set search_path = public, pg_temp;
+
+revoke execute on function validate_booking_staff_assignment() from public;
+revoke execute on function validate_booking_staff_assignment() from anon, authenticated;
+
+create trigger enforce_booking_staff_assignment
+  before insert or update on bookings
+  for each row execute function validate_booking_staff_assignment();
+
+-- Multi-line services per booking. Additive: bookings.service stays as the
+-- simple free-text summary field for bookings that never use line items.
+create table booking_items (
+  id uuid primary key default gen_random_uuid(),
+  booking_id uuid references bookings(id) not null,
+  business_id uuid references businesses(id) not null,
+  description text not null,
+  qty integer not null default 1,
+  unit_price numeric(10,2) not null default 0,
+  created_at timestamptz default now()
+);
+
+alter table booking_items enable row level security;
+
+create index idx_booking_items_booking_id on booking_items(booking_id);
+create index idx_booking_items_business_id on booking_items(business_id);
+
+create policy "Owners can view their own booking items"
+  on booking_items for select
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+create policy "Owners can insert items on their own bookings"
+  on booking_items for insert
+  with check (
+    business_id in (select id from businesses where owner_id = (select auth.uid()))
+    and booking_id in (select id from bookings where business_id = booking_items.business_id)
+  );
+
+create policy "Owners can update their own booking items"
+  on booking_items for update
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())))
+  with check (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+create policy "Owners can delete their own booking items"
+  on booking_items for delete
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+-- Deposit/balance/full/refund ledger. bookings.paid/amount stay as the
+-- simple display fields — this table is the source of truth going forward
+-- for anything that wants a deposit-vs-balance breakdown.
+create table booking_payments (
+  id uuid primary key default gen_random_uuid(),
+  booking_id uuid references bookings(id) not null,
+  business_id uuid references businesses(id) not null,
+  type text not null check (type in ('deposit', 'balance', 'full', 'refund')),
+  method text check (method in ('cash', 'card')),
+  amount numeric(10,2) not null,
+  created_at timestamptz default now()
+);
+
+alter table booking_payments enable row level security;
+
+create index idx_booking_payments_booking_id on booking_payments(booking_id);
+create index idx_booking_payments_business_id on booking_payments(business_id);
+
+create policy "Owners can view their own booking payments"
+  on booking_payments for select
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+create policy "Owners can insert payments on their own bookings"
+  on booking_payments for insert
+  with check (
+    business_id in (select id from businesses where owner_id = (select auth.uid()))
+    and booking_id in (select id from bookings where business_id = booking_payments.business_id)
+  );
+
+create policy "Owners can update their own booking payments"
+  on booking_payments for update
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())))
+  with check (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+create policy "Owners can delete their own booking payments"
+  on booking_payments for delete
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+-- Per-business tags/notes on a customer, keyed by customer_id OR
+-- customer_phone so it works for both linked accounts and walk-ins. Scoped
+-- per-business because customers is platform-wide — one business's tag on a
+-- shared customer must never be visible to another business.
+create table customer_notes (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid references businesses(id) not null,
+  customer_id uuid references customers(id),
+  customer_phone text,
+  tag text,
+  note text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint customer_notes_identity_check check (customer_id is not null or customer_phone is not null)
+);
+
+alter table customer_notes enable row level security;
+
+create unique index idx_customer_notes_unique_customer
+  on customer_notes(business_id, customer_id) where customer_id is not null;
+create unique index idx_customer_notes_unique_phone
+  on customer_notes(business_id, customer_phone) where customer_id is null and customer_phone is not null;
+create index idx_customer_notes_business_id on customer_notes(business_id);
+create index idx_customer_notes_customer_id on customer_notes(customer_id);
+
+create policy "Owners can view their own customer notes"
+  on customer_notes for select
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+-- Requires the business to already have a real booking with this
+-- customer_id/customer_phone — an owner can't tag or write a note about an
+-- arbitrary customer they never actually served.
+create policy "Owners can insert notes for customers they've actually served"
+  on customer_notes for insert
+  with check (
+    business_id in (select id from businesses where owner_id = (select auth.uid()))
+    and (
+      (customer_id is not null and exists (
+        select 1 from bookings where bookings.business_id = customer_notes.business_id and bookings.customer_id = customer_notes.customer_id
+      ))
+      or
+      (customer_id is null and customer_phone is not null and exists (
+        select 1 from bookings where bookings.business_id = customer_notes.business_id and bookings.customer_contact = customer_notes.customer_phone
+      ))
+    )
+  );
+
+create policy "Owners can update their own customer notes"
+  on customer_notes for update
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())))
+  with check (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+create policy "Owners can delete their own customer notes"
+  on customer_notes for delete
+  using (business_id in (select id from businesses where owner_id = (select auth.uid())));
+
+create or replace function touch_customer_notes_updated_at()
+returns trigger as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$ language plpgsql security definer
+set search_path = public, pg_temp;
+
+revoke execute on function touch_customer_notes_updated_at() from public;
+revoke execute on function touch_customer_notes_updated_at() from anon, authenticated;
+
+create trigger touch_customer_notes_updated_at_trigger
+  before update on customer_notes
+  for each row execute function touch_customer_notes_updated_at();
+
+-- Customer's own saved vehicles. Self-only RLS, same trust model as the
+-- customers table itself — USING/WITH CHECK both pin to auth.uid() on every
+-- clause, so no lock trigger is needed the way bookings.customer_id needed one.
+create table vehicles (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid references customers(id) not null,
+  make text,
+  model text,
+  plate text,
+  nickname text,
+  created_at timestamptz default now()
+);
+
+alter table vehicles enable row level security;
+
+create index idx_vehicles_customer_id on vehicles(customer_id);
+
+create policy "Customers can view their own vehicles"
+  on vehicles for select
+  using ((select auth.uid()) = customer_id);
+
+create policy "Customers can insert their own vehicles"
+  on vehicles for insert
+  with check ((select auth.uid()) = customer_id);
+
+create policy "Customers can update their own vehicles"
+  on vehicles for update
+  using ((select auth.uid()) = customer_id)
+  with check ((select auth.uid()) = customer_id);
+
+create policy "Customers can delete their own vehicles"
+  on vehicles for delete
+  using ((select auth.uid()) = customer_id);
