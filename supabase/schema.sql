@@ -496,7 +496,9 @@ create policy "Owners can delete their own staff"
 -- the trigger below stops assigned_staff_id from ever pointing at another
 -- business's staff row (WITH CHECK alone can't validate cross-table
 -- ownership consistency).
-alter table bookings add column assigned_staff_id uuid references staff(id);
+-- on delete set null: removing a staff member must never affect the booking
+-- itself — it should just un-assign them, not block the deletion.
+alter table bookings add column assigned_staff_id uuid references staff(id) on delete set null;
 create index idx_bookings_assigned_staff_id on bookings(assigned_staff_id);
 
 create or replace function validate_booking_staff_assignment()

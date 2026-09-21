@@ -101,8 +101,23 @@ create policy "Owners can delete their own staff"
 -- "assigned to [someone else's staff]"). Closed the same way v18 closed the
 -- analogous customer_id gap: a trigger, since WITH CHECK can't validate
 -- cross-row consistency against another table's ownership on its own.
-alter table bookings add column if not exists assigned_staff_id uuid references staff(id);
+-- on delete set null: removing a staff member must never affect the booking
+-- itself — it should just un-assign them, not block the deletion or touch
+-- any other booking data.
+alter table bookings add column if not exists assigned_staff_id uuid references staff(id) on delete set null;
 create index if not exists idx_bookings_assigned_staff_id on bookings(assigned_staff_id);
+
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conrelid = 'bookings'::regclass and conname = 'bookings_assigned_staff_id_fkey' and confdeltype != 'n'
+  ) then
+    alter table bookings drop constraint bookings_assigned_staff_id_fkey;
+    alter table bookings add constraint bookings_assigned_staff_id_fkey
+      foreign key (assigned_staff_id) references staff(id) on delete set null;
+  end if;
+end $$;
 
 create or replace function validate_booking_staff_assignment()
 returns trigger as $$
