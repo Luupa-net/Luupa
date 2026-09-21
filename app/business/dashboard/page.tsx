@@ -19,7 +19,7 @@ import {
   Clock, CheckCircle2, XCircle, Eye, BadgeCheck, ImageIcon, Wrench,
   ShieldCheck, ExternalLink, User, FolderClock, LayoutDashboard,
   Wallet, CalendarClock, ArrowRight, Plus, Sparkles, MapPin, Phone, Clock4,
-  FileText, Building2, Users,
+  FileText, Building2, Users, UsersRound,
 } from "lucide-react";
 
 // Internal/verification info — never shown to customers, so no review needed.
@@ -242,6 +242,12 @@ export default function Dashboard() {
               className="mt-2 flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink/70 bg-white border border-stone-line hover:border-navy/30 hover:text-ink transition-all"
             >
               <Users size={15} /> Customers <ArrowRight size={13} className="ml-auto" />
+            </Link>
+            <Link
+              href="/business/staff"
+              className="mt-2 flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium text-ink/70 bg-white border border-stone-line hover:border-navy/30 hover:text-ink transition-all"
+            >
+              <UsersRound size={15} /> Staff <ArrowRight size={13} className="ml-auto" />
             </Link>
           </aside>
 
