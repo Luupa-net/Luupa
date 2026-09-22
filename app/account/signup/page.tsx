@@ -19,8 +19,9 @@ function AccountSignupForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const hadExplicitNext = searchParams.get("next") != null;
   const next = safeNextPath(searchParams.get("next"));
-  const { oauthError, setOauthError, completingOAuth } = useGoogleOAuthCompletion(next);
+  const { oauthError, setOauthError, completingOAuth } = useGoogleOAuthCompletion(next, hadExplicitNext);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

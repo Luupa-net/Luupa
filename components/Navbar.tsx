@@ -193,10 +193,10 @@ export default function Navbar() {
                     List your business
                   </Link>
                   <Link
-                    href="/business/login"
+                    href="/account/login"
                     className="px-4 py-2 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim transition-colors"
                   >
-                    Business login
+                    Log in
                   </Link>
                 </>
               )}
@@ -293,11 +293,11 @@ export default function Navbar() {
                 List your business
               </Link>
               <Link
-                href="/business/login"
+                href="/account/login"
                 className="mt-3 text-center py-3 rounded-lg bg-teal text-white font-medium"
                 onClick={() => setOpen(false)}
               >
-                Business login
+                Log in
               </Link>
             </>
           )}

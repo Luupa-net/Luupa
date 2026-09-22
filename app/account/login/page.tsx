@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { safeNextPath } from "@/lib/validation";
 import { useGoogleOAuthCompletion } from "@/lib/useGoogleOAuthCompletion";
+import { resolveLoginRedirect } from "@/lib/resolveLoginRedirect";
 import GoogleAuthButton from "@/components/GoogleAuthButton";
 import { Check, AlertCircle } from "lucide-react";
 
@@ -18,20 +19,27 @@ function AccountLoginForm() {
   const [resetSent, setResetSent] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const hadExplicitNext = searchParams.get("next") != null;
   const next = safeNextPath(searchParams.get("next"));
-  const { oauthError, setOauthError, completingOAuth } = useGoogleOAuthCompletion(next);
+  const { oauthError, setOauthError, completingOAuth } = useGoogleOAuthCompletion(next, hadExplicitNext);
 
+  // One login for everyone — business owner or customer, same form. Which
+  // account type this is only matters for where it lands afterward: an
+  // explicit ?next= (e.g. "sign in to book") always wins, otherwise a
+  // business owner goes to their dashboard and everyone else goes to `next`
+  // (home, by default). See lib/resolveLoginRedirect.ts.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInError) {
-      setError(signInError.message);
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError || !data.user) {
+      setError(signInError?.message || "Couldn't log in. Please try again.");
       setLoading(false);
       return;
     }
-    router.push(next);
+    const dest = await resolveLoginRedirect(data.user.id, next, hadExplicitNext);
+    router.push(dest);
   }
 
   async function handleResetRequest(e: React.FormEvent) {
@@ -139,6 +147,12 @@ function AccountLoginForm() {
         New here?{" "}
         <Link href={`/account/signup?next=${encodeURIComponent(next)}`} className="text-teal-dim font-medium">
           Create an account
+        </Link>
+      </p>
+      <p className="text-sm text-stone mt-2">
+        Own a business?{" "}
+        <Link href="/business/signup" className="text-teal-dim font-medium">
+          List it on Luupa
         </Link>
       </p>
     </div>

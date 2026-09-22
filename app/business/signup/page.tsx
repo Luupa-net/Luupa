@@ -36,7 +36,7 @@ export default function BusinessSignup() {
         </div>
 
         <p className="text-sm text-stone mt-10">
-          Already listed? <Link href="/business/login" className="text-teal-dim font-medium">Log in</Link>
+          Already listed? <Link href="/account/login" className="text-teal-dim font-medium">Log in</Link>
         </p>
       </div>
 

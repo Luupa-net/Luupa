@@ -17,14 +17,13 @@ export default function Footer() {
             <li><Link href="/browse?area=manama" className="hover:text-white">Manama</Link></li>
             <li><Link href="/browse?area=riffa" className="hover:text-white">Riffa</Link></li>
             <li><Link href="/browse?area=muharraq" className="hover:text-white">Muharraq</Link></li>
-            <li><Link href="/account/login" className="hover:text-white">Customer sign in</Link></li>
+            <li><Link href="/account/login" className="hover:text-white">Log in</Link></li>
           </ul>
         </div>
         <div>
           <h4 className="text-white font-semibold mb-3">For businesses</h4>
           <ul className="space-y-2">
             <li><Link href="/business/signup" className="hover:text-white">List your business</Link></li>
-            <li><Link href="/business/login" className="hover:text-white">Business login</Link></li>
           </ul>
         </div>
         <div>

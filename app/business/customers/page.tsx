@@ -110,7 +110,7 @@ export default function CustomersPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        router.push("/business/login");
+        router.push("/account/login");
         return;
       }
       const { data: biz } = await supabase.from("businesses").select("id, name").eq("owner_id", user.id).single();

@@ -11,6 +11,7 @@ export default function ResetPassword() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [doneDest, setDoneDest] = useState<"business" | "home">("home");
   const router = useRouter();
 
   useEffect(() => {
@@ -39,21 +40,27 @@ export default function ResetPassword() {
       return;
     }
     setSaving(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
+    const { data: updateData, error: updateError } = await supabase.auth.updateUser({ password });
     setSaving(false);
     if (updateError) {
       setError(updateError.message);
       return;
     }
+    // Business and customer accounts now share this one reset flow — send a
+    // business owner back to their dashboard instead of the customer home page.
+    const { data: biz } = updateData.user
+      ? await supabase.from("businesses").select("id").eq("owner_id", updateData.user.id).maybeSingle()
+      : { data: null };
+    setDoneDest(biz ? "business" : "home");
     setDone(true);
-    setTimeout(() => router.push("/"), 1800);
+    setTimeout(() => router.push(biz ? "/business/dashboard" : "/"), 1800);
   }
 
   if (done) {
     return (
       <div className="max-w-md mx-auto px-6 py-16 text-center">
         <h1 className="font-display text-2xl font-semibold text-ink">Password updated</h1>
-        <p className="text-stone mt-2 text-sm">Taking you home…</p>
+        <p className="text-stone mt-2 text-sm">{doneDest === "business" ? "Taking you to your dashboard…" : "Taking you home…"}</p>
       </div>
     );
   }

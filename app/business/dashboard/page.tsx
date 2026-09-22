@@ -49,7 +49,7 @@ export default function Dashboard() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        router.push("/business/login");
+        router.push("/account/login");
         return;
       }
       const { data } = await supabase.from("businesses").select("*").eq("owner_id", user.id).single();
