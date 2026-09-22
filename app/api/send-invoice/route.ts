@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   const { bookingId, vehicle, amount, paymentMethod, qrUrl } = await req.json();
 
-  if (!bookingId || !["cash", "card"].includes(paymentMethod)) {
+  if (!bookingId || !["cash", "card", "benefit"].includes(paymentMethod)) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 

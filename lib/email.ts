@@ -79,7 +79,7 @@ type InvoiceDetails = {
   service?: string;
   vehicle?: string;
   amount?: string;
-  paymentMethod: "cash" | "card";
+  paymentMethod: "cash" | "card" | "benefit";
   qrUrl?: string;
 };
 
@@ -107,7 +107,7 @@ export async function sendInvoiceEmail(to: string, details: InvoiceDetails) {
             ${service ? `<tr><td style="color:#6B7280; padding:4px 0;">Service</td><td style="text-align:right; font-weight:600;">${service}</td></tr>` : ""}
             ${vehicle ? `<tr><td style="color:#6B7280; padding:4px 0;">Vehicle</td><td style="text-align:right;">${vehicle}</td></tr>` : ""}
             ${amount ? `<tr><td style="color:#6B7280; padding:4px 0;">Total</td><td style="text-align:right; font-weight:600;">BHD ${amount}</td></tr>` : ""}
-            <tr><td style="color:#6B7280; padding:4px 0;">Payment</td><td style="text-align:right;">${details.paymentMethod === "cash" ? "Cash" : "Card"}</td></tr>
+            <tr><td style="color:#6B7280; padding:4px 0;">Payment</td><td style="text-align:right;">${details.paymentMethod === "cash" ? "Cash" : details.paymentMethod === "card" ? "Card" : "Benefit"}</td></tr>
           </table>
           ${qrUrl ? `
             <div style="text-align:center; margin: 20px 0; padding: 16px; background:#F7F6F3; border-radius: 12px;">
