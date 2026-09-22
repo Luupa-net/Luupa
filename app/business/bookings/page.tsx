@@ -47,7 +47,7 @@ export default function BookingsPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        router.push("/business/login");
+        router.push("/account/login");
         return;
       }
       const { data: biz } = await supabase.from("businesses").select("id, name, payment_qr_url").eq("owner_id", user.id).single();
@@ -155,7 +155,11 @@ export default function BookingsPage() {
 
   return (
     <div className="bg-canvas2 min-h-screen">
-      <div className="max-w-6xl mx-auto px-5 sm:px-6 py-8 sm:py-10">
+      <div
+        className={`mx-auto px-5 sm:px-6 py-8 sm:py-10 transition-[max-width,margin] duration-300 ease-out ${
+          selected ? "max-w-none lg:mr-[492px] lg:ml-0" : "max-w-6xl"
+        }`}
+      >
         <Link href="/business/dashboard" className="flex items-center gap-1.5 text-sm text-stone hover:text-ink mb-4 w-fit">
           <ArrowLeft size={14} /> Back to dashboard
         </Link>
@@ -235,8 +239,12 @@ export default function BookingsPage() {
         {/* Calendar + booking detail — the panel opens beside the calendar on
             desktop (a real split view, always reserved so nothing jumps
             around when you select something), and as a bottom sheet on
-            mobile where there's no room for two columns. */}
-        <div className="mt-6 lg:flex lg:items-start lg:gap-6">
+            mobile where there's no room for two columns. When a booking is
+            selected the whole page content above (stat cards, toolbar) has
+            already shrunk out from under the fixed drawer via the wrapper's
+            lg:mr-[492px], so this row just needs the calendar column alone —
+            no reserved spacer needed once nothing sits behind the drawer. */}
+        <div className={selected ? "mt-6" : "mt-6 lg:flex lg:items-start lg:gap-6"}>
         <div className="flex-1 min-w-0 bg-white rounded-2xl border border-stone-line shadow-sm overflow-hidden">
           {view !== "list" && (
             <div className="flex items-center justify-between flex-wrap gap-2 p-4 border-b border-stone-line relative">
@@ -317,9 +325,11 @@ export default function BookingsPage() {
         {/* Reserved-width spacer so the calendar column doesn't reflow when
             the drawer opens/closes — the drawer itself renders separately
             below since it's fixed-positioned on desktop, not part of this
-            column's box. */}
-        <div className="mt-6 lg:mt-0 lg:w-[460px] lg:shrink-0">
-          {!selected && (
+            column's box. Only rendered when nothing is selected; once a
+            booking opens, the outer wrapper's own margin already makes room
+            for the drawer, so this spacer would just double up the gap. */}
+        {!selected && (
+          <div className="mt-6 lg:mt-0 lg:w-[460px] lg:shrink-0">
             <div className="hidden lg:flex lg:flex-col lg:items-center lg:justify-center lg:h-[calc(100vh-260px)] lg:min-h-[360px] rounded-2xl border border-dashed border-stone-line bg-white/60 text-center px-8">
               <div className="w-14 h-14 rounded-full bg-navy/5 flex items-center justify-center mb-4">
                 <MousePointerClick size={22} className="text-navy/50" />
@@ -329,8 +339,8 @@ export default function BookingsPage() {
                 Pick anything from the calendar or list to see full details, move its status forward, and send an invoice.
               </p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
         </div>
       </div>
 

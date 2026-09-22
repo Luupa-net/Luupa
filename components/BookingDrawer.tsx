@@ -91,7 +91,7 @@ export default function BookingDrawer({
       <div
         className="panel-in bg-white rounded-t-2xl w-full max-h-[92vh] flex flex-col overflow-hidden
                    border-0 shadow-2xl
-                   lg:fixed lg:z-40 lg:right-0 lg:top-24 lg:bottom-0 lg:w-[460px] lg:max-h-none
+                   lg:fixed lg:z-40 lg:right-0 lg:top-16 lg:bottom-0 lg:w-[460px] lg:max-h-none
                    lg:rounded-none lg:border-0 lg:border-l lg:border-stone-line lg:shadow-2xl"
       >
         <div className="shrink-0 bg-gradient-to-br from-navy to-navy-dim px-6 pt-5 pb-4 rounded-t-2xl lg:rounded-none space-y-4">
