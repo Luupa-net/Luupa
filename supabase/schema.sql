@@ -291,7 +291,7 @@ create table bookings (
   vehicle_make text,
   vehicle_model text,
   vehicle_plate text,
-  payment_method text check (payment_method in ('cash', 'card')),
+  payment_method text check (payment_method in ('cash', 'card', 'benefit')),
   created_at timestamptz default now(),
   discount_amount numeric(10,2) default 0,
   discount_note text,
@@ -566,7 +566,7 @@ create table booking_payments (
   booking_id uuid references bookings(id) not null,
   business_id uuid references businesses(id) not null,
   type text not null check (type in ('deposit', 'balance', 'full', 'refund')),
-  method text check (method in ('cash', 'card')),
+  method text check (method in ('cash', 'card', 'benefit')),
   amount numeric(10,2) not null,
   created_at timestamptz default now()
 );

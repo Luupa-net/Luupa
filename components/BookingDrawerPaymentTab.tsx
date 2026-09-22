@@ -22,14 +22,22 @@ type BookingItem = {
   created_at?: string;
 };
 
+type PaymentMethod = "cash" | "card" | "benefit";
+
 type BookingPayment = {
   id: string;
   booking_id: string;
   business_id: string;
   type: "deposit" | "balance" | "full" | "refund";
-  method: "cash" | "card" | null;
+  method: PaymentMethod | null;
   amount: number;
   created_at?: string;
+};
+
+const METHOD_LABEL: Record<PaymentMethod, string> = {
+  cash: "Cash",
+  card: "Card",
+  benefit: "Benefit",
 };
 
 export default function BookingDrawerPaymentTab({
@@ -67,7 +75,7 @@ export default function BookingDrawerPaymentTab({
   const [paymentsLoading, setPaymentsLoading] = useState(true);
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
   const [newPaymentType, setNewPaymentType] = useState<"deposit" | "balance" | "full" | "refund">("deposit");
-  const [newPaymentMethod, setNewPaymentMethod] = useState<"" | "cash" | "card">("");
+  const [newPaymentMethod, setNewPaymentMethod] = useState<"" | PaymentMethod>("");
   const [newPaymentAmount, setNewPaymentAmount] = useState("");
   const [addingPayment, setAddingPayment] = useState(false);
 
@@ -221,8 +229,12 @@ export default function BookingDrawerPaymentTab({
 
   // Invoicing ------------------------------------------------------------
 
-  function sendWhatsAppInvoice(method: "cash" | "card") {
-    apply({ payment_method: method, paid: true, amount: parsedAmount() });
+  // Builds the wa.me link for a given method — used as a real <a href>
+  // (see sendWhatsAppInvoice below) rather than an in-JS window.open(), which
+  // some browsers' popup blockers can silently swallow even from a direct
+  // click handler.
+  function whatsAppInvoiceHref(method: PaymentMethod): string | undefined {
+    if (!bk.customer_contact) return undefined;
     const { vehicle, itemLines } = invoiceLines();
     const lines = [
       `Invoice from ${businessName}`,
@@ -233,17 +245,23 @@ export default function BookingDrawerPaymentTab({
       itemLines && subtotal > 0 ? `Subtotal: BHD ${subtotal.toFixed(2)}` : "",
       discountAmt > 0 ? `Discount: -BHD ${discountAmt.toFixed(2)}${bk.discount_note ? ` (${bk.discount_note})` : ""}` : "",
       amount ? `Total: BHD ${amount}` : "",
-      `Payment: ${method === "cash" ? "Cash" : "Card"}`,
+      `Payment: ${METHOD_LABEL[method]}`,
       paymentQrUrl ? `\nPay via BenefitPay: ${paymentQrUrl}` : "",
       ``,
       `Thank you for choosing ${businessName}!`,
     ].filter(Boolean).join("\n");
 
-    const number = normalizeWhatsAppNumber(bk.customer_contact || "");
-    window.open(`https://wa.me/${number}?text=${encodeURIComponent(lines)}`, "_blank");
+    const number = normalizeWhatsAppNumber(bk.customer_contact);
+    return `https://wa.me/${number}?text=${encodeURIComponent(lines)}`;
   }
 
-  async function sendEmailInvoice(method: "cash" | "card") {
+  // Runs as the anchor's onClick alongside its href — the browser still
+  // follows the link natively, this just records the invoice as sent first.
+  function sendWhatsAppInvoice(method: PaymentMethod) {
+    apply({ payment_method: method, paid: true, amount: parsedAmount() });
+  }
+
+  async function sendEmailInvoice(method: PaymentMethod) {
     if (!bk.customer_email) return;
     apply({ payment_method: method, paid: true, amount: parsedAmount() });
     setSendingEmail(true);
@@ -366,7 +384,7 @@ export default function BookingDrawerPaymentTab({
       {["arrived", "in_progress", "completed"].includes(bk.status) && (
         <div className={`${cardCls} bg-canvas2 border-stone-line`}>
           <p className="flex items-center gap-1.5 text-sm font-semibold text-ink mb-3">
-            <CircleDollarSign size={14} /> Payment {bk.paid && <span className="text-teal-dim text-xs font-medium">· Paid ({bk.payment_method}{bk.amount != null ? ` · BHD ${bk.amount}` : ""})</span>}
+            <CircleDollarSign size={14} /> Payment {bk.paid && <span className="text-teal-dim text-xs font-medium">· Paid ({METHOD_LABEL[bk.payment_method as PaymentMethod] || bk.payment_method}{bk.amount != null ? ` · BHD ${bk.amount}` : ""})</span>}
           </p>
           {paymentQrUrl && (
             <p className="text-xs text-navy mb-2">Your BenefitPay QR code will be included automatically.</p>
@@ -391,26 +409,33 @@ export default function BookingDrawerPaymentTab({
 
           <p className="text-xs text-stone mb-1.5 flex items-center gap-1"><MessageCircle size={11} /> Send invoice via WhatsApp</p>
           <div className="flex gap-2 mb-3">
-            <button onClick={() => sendWhatsAppInvoice("cash")} className={`${btnGhost} flex-1 bg-white`}>Cash</button>
-            <button onClick={() => sendWhatsAppInvoice("card")} className={`${btnGhost} flex-1 bg-white`}>Card</button>
+            {(["cash", "card", "benefit"] as const).map((method) => (
+              <a
+                key={method}
+                href={whatsAppInvoiceHref(method)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => sendWhatsAppInvoice(method)}
+                className={`${btnGhost} flex-1 bg-white text-center ${!bk.customer_contact ? "opacity-40 pointer-events-none" : ""}`}
+              >
+                {METHOD_LABEL[method]}
+              </a>
+            ))}
           </div>
+          {!bk.customer_contact && <p className="text-xs text-stone -mt-2 mb-3">Add a customer contact number above to enable this.</p>}
 
           <p className="text-xs text-stone mb-1.5 flex items-center gap-1"><Mail size={11} /> Or send by email</p>
           <div className="flex gap-2">
-            <button
-              onClick={() => sendEmailInvoice("cash")}
-              disabled={!bk.customer_email || sendingEmail}
-              className={`${btnGhost} flex-1 bg-white disabled:opacity-40`}
-            >
-              {sendingEmail ? <Loader2 size={14} className="animate-spin" /> : "Cash"}
-            </button>
-            <button
-              onClick={() => sendEmailInvoice("card")}
-              disabled={!bk.customer_email || sendingEmail}
-              className={`${btnGhost} flex-1 bg-white disabled:opacity-40`}
-            >
-              {sendingEmail ? <Loader2 size={14} className="animate-spin" /> : "Card"}
-            </button>
+            {(["cash", "card", "benefit"] as const).map((method) => (
+              <button
+                key={method}
+                onClick={() => sendEmailInvoice(method)}
+                disabled={!bk.customer_email || sendingEmail}
+                className={`${btnGhost} flex-1 bg-white disabled:opacity-40`}
+              >
+                {sendingEmail ? <Loader2 size={14} className="animate-spin" /> : METHOD_LABEL[method]}
+              </button>
+            ))}
           </div>
           {!bk.customer_email && <p className="text-xs text-stone mt-1.5">Add a customer email above to enable this.</p>}
           {emailResult === "sent" && (
@@ -439,7 +464,7 @@ export default function BookingDrawerPaymentTab({
               <div key={p.id} className="flex items-center justify-between text-sm bg-canvas2 rounded-lg px-3 py-2">
                 <div className="min-w-0">
                   <span className="font-medium text-ink capitalize">{p.type}</span>
-                  {p.method && <span className="text-stone"> · {p.method}</span>}
+                  {p.method && <span className="text-stone"> · {METHOD_LABEL[p.method]}</span>}
                   <span className="text-stone"> · {p.created_at ? new Date(p.created_at).toLocaleDateString() : ""}</span>
                 </div>
                 <span className={`font-semibold shrink-0 ${p.type === "refund" ? "text-red-600" : "text-ink"}`}>
@@ -463,6 +488,7 @@ export default function BookingDrawerPaymentTab({
             <option value="">Method</option>
             <option value="cash">Cash</option>
             <option value="card">Card</option>
+            <option value="benefit">Benefit</option>
           </select>
           <input
             type="number"
