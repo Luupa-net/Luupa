@@ -31,7 +31,8 @@ const STATUS_FILTERS = [
 ] as const;
 
 export default function BookingsPage() {
-  const { business, checked } = useBusiness();
+  const { business, role, checked } = useBusiness();
+  const isStaff = role === "staff";
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("month");
@@ -51,8 +52,12 @@ export default function BookingsPage() {
       return;
     }
     async function load() {
+      // Staff have no SELECT policy on the base `bookings` table — amount/
+      // discount/payment_method are owner-only, even via a direct REST call,
+      // not just hidden in this UI (see migration-v23.sql). They read through
+      // bookings_operational instead, which leaves those columns out entirely.
       const { data: bks } = await supabase
-        .from("bookings")
+        .from(isStaff ? "bookings_operational" : "bookings")
         .select("*")
         .eq("business_id", business.id)
         .order("created_at", { ascending: false });
@@ -63,14 +68,18 @@ export default function BookingsPage() {
     // Keyed on business?.id, not the business object itself, so a content-only
     // update (e.g. the dashboard patching a saved field into the shared
     // context) doesn't retrigger this effect and refetch bookings for nothing.
-  }, [checked, business?.id, router]);
+  }, [checked, business?.id, isStaff, router]);
 
   // Live updates from Realtime: another tab/device changing a booking (or a
   // customer's own action on their side) shows up here without a refresh.
   // `ManualBookingForm` already does its own optimistic prepend on submit —
   // this tab is also subscribed to its own writes, so the same INSERT will
   // arrive again here moments later; guard against double-inserting it.
-  useRealtimeBookings("business_id", business?.id, ({ eventType, new: newRow, old: oldRow }) => {
+  // Skipped entirely for staff: Realtime's postgres_changes stream is RLS-gated
+  // on the base `bookings` table, and staff have no SELECT policy there, so it
+  // would never deliver anything anyway — passing undefined makes the hook a
+  // no-op instead of holding open a channel that never fires.
+  useRealtimeBookings("business_id", isStaff ? undefined : business?.id, ({ eventType, new: newRow, old: oldRow }) => {
     if (eventType === "INSERT") {
       setBookings((prev) => (prev.some((b) => b.id === newRow.id) ? prev : [newRow, ...prev]));
     } else if (eventType === "UPDATE") {
@@ -149,7 +158,9 @@ export default function BookingsPage() {
   const month = periodComparison(bookings, "month");
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
   const monthBounds = getPeriodBounds("month", 0);
-  const revenueThisMonth = bookings
+  // Not computed at all for staff — bookings_operational doesn't carry
+  // `amount`, so this would be meaningless (always 0) rather than just hidden.
+  const revenueThisMonth = isStaff ? 0 : bookings
     .filter((b) => b.paid && b.amount != null && new Date(b.created_at) >= monthBounds.start && new Date(b.created_at) < monthBounds.end)
     .reduce((sum, b) => sum + Number(b.amount || 0), 0);
 
@@ -160,9 +171,11 @@ export default function BookingsPage() {
           selected ? "max-w-none lg:mr-[492px] lg:ml-0" : "max-w-6xl"
         }`}
       >
-        <Link href="/business/dashboard" className="flex items-center gap-1.5 text-sm text-stone hover:text-ink mb-4 w-fit">
-          <ArrowLeft size={14} /> Back to dashboard
-        </Link>
+        {!isStaff && (
+          <Link href="/business/dashboard" className="flex items-center gap-1.5 text-sm text-stone hover:text-ink mb-4 w-fit">
+            <ArrowLeft size={14} /> Back to dashboard
+          </Link>
+        )}
 
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Bookings</h1>
@@ -185,12 +198,14 @@ export default function BookingsPage() {
 
         {/* Analytics — a horizontally scrollable row on phones, a full grid
             from tablet up. Clickable, jumps the calendar to that view. */}
-        <div className="flex sm:grid sm:grid-cols-5 gap-3 mt-6 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:overflow-visible">
+        <div className={`flex ${isStaff ? "sm:grid-cols-4" : "sm:grid-cols-5"} sm:grid gap-3 mt-6 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:overflow-visible`}>
           <AnalyticsCard label="Today" data={today} onClick={() => jumpTo("day")} />
           <AnalyticsCard label="This week" data={week} compareLabel="vs last week" onClick={() => jumpTo("week")} />
           <AnalyticsCard label="This month" data={month} compareLabel="vs last month" onClick={() => jumpTo("month")} />
           <SimpleStatCard icon={<Clock3 size={14} />} label="Pending" value={pendingCount} tint={pendingCount > 0 ? "teal" : "stone"} onClick={() => setStatusFilter("pending")} />
-          <SimpleStatCard icon={<Wallet size={14} />} label="Revenue (mo.)" value={`BHD ${revenueThisMonth.toFixed(revenueThisMonth % 1 === 0 ? 0 : 2)}`} tint="navy" />
+          {!isStaff && (
+            <SimpleStatCard icon={<Wallet size={14} />} label="Revenue (mo.)" value={`BHD ${revenueThisMonth.toFixed(revenueThisMonth % 1 === 0 ? 0 : 2)}`} tint="navy" />
+          )}
         </div>
 
         {/* Toolbar — search, status filter, view switch, all in one row that
@@ -350,6 +365,7 @@ export default function BookingsPage() {
           business={business}
           businessName={business.name}
           paymentQrUrl={business.payment_qr_url}
+          isStaff={isStaff}
           onUpdate={updateBooking}
           onClose={() => setSelected(null)}
         />

@@ -99,7 +99,7 @@ function buildCustomers(bookings: any[], notes: any[]): Customer[] {
 }
 
 export default function CustomersPage() {
-  const { business, checked } = useBusiness();
+  const { business, role, checked } = useBusiness();
   const [bookings, setBookings] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,6 +111,12 @@ export default function CustomersPage() {
     if (!checked) return;
     if (!business) {
       router.push("/account/login");
+      return;
+    }
+    // Customer lifetime-value figures are revenue-derived — owner/manager only
+    // for this pass (see the staff feature's scope notes).
+    if (role === "staff") {
+      router.push("/business/bookings");
       return;
     }
     async function load() {
@@ -125,7 +131,7 @@ export default function CustomersPage() {
     load();
     // Keyed on business?.id, not the business object itself, so a content-only
     // update to the shared context doesn't retrigger this effect for nothing.
-  }, [checked, business?.id, router]);
+  }, [checked, business?.id, role, router]);
 
   const customers = useMemo(() => buildCustomers(bookings, notes), [bookings, notes]);
 

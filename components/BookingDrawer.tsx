@@ -15,7 +15,7 @@ import {
 
 type Tab = "details" | "payment" | "history" | "notes";
 
-const TABS = [
+const ALL_TABS = [
   { key: "details" as const, label: "Details", icon: ClipboardList },
   { key: "payment" as const, label: "Payment", icon: CircleDollarSign },
   { key: "history" as const, label: "History", icon: CheckCircle2 },
@@ -34,6 +34,7 @@ export default function BookingDrawer({
   businessName,
   paymentQrUrl,
   business,
+  isStaff,
   onUpdate,
   onClose,
 }: {
@@ -41,11 +42,17 @@ export default function BookingDrawer({
   businessName: string;
   paymentQrUrl?: string | null;
   business: any;
+  isStaff?: boolean;
   onUpdate: (id: string, changes: Record<string, any>) => void | Promise<void>;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("details");
   const [copied, setCopied] = useState(false);
+  // Payment (amounts, discounts, invoicing) is owner/manager only — see
+  // migration-v23.sql for why staff can't reach the underlying figures even
+  // via a direct API call, this just keeps the UI from offering a tab that
+  // would have nothing real to show.
+  const TABS = isStaff ? ALL_TABS.filter((t) => t.key !== "payment") : ALL_TABS;
 
   // Locking body scroll only makes sense on mobile, where this renders as a
   // full-screen bottom sheet. On desktop (lg+) it's a right-side panel that
@@ -190,7 +197,7 @@ export default function BookingDrawer({
 
         <div key={tab} className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4 fade-up" style={{ animationDuration: "0.2s" }}>
           {tab === "details" && <BookingDrawerDetailsTab key={booking.id} booking={booking} businessId={business.id} onUpdate={onUpdate} />}
-          {tab === "payment" && <BookingDrawerPaymentTab key={booking.id} booking={booking} businessName={businessName} businessId={business.id} paymentQrUrl={paymentQrUrl} onUpdate={onUpdate} />}
+          {tab === "payment" && !isStaff && <BookingDrawerPaymentTab key={booking.id} booking={booking} businessName={businessName} businessId={business.id} paymentQrUrl={paymentQrUrl} onUpdate={onUpdate} />}
           {tab === "history" && <BookingDrawerHistoryTab key={booking.id} booking={booking} onUpdate={onUpdate} />}
           {tab === "notes" && <BookingDrawerNotesTab key={booking.id} booking={booking} onUpdate={onUpdate} />}
         </div>

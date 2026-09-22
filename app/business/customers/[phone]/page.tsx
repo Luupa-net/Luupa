@@ -52,7 +52,7 @@ function StatusChip({ status }: { status: string }) {
 export default function CustomerDetailPage() {
   const params = useParams<{ phone: string }>();
   const phone = params.phone;
-  const { business, checked } = useBusiness();
+  const { business, role, checked } = useBusiness();
   const [bookings, setBookings] = useState<any[]>([]);
   const [tag, setTag] = useState("");
   const [note, setNote] = useState("");
@@ -66,6 +66,10 @@ export default function CustomerDetailPage() {
     if (!checked) return;
     if (!business) {
       router.push("/account/login");
+      return;
+    }
+    if (role === "staff") {
+      router.push("/business/bookings");
       return;
     }
     async function load() {
@@ -97,7 +101,7 @@ export default function CustomerDetailPage() {
     load();
     // Keyed on business?.id, not the business object itself, so a content-only
     // update to the shared context doesn't retrigger this effect for nothing.
-  }, [checked, business?.id, router, phone]);
+  }, [checked, business?.id, role, router, phone]);
 
   const sorted = useMemo(
     () => [...bookings].sort((a, b) => visitDate(b).getTime() - visitDate(a).getTime()),

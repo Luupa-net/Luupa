@@ -6,7 +6,7 @@ import { useBusiness } from "@/lib/BusinessContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PhoneInput from "@/components/PhoneInput";
-import { ArrowLeft, Plus, X, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, X, Trash2, KeyRound } from "lucide-react";
 
 type Staff = {
   id: string;
@@ -15,20 +15,29 @@ type Staff = {
   phone: string | null;
   role: string | null;
   active: boolean;
+  auth_user_id: string | null;
   created_at: string;
 };
 
 export default function StaffPage() {
-  const { business, checked } = useBusiness();
+  const { business, role, checked } = useBusiness();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [pinTarget, setPinTarget] = useState<Staff | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     if (!checked) return;
     if (!business) {
       router.push("/account/login");
+      return;
+    }
+    // Staff management is owner/manager only — a staff session that lands
+    // here directly (typed URL, old bookmark) gets bounced to their own
+    // dashboard, not shown a stripped-down version of this page.
+    if (role === "staff") {
+      router.push("/business/bookings");
       return;
     }
     async function load() {
@@ -39,7 +48,7 @@ export default function StaffPage() {
     load();
     // Keyed on business?.id, not the business object itself, so a content-only
     // update to the shared context doesn't retrigger this effect for nothing.
-  }, [checked, business?.id, router]);
+  }, [checked, business?.id, role, router]);
 
   async function toggleActive(member: Staff) {
     const next = !member.active;
@@ -104,6 +113,7 @@ export default function StaffPage() {
                 <span className="flex-1 min-w-0">Name</span>
                 <span className="w-32 shrink-0">Role</span>
                 <span className="w-36 shrink-0">Phone</span>
+                <span className="w-28 shrink-0">Login</span>
                 <span className="w-20 text-right shrink-0">Active</span>
                 <span className="w-9 shrink-0" />
               </div>
@@ -120,6 +130,19 @@ export default function StaffPage() {
                   </span>
                   <span className="hidden sm:block w-32 shrink-0 text-sm text-ink truncate">{s.role || "—"}</span>
                   <span className="hidden sm:block w-36 shrink-0 text-sm text-stone truncate">{s.phone ? `+${s.phone}` : "—"}</span>
+                  <span className="w-28 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setPinTarget(s)}
+                      disabled={!s.phone}
+                      title={!s.phone ? "Add a phone number first" : s.auth_user_id ? "Reset login PIN" : "Set up login PIN"}
+                      className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                        s.auth_user_id ? "border-stone-line text-stone hover:text-ink hover:border-navy/30" : "border-teal/30 text-teal-dim hover:bg-teal/5"
+                      }`}
+                    >
+                      <KeyRound size={12} /> {s.auth_user_id ? "Reset PIN" : "Set up login"}
+                    </button>
+                  </span>
                   <span className="w-20 flex justify-end shrink-0">
                     <button
                       type="button"
@@ -160,6 +183,121 @@ export default function StaffPage() {
           onClose={() => setShowAddForm(false)}
         />
       )}
+
+      {pinTarget && (
+        <StaffPinModal
+          staff={pinTarget}
+          onSet={(authUserId) => {
+            setStaff((prev) => prev.map((s) => (s.id === pinTarget.id ? { ...s, auth_user_id: authUserId } : s)));
+          }}
+          onClose={() => setPinTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function StaffPinModal({
+  staff,
+  onSet,
+  onClose,
+}: {
+  staff: Staff;
+  onSet: (authUserId: string) => void;
+  onClose: () => void;
+}) {
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!/^\d{4,6}$/.test(pin)) {
+      setError("PIN must be 4-6 digits.");
+      return;
+    }
+    if (pin !== confirmPin) {
+      setError("PINs don't match.");
+      return;
+    }
+    setSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    try {
+      const res = await fetch("/api/business/staff-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ staffId: staff.id, pin }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setError(result.error || "Couldn't set that PIN — try again.");
+        setSaving(false);
+        return;
+      }
+      setDone(true);
+      onSet(result.authUserId);
+    } catch {
+      setError("Couldn't reach the server — try again.");
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-sm max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display text-lg font-semibold text-ink">
+            {staff.auth_user_id ? "Reset" : "Set up"} login PIN
+          </h3>
+          <button onClick={onClose} aria-label="Close"><X size={18} className="text-stone" /></button>
+        </div>
+
+        {done ? (
+          <div className="text-sm text-ink space-y-3">
+            <p>
+              <span className="font-medium">{staff.name}</span> can now sign in at{" "}
+              <span className="font-mono text-teal-dim">/staff/login</span> with their phone number and this PIN.
+            </p>
+            <p className="text-xs text-stone">Share the PIN with them directly — it isn't sent anywhere automatically.</p>
+            <button onClick={onClose} className="w-full h-11 rounded-lg bg-navy text-white font-medium hover:bg-navy-light transition-colors">
+              Done
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-2.5">
+            <p className="text-sm text-stone mb-2">
+              {staff.name} will sign in with <span className="font-medium text-ink">+{staff.phone}</span> and this PIN.
+            </p>
+            <input
+              type="password"
+              inputMode="numeric"
+              placeholder="4-6 digit PIN"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              className="input text-center tracking-[0.4em] font-mono"
+              autoFocus
+            />
+            <input
+              type="password"
+              inputMode="numeric"
+              placeholder="Confirm PIN"
+              value={confirmPin}
+              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              className="input text-center tracking-[0.4em] font-mono"
+            />
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <button
+              disabled={saving}
+              className="w-full h-11 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim transition-colors disabled:opacity-60"
+            >
+              {saving ? "Saving…" : staff.auth_user_id ? "Reset PIN" : "Set up login"}
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

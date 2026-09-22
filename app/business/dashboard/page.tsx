@@ -35,7 +35,7 @@ const TABS = [
 ] as const;
 
 export default function Dashboard() {
-  const { business, checked, patchBusiness } = useBusiness();
+  const { business, role, checked, patchBusiness } = useBusiness();
   const [liveRow, setLiveRow] = useState<any>(null); // untouched, as-fetched — source of truth for status/banners
   const [form, setForm] = useState<any>(null);        // the editable draft the business is working on
   const [saved, setSaved] = useState(false);
@@ -51,6 +51,12 @@ export default function Dashboard() {
     if (!checked) return;
     if (!business) {
       router.push("/account/login");
+      return;
+    }
+    // The dashboard (revenue, full profile editing, verification) is
+    // owner/manager only — a staff session lands on their own view instead.
+    if (role === "staff") {
+      router.push("/business/bookings");
       return;
     }
     async function load() {
@@ -82,7 +88,7 @@ export default function Dashboard() {
     // context value. If this effect depended on the object identity, every
     // save would retrigger it — resetting the in-progress `form` draft back
     // to the just-saved snapshot and firing a redundant bookings refetch.
-  }, [checked, business?.id, router]);
+  }, [checked, business?.id, role, router]);
 
   function toggle(key: "subcategories" | "areas", value: string) {
     const current: string[] = form[key] || [];

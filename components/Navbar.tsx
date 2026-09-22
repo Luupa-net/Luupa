@@ -13,7 +13,7 @@ import {
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
-  const { business, userId, checked } = useBusiness();
+  const { business, role, staffProfile, userId, checked } = useBusiness();
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [pendingBookingsCount, setPendingBookingsCount] = useState(0);
@@ -28,8 +28,12 @@ export default function Navbar() {
     if (!checked) return;
     if (business) {
       setCustomerName(null);
+      // Staff have no SELECT policy on the base `bookings` table (that's
+      // deliberate — see migration-v23.sql) so this count has to go through
+      // the same revenue-free view their pages use, or it always reads 0.
+      const table = role === "staff" ? "bookings_operational" : "bookings";
       supabase
-        .from("bookings")
+        .from(table)
         .select("*", { count: "exact", head: true })
         .eq("business_id", business.id)
         .eq("status", "pending")
@@ -44,7 +48,7 @@ export default function Navbar() {
     } else {
       setCustomerName(null);
     }
-  }, [business, userId, checked]);
+  }, [business, role, userId, checked]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -81,7 +85,7 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-ink/80">
           <Link href="/browse" className="hover:text-ink transition-colors">Browse</Link>
 
-          {!checked ? null : business ? (
+          {!checked ? null : role === "owner" && business ? (
             <>
               <NavIconLink href="/business/bookings" icon={<CalendarClock size={18} />} count={pendingBookingsCount} label="Bookings" />
             <div className="relative" ref={dropdownRef}>
@@ -127,6 +131,38 @@ export default function Navbar() {
                 </div>
               )}
             </div>
+            </>
+          ) : role === "staff" ? (
+            // Deliberately narrow: no dashboard link, no verification, no
+            // business switcher — staff have exactly one thing to do here.
+            <>
+              <NavIconLink href="/business/bookings" icon={<CalendarClock size={18} />} count={pendingBookingsCount} label="Bookings" />
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setDropdownOpen((o) => !o)}
+                  className="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border border-stone-line hover:border-navy/30 transition-colors"
+                >
+                  <span className="w-7 h-7 rounded-full bg-navy/10 flex items-center justify-center shrink-0">
+                    <span className="text-navy text-xs font-semibold">{staffProfile?.name?.[0]?.toUpperCase() || "S"}</span>
+                  </span>
+                  <span className="text-ink font-medium max-w-[120px] truncate">{staffProfile?.name}</span>
+                  <ChevronDown size={14} className={`text-stone transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+                {dropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-stone-line shadow-lg shadow-black/5 py-1.5 animate-[fadeUp_0.15s_ease-out]">
+                    <div className="px-3.5 py-2.5 border-b border-stone-line">
+                      <p className="text-sm font-medium text-ink truncate">{staffProfile?.name}</p>
+                      <p className="text-xs text-stone capitalize mt-0.5">{staffProfile?.role || "Staff"} · {business?.name}</p>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut size={15} /> Log out
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -208,7 +244,7 @@ export default function Navbar() {
             Browse businesses
           </Link>
 
-          {business ? (
+          {role === "owner" && business ? (
             <>
               <div className="flex items-center gap-2.5 py-3 border-b border-stone-line">
                 <span className={`relative w-8 h-8 rounded-full bg-navy/10 overflow-hidden flex items-center justify-center shrink-0 ring-2 ${statusRing}`}>
@@ -239,6 +275,24 @@ export default function Navbar() {
                   Get verified
                 </Link>
               )}
+              <button onClick={handleLogout} className="py-3 text-base font-medium text-red-600 text-left">
+                Log out
+              </button>
+            </>
+          ) : role === "staff" ? (
+            <>
+              <div className="flex items-center gap-2.5 py-3 border-b border-stone-line">
+                <span className="w-8 h-8 rounded-full bg-navy/10 flex items-center justify-center shrink-0">
+                  <span className="text-navy text-xs font-semibold">{staffProfile?.name?.[0]?.toUpperCase() || "S"}</span>
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-ink">{staffProfile?.name}</p>
+                  <p className="text-xs text-stone capitalize">{staffProfile?.role || "Staff"} · {business?.name}</p>
+                </div>
+              </div>
+              <Link href="/business/bookings" className="py-3 text-base font-medium text-ink border-b border-stone-line flex items-center justify-between" onClick={() => setOpen(false)}>
+                Bookings {pendingBookingsCount > 0 && <span className="text-xs font-bold bg-teal text-white px-2 py-0.5 rounded-full">{pendingBookingsCount > 9 ? "9+" : pendingBookingsCount}</span>}
+              </Link>
               <button onClick={handleLogout} className="py-3 text-base font-medium text-red-600 text-left">
                 Log out
               </button>
