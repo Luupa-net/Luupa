@@ -9,7 +9,7 @@ import PlateInput from "@/components/PlateInput";
 import BookingStepper from "@/components/BookingStepper";
 import { useRealtimeBookings } from "@/lib/useRealtimeBookings";
 import {
-  User, Check, Loader2, CalendarClock, MapPin, Car, ChevronRight, Pencil, Trash2,
+  User, Check, Loader2, CalendarClock, MapPin, Car, ChevronRight, Pencil, Trash2, Lock, ClipboardList,
 } from "lucide-react";
 
 type Customer = { id: string; name: string; email: string | null; phone: string | null };
@@ -276,46 +276,77 @@ function ProfileContent() {
   }
 
   if (loading) {
-    return <div className="max-w-2xl mx-auto px-6 py-24 text-center text-stone">Loading…</div>;
+    return (
+      <div className="bg-canvas2 min-h-screen">
+        <div className="max-w-3xl mx-auto px-5 sm:px-6 py-10 sm:py-14">
+          <div className="h-[172px] rounded-2xl bg-stone-line/40 animate-pulse mb-6" />
+          <div className="h-11 w-64 rounded-xl bg-stone-line/40 animate-pulse mb-6" />
+          <div className="h-64 rounded-2xl bg-white border border-stone-line animate-pulse" />
+        </div>
+      </div>
+    );
   }
   if (!customer) {
     return <div className="max-w-2xl mx-auto px-6 py-24 text-center text-stone">We couldn't find your account.</div>;
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-12">
-      <div className="flex items-center gap-3 mb-8">
-        <span className="w-12 h-12 rounded-full bg-teal/10 flex items-center justify-center shrink-0">
-          <User size={20} className="text-teal-dim" />
-        </span>
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">{customer.name}</h1>
-          <p className="text-sm text-stone">{customer.email}</p>
+    <div className="bg-canvas2 min-h-screen">
+      <div className="max-w-3xl mx-auto px-5 sm:px-6 py-10 sm:py-14">
+        {/* Hero — reuses the same racing-green gradient + drifting flare
+            treatment as the business booking drawer header, so the customer
+            side reads as one product instead of a plainer "second app". */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-navy to-navy-dim px-6 py-7 sm:px-8 sm:py-9 mb-6 fade-up">
+          <div className="absolute -top-12 -right-8 w-44 h-44 rounded-full bg-teal/25 blur-3xl drift-slow pointer-events-none" />
+          <div className="absolute -bottom-16 -left-12 w-52 h-52 rounded-full bg-white/5 blur-3xl drift-slow-reverse pointer-events-none" />
+          <div className="relative flex items-center gap-4">
+            <span className="w-16 h-16 rounded-full bg-white/10 border border-white/15 flex items-center justify-center shrink-0 text-white font-display text-2xl font-semibold">
+              {customer.name?.[0]?.toUpperCase() || <User size={24} />}
+            </span>
+            <div className="min-w-0">
+              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-white truncate">{customer.name}</h1>
+              <p className="text-sm text-white/55 truncate">{customer.email}</p>
+            </div>
+          </div>
+          <div className="relative flex gap-3 mt-6">
+            <div className="rounded-xl bg-white/10 px-4 py-3 min-w-[92px]">
+              <p className="font-display text-2xl font-semibold text-white leading-tight">{bookings.length}</p>
+              <p className="text-xs text-white/55 mt-0.5">{bookings.length === 1 ? "Booking" : "Bookings"}</p>
+            </div>
+            <div className="rounded-xl bg-white/10 px-4 py-3 min-w-[92px]">
+              <p className="font-display text-2xl font-semibold text-white leading-tight">{vehicles.length}</p>
+              <p className="text-xs text-white/55 mt-0.5">{vehicles.length === 1 ? "Vehicle" : "Vehicles"}</p>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="flex gap-2 border-b border-stone-line mb-8">
-        {(["profile", "bookings", "vehicles"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
-              tab === t ? "border-teal text-ink" : "border-transparent text-stone hover:text-ink"
-            }`}
-          >
-            {t === "profile"
-              ? "My profile"
-              : t === "bookings"
-              ? `My bookings${bookings.length ? ` (${bookings.length})` : ""}`
-              : `My vehicles${vehicles.length ? ` (${vehicles.length})` : ""}`}
-          </button>
-        ))}
-      </div>
+        <div className="flex items-center gap-1 bg-white border border-stone-line rounded-xl p-1 mb-6 w-fit shadow-sm">
+          {(["profile", "bookings", "vehicles"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                tab === t ? "bg-navy text-white" : "text-ink/70 hover:bg-canvas2"
+              }`}
+            >
+              {t === "profile"
+                ? "My profile"
+                : t === "bookings"
+                ? `My bookings${bookings.length ? ` (${bookings.length})` : ""}`
+                : `My vehicles${vehicles.length ? ` (${vehicles.length})` : ""}`}
+            </button>
+          ))}
+        </div>
 
       {tab === "profile" ? (
-        <div className="space-y-10">
-          <section>
-            <h2 className="font-display text-lg font-semibold text-ink mb-4">Personal information</h2>
+        <div className="space-y-6 fade-up">
+          <section className="bg-white rounded-2xl border border-stone-line shadow-sm p-6 sm:p-7">
+            <div className="flex items-center gap-2.5 mb-5">
+              <span className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center shrink-0">
+                <User size={15} className="text-teal-dim" />
+              </span>
+              <h2 className="font-display text-lg font-semibold text-ink">Personal information</h2>
+            </div>
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <label className="block">
                 <span className="text-sm font-medium text-ink">Full name</span>
@@ -346,11 +377,14 @@ function ProfileContent() {
             </form>
           </section>
 
-          <div className="h-px bg-stone-line" />
-
-          <section>
-            <h2 className="font-display text-lg font-semibold text-ink mb-1">Change password</h2>
-            <p className="text-sm text-stone mb-4">Enter your current password to set a new one.</p>
+          <section className="bg-white rounded-2xl border border-stone-line shadow-sm p-6 sm:p-7">
+            <div className="flex items-center gap-2.5 mb-1">
+              <span className="w-8 h-8 rounded-lg bg-navy/10 flex items-center justify-center shrink-0">
+                <Lock size={14} className="text-navy" />
+              </span>
+              <h2 className="font-display text-lg font-semibold text-ink">Change password</h2>
+            </div>
+            <p className="text-sm text-stone mb-4 ml-[42px]">Enter your current password to set a new one.</p>
             <form onSubmit={handleChangePassword} className="space-y-4">
               <label className="block">
                 <span className="text-sm font-medium text-ink">Current password</span>
@@ -381,11 +415,18 @@ function ProfileContent() {
           </section>
         </div>
       ) : tab === "bookings" ? (
-        <div className="space-y-3">
+        <div className="space-y-3 fade-up">
           {bookingsLoading ? (
-            <p className="text-stone text-sm py-10 text-center">Loading your bookings…</p>
+            <div className="space-y-3">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="h-[124px] rounded-xl bg-white border border-stone-line animate-pulse" />
+              ))}
+            </div>
           ) : bookings.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-stone-line p-10 text-center">
+            <div className="rounded-2xl border border-dashed border-stone-line bg-white p-10 text-center">
+              <span className="w-12 h-12 rounded-full bg-teal/10 flex items-center justify-center mx-auto mb-3">
+                <CalendarClock size={20} className="text-teal-dim" />
+              </span>
               <p className="text-stone text-sm">You haven't booked anything yet.</p>
               <Link href="/browse" className="text-teal font-medium text-sm mt-1.5 inline-block">
                 Browse businesses →
@@ -398,7 +439,7 @@ function ProfileContent() {
                 <Link
                   key={b.id}
                   href={biz ? `/listing/${b.business_id}` : "#"}
-                  className="flex items-center justify-between gap-4 rounded-xl border border-stone-line p-4 hover:border-teal/40 hover:shadow-sm transition-all bg-white"
+                  className="flex items-center justify-between gap-4 rounded-xl border border-stone-line p-4 hover:border-teal/40 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-150 bg-white"
                 >
                   <div className="min-w-0">
                     <p className="font-medium text-ink truncate">{biz?.name ?? "Business"}</p>
@@ -435,9 +476,14 @@ function ProfileContent() {
           )}
         </div>
       ) : (
-        <div className="space-y-10">
-          <section>
-            <h2 className="font-display text-lg font-semibold text-ink mb-4">Add a vehicle</h2>
+        <div className="space-y-6 fade-up">
+          <section className="bg-white rounded-2xl border border-stone-line shadow-sm p-6 sm:p-7">
+            <div className="flex items-center gap-2.5 mb-4">
+              <span className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center shrink-0">
+                <Car size={15} className="text-teal-dim" />
+              </span>
+              <h2 className="font-display text-lg font-semibold text-ink">Add a vehicle</h2>
+            </div>
             <form onSubmit={handleAddVehicle} className="space-y-2.5 max-w-md">
               <div className="grid grid-cols-2 gap-2.5">
                 <input placeholder="Make" value={newMake} onChange={(e) => setNewMake(e.target.value)} className="input" />
@@ -461,12 +507,19 @@ function ProfileContent() {
             </form>
           </section>
 
-          <div className="h-px bg-stone-line" />
-
-          <section>
-            <h2 className="font-display text-lg font-semibold text-ink mb-4">Saved vehicles</h2>
+          <section className="bg-white rounded-2xl border border-stone-line shadow-sm p-6 sm:p-7">
+            <div className="flex items-center gap-2.5 mb-4">
+              <span className="w-8 h-8 rounded-lg bg-navy/10 flex items-center justify-center shrink-0">
+                <ClipboardList size={14} className="text-navy" />
+              </span>
+              <h2 className="font-display text-lg font-semibold text-ink">Saved vehicles</h2>
+            </div>
             {vehiclesLoading ? (
-              <p className="text-stone text-sm py-10 text-center">Loading your vehicles…</p>
+              <div className="space-y-2.5">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <div key={i} className="h-[68px] rounded-xl bg-canvas2 animate-pulse" />
+                ))}
+              </div>
             ) : vehicles.length === 0 ? (
               <div className="rounded-xl border border-dashed border-stone-line p-10 text-center">
                 <p className="text-stone text-sm">No saved vehicles yet — add one so it's ready to pick next time you book.</p>
@@ -475,7 +528,7 @@ function ProfileContent() {
               <div className="space-y-3">
                 {vehicles.map((v) =>
                   editingVehicleId === v.id ? (
-                    <div key={v.id} className="rounded-xl border border-stone-line p-4 bg-white space-y-2.5">
+                    <div key={v.id} className="rounded-xl border border-stone-line p-4 bg-canvas2 space-y-2.5">
                       <div className="grid grid-cols-2 gap-2.5">
                         <input placeholder="Make" value={editMake} onChange={(e) => setEditMake(e.target.value)} className="input" />
                         <input placeholder="Model" value={editModel} onChange={(e) => setEditModel(e.target.value)} className="input" />
@@ -508,7 +561,7 @@ function ProfileContent() {
                       </div>
                     </div>
                   ) : (
-                    <div key={v.id} className="flex items-center justify-between gap-4 rounded-xl border border-stone-line p-4 bg-white">
+                    <div key={v.id} className="flex items-center justify-between gap-4 rounded-xl border border-stone-line p-4 bg-canvas2 hover:border-teal/30 transition-colors">
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="w-10 h-10 rounded-full bg-teal/10 flex items-center justify-center shrink-0">
                           <Car size={16} className="text-teal-dim" />
@@ -547,6 +600,7 @@ function ProfileContent() {
           </section>
         </div>
       )}
+      </div>
     </div>
   );
 }
