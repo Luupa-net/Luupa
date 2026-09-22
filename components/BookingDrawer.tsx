@@ -74,10 +74,13 @@ export default function BookingDrawer({
     });
   }
 
-  function openWhatsAppChat() {
-    const number = normalizeWhatsAppNumber(booking.customer_contact || "");
-    window.open(`https://wa.me/${number}`, "_blank");
-  }
+  // A real <a href> instead of a window.open() call in an onClick — some
+  // browsers' popup blockers silently swallow window.open() even from a
+  // direct click handler, which was exactly why this button could look like
+  // it "did nothing." A native anchor navigation is never blocked that way.
+  const whatsappHref = booking.customer_contact
+    ? `https://wa.me/${normalizeWhatsAppNumber(booking.customer_contact)}`
+    : undefined;
 
   return (
     <div
@@ -91,8 +94,8 @@ export default function BookingDrawer({
                    lg:fixed lg:z-40 lg:right-0 lg:top-24 lg:bottom-0 lg:w-[460px] lg:max-h-none
                    lg:rounded-none lg:border-0 lg:border-l lg:border-stone-line lg:shadow-2xl"
       >
-        <div className="shrink-0 bg-gradient-to-br from-navy to-navy-dim px-6 py-5 rounded-t-2xl lg:rounded-none">
-          <div className="flex items-center justify-between gap-3">
+        <div className="shrink-0 bg-gradient-to-br from-navy to-navy-dim px-6 pt-5 pb-4 rounded-t-2xl lg:rounded-none space-y-4">
+          <div className="flex items-center justify-between gap-3 fade-up" style={{ animationDuration: "0.35s" }}>
             <div className="min-w-0 flex items-center gap-3">
               <span className="hidden sm:flex w-11 h-11 rounded-full bg-white/10 border border-white/15 items-center justify-center shrink-0 text-white font-display text-lg font-semibold">
                 {booking.customer_name?.[0]?.toUpperCase() || "?"}
@@ -110,35 +113,39 @@ export default function BookingDrawer({
             <button
               onClick={onClose}
               aria-label="Close"
-              className="shrink-0 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center transition-all"
+              className="group shrink-0 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 flex items-center justify-center transition-all"
             >
-              <X size={16} className="text-white" />
+              <X size={16} className="text-white transition-transform duration-200 group-hover:rotate-90" />
             </button>
           </div>
 
           {/* Quick contact — one tap to call, WhatsApp, or copy the number,
               instead of hunting for it further down in the edit fields. */}
-          <div className="mt-4 flex items-center gap-2">
+          <div className="flex items-center gap-2 fade-up" style={{ animationDuration: "0.35s", animationDelay: "0.04s" }}>
             <a
               href={booking.customer_contact ? `tel:+${booking.customer_contact}` : undefined}
               aria-label="Call"
-              className={`flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 active:scale-90 transition-all ${!booking.customer_contact ? "opacity-40 pointer-events-none" : ""}`}
+              title="Call"
+              className={`flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 hover:-translate-y-0.5 active:scale-90 active:translate-y-0 transition-all ${!booking.customer_contact ? "opacity-40 pointer-events-none" : ""}`}
             >
               <Phone size={14} className="text-white" />
             </a>
-            <button
-              onClick={openWhatsAppChat}
-              disabled={!booking.customer_contact}
-              aria-label="WhatsApp"
-              className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 active:scale-90 transition-all disabled:opacity-40"
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Message on WhatsApp"
+              title="Message on WhatsApp"
+              className={`flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 hover:-translate-y-0.5 active:scale-90 active:translate-y-0 transition-all ${!whatsappHref ? "opacity-40 pointer-events-none" : ""}`}
             >
               <MessageCircle size={14} className="text-white" />
-            </button>
+            </a>
             <button
               onClick={copyContact}
               disabled={!booking.customer_contact}
               aria-label="Copy number"
-              className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 active:scale-90 transition-all disabled:opacity-40"
+              title="Copy number"
+              className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 hover:-translate-y-0.5 active:scale-90 active:translate-y-0 transition-all disabled:opacity-40 disabled:hover:translate-y-0"
             >
               {copied ? <CopyCheck size={14} className="text-teal-light" /> : <Copy size={14} className="text-white" />}
             </button>
@@ -149,18 +156,18 @@ export default function BookingDrawer({
             )}
           </div>
 
-          <div className="mt-4 bg-white/5 rounded-xl px-3 py-3">
+          <div className="bg-white/5 rounded-xl px-3 py-3.5 fade-up" style={{ animationDuration: "0.35s", animationDelay: "0.08s" }}>
             <BookingStepper status={booking.status} />
           </div>
         </div>
 
-        <div className="shrink-0 flex gap-2 border-b border-stone-line px-4 sm:px-6 bg-white overflow-x-auto no-scrollbar">
+        <div className="shrink-0 flex gap-1 border-b border-stone-line px-3 sm:px-5 bg-white overflow-x-auto no-scrollbar">
           {TABS.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`flex items-center gap-1.5 px-2 py-3 text-sm font-medium border-b-2 -mb-px shrink-0 transition-colors ${
-                tab === key ? "border-teal text-ink" : "border-transparent text-stone hover:text-ink"
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 -mb-px shrink-0 transition-colors ${
+                tab === key ? "border-teal text-ink" : "border-transparent text-stone hover:text-ink hover:border-stone-line"
               }`}
             >
               <Icon size={14} /> {label}
@@ -168,7 +175,7 @@ export default function BookingDrawer({
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4">
+        <div key={tab} className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4 fade-up" style={{ animationDuration: "0.2s" }}>
           {tab === "details" && <BookingDrawerDetailsTab key={booking.id} booking={booking} businessId={business.id} onUpdate={onUpdate} />}
           {tab === "payment" && <BookingDrawerPaymentTab key={booking.id} booking={booking} businessName={businessName} businessId={business.id} paymentQrUrl={paymentQrUrl} onUpdate={onUpdate} />}
           {tab === "history" && <BookingDrawerHistoryTab key={booking.id} booking={booking} onUpdate={onUpdate} />}
