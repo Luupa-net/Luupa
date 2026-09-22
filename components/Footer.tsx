@@ -17,6 +17,7 @@ export default function Footer() {
             <li><Link href="/browse?area=manama" className="hover:text-white">Manama</Link></li>
             <li><Link href="/browse?area=riffa" className="hover:text-white">Riffa</Link></li>
             <li><Link href="/browse?area=muharraq" className="hover:text-white">Muharraq</Link></li>
+            <li><Link href="/account/login" className="hover:text-white">Customer sign in</Link></li>
           </ul>
         </div>
         <div>

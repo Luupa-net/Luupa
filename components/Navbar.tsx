@@ -255,7 +255,7 @@ export default function Navbar() {
                 </div>
               </div>
               <Link href="/business/bookings" className="py-3 text-base font-medium text-ink border-b border-stone-line flex items-center justify-between" onClick={() => setOpen(false)}>
-                Bookings {pendingBookingsCount > 0 && <span className="text-xs font-bold bg-teal text-white px-2 py-0.5 rounded-full">{pendingBookingsCount}</span>}
+                Bookings {pendingBookingsCount > 0 && <span className="text-xs font-bold bg-teal text-white px-2 py-0.5 rounded-full">{pendingBookingsCount > 9 ? "9+" : pendingBookingsCount}</span>}
               </Link>
               <Link href="/business/dashboard" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
                 Dashboard
