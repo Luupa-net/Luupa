@@ -47,9 +47,22 @@ export default function BookingDrawer({
   const [tab, setTab] = useState<Tab>("details");
   const [copied, setCopied] = useState(false);
 
+  // Locking body scroll only makes sense on mobile, where this renders as a
+  // full-screen bottom sheet. On desktop (lg+) it's a right-side panel that
+  // leaves the calendar visible and interactive, so locking the page there
+  // just froze the calendar underneath and made it impossible to scroll back
+  // up to buttons like "Add booking" above the current scroll position.
   useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
+    const mql = window.matchMedia("(min-width: 1024px)");
+    function sync() {
+      document.body.style.overflow = mql.matches ? "" : "hidden";
+    }
+    sync();
+    mql.addEventListener("change", sync);
+    return () => {
+      mql.removeEventListener("change", sync);
+      document.body.style.overflow = "";
+    };
   }, []);
 
   // Bound here in the chrome layer (not per-tab) so shortcuts keep working

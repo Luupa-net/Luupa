@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useBusiness } from "@/lib/BusinessContext";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
@@ -51,7 +52,7 @@ function StatusChip({ status }: { status: string }) {
 export default function CustomerDetailPage() {
   const params = useParams<{ phone: string }>();
   const phone = params.phone;
-  const [business, setBusiness] = useState<any>(null);
+  const { business, checked } = useBusiness();
   const [bookings, setBookings] = useState<any[]>([]);
   const [tag, setTag] = useState("");
   const [note, setNote] = useState("");
@@ -62,39 +63,41 @@ export default function CustomerDetailPage() {
   const router = useRouter();
 
   useEffect(() => {
+    if (!checked) return;
+    if (!business) {
+      router.push("/account/login");
+      return;
+    }
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/account/login");
+      if (!phone) {
+        setLoading(false);
         return;
       }
-      const { data: biz } = await supabase.from("businesses").select("id, name").eq("owner_id", user.id).single();
-      if (biz && phone) {
-        setBusiness(biz);
-        // Fetch every booking for this business, then filter client-side by
-        // normalized phone — bookings.customer_id is null for walk-ins, so
-        // phone is the only key that works for every booking.
-        const { data: bks } = await supabase.from("bookings").select("*").eq("business_id", biz.id);
-        const matches = (bks || []).filter(
-          (b) => b.customer_contact && normalizeWhatsAppNumber(b.customer_contact) === phone
-        );
-        setBookings(matches);
+      // Fetch every booking for this business, then filter client-side by
+      // normalized phone — bookings.customer_id is null for walk-ins, so
+      // phone is the only key that works for every booking.
+      const { data: bks } = await supabase.from("bookings").select("*").eq("business_id", business.id);
+      const matches = (bks || []).filter(
+        (b) => b.customer_contact && normalizeWhatsAppNumber(b.customer_contact) === phone
+      );
+      setBookings(matches);
 
-        const customerId = matches.find((b) => b.customer_id)?.customer_id || null;
-        const noteQuery = supabase.from("customer_notes").select("*").eq("business_id", biz.id);
-        const { data: existingNote } = await (customerId
-          ? noteQuery.eq("customer_id", customerId)
-          : noteQuery.eq("customer_phone", phone)
-        ).maybeSingle();
-        if (existingNote) {
-          setTag(existingNote.tag || "");
-          setNote(existingNote.note || "");
-        }
+      const customerId = matches.find((b) => b.customer_id)?.customer_id || null;
+      const noteQuery = supabase.from("customer_notes").select("*").eq("business_id", business.id);
+      const { data: existingNote } = await (customerId
+        ? noteQuery.eq("customer_id", customerId)
+        : noteQuery.eq("customer_phone", phone)
+      ).maybeSingle();
+      if (existingNote) {
+        setTag(existingNote.tag || "");
+        setNote(existingNote.note || "");
       }
       setLoading(false);
     }
     load();
-  }, [router, phone]);
+    // Keyed on business?.id, not the business object itself, so a content-only
+    // update to the shared context doesn't retrigger this effect for nothing.
+  }, [checked, business?.id, router, phone]);
 
   const sorted = useMemo(
     () => [...bookings].sort((a, b) => visitDate(b).getTime() - visitDate(a).getTime()),

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useBusiness } from "@/lib/BusinessContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
@@ -34,6 +35,7 @@ const TABS = [
 ] as const;
 
 export default function Dashboard() {
+  const { business, checked, patchBusiness } = useBusiness();
   const [liveRow, setLiveRow] = useState<any>(null); // untouched, as-fetched — source of truth for status/banners
   const [form, setForm] = useState<any>(null);        // the editable draft the business is working on
   const [saved, setSaved] = useState(false);
@@ -46,39 +48,41 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
+    if (!checked) return;
+    if (!business) {
+      router.push("/account/login");
+      return;
+    }
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/account/login");
-        return;
-      }
-      const { data } = await supabase.from("businesses").select("*").eq("owner_id", user.id).single();
-      if (data) {
-        const normalized = { ...data, subcategories: data.subcategories || [], areas: data.areas || [] };
-        setLiveRow(normalized);
-        // Draft starts from whatever's pending, falling back to the live version
-        setForm({ ...normalized, ...(normalized.pending_changes || {}) });
+      const normalized = { ...business, subcategories: business.subcategories || [], areas: business.areas || [] };
+      setLiveRow(normalized);
+      // Draft starts from whatever's pending, falling back to the live version
+      setForm({ ...normalized, ...(normalized.pending_changes || {}) });
 
-        const { data: bks } = await supabase
-          .from("bookings")
-          .select("id, customer_name, service, status, created_at, preferred_date, preferred_time, amount, paid")
-          .eq("business_id", data.id)
-          .order("created_at", { ascending: false })
-          .limit(200);
-        const all = bks || [];
-        const { start, end } = getPeriodBounds("month", 0);
-        const inMonth = all.filter((b) => new Date(b.created_at) >= start && new Date(b.created_at) < end);
-        setBookingStats({
-          monthCount: inMonth.length,
-          pendingCount: all.filter((b) => b.status === "pending").length,
-          revenueMonth: inMonth.filter((b) => b.paid && b.amount != null).reduce((sum, b) => sum + Number(b.amount || 0), 0),
-        });
-        setRecentBookings(all.slice(0, 5));
-      }
+      const { data: bks } = await supabase
+        .from("bookings")
+        .select("id, customer_name, service, status, created_at, preferred_date, preferred_time, amount, paid")
+        .eq("business_id", business.id)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      const all = bks || [];
+      const { start, end } = getPeriodBounds("month", 0);
+      const inMonth = all.filter((b) => new Date(b.created_at) >= start && new Date(b.created_at) < end);
+      setBookingStats({
+        monthCount: inMonth.length,
+        pendingCount: all.filter((b) => b.status === "pending").length,
+        revenueMonth: inMonth.filter((b) => b.paid && b.amount != null).reduce((sum, b) => sum + Number(b.amount || 0), 0),
+      });
+      setRecentBookings(all.slice(0, 5));
       setLoading(false);
     }
     load();
-  }, [router]);
+    // Keyed on business?.id rather than the business object itself: handleSave
+    // below calls patchBusiness() after every save, which updates this same
+    // context value. If this effect depended on the object identity, every
+    // save would retrigger it — resetting the in-progress `form` draft back
+    // to the just-saved snapshot and firing a redundant bookings refetch.
+  }, [checked, business?.id, router]);
 
   function toggle(key: "subcategories" | "areas", value: string) {
     const current: string[] = form[key] || [];
@@ -122,6 +126,7 @@ export default function Dashboard() {
       return;
     }
     setLiveRow({ ...liveRow, ...payload });
+    patchBusiness(payload);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }

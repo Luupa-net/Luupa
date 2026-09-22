@@ -4,6 +4,7 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { BusinessProvider } from "@/lib/BusinessContext";
 
 export const metadata: Metadata = {
   title: "Luupa — Bahrain's trusted car care directory",
@@ -29,9 +30,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <Navbar />
-        <main>{children}</main>
-        <Footer />
+        <BusinessProvider>
+          <Navbar />
+          <main>{children}</main>
+          <Footer />
+        </BusinessProvider>
       </body>
     </html>
   );

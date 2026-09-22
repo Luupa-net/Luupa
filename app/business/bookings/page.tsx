@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useBusiness } from "@/lib/BusinessContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { periodComparison, getPeriodBounds } from "@/lib/bookingPeriods";
@@ -30,7 +31,7 @@ const STATUS_FILTERS = [
 ] as const;
 
 export default function BookingsPage() {
-  const [business, setBusiness] = useState<any>(null);
+  const { business, checked } = useBusiness();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("month");
@@ -44,26 +45,25 @@ export default function BookingsPage() {
   const router = useRouter();
 
   useEffect(() => {
+    if (!checked) return;
+    if (!business) {
+      router.push("/account/login");
+      return;
+    }
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/account/login");
-        return;
-      }
-      const { data: biz } = await supabase.from("businesses").select("id, name, payment_qr_url").eq("owner_id", user.id).single();
-      if (biz) {
-        setBusiness(biz);
-        const { data: bks } = await supabase
-          .from("bookings")
-          .select("*")
-          .eq("business_id", biz.id)
-          .order("created_at", { ascending: false });
-        setBookings(bks || []);
-      }
+      const { data: bks } = await supabase
+        .from("bookings")
+        .select("*")
+        .eq("business_id", business.id)
+        .order("created_at", { ascending: false });
+      setBookings(bks || []);
       setLoading(false);
     }
     load();
-  }, [router]);
+    // Keyed on business?.id, not the business object itself, so a content-only
+    // update (e.g. the dashboard patching a saved field into the shared
+    // context) doesn't retrigger this effect and refetch bookings for nothing.
+  }, [checked, business?.id, router]);
 
   // Live updates from Realtime: another tab/device changing a booking (or a
   // customer's own action on their side) shows up here without a refresh.

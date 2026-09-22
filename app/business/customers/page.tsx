@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useBusiness } from "@/lib/BusinessContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
@@ -98,7 +99,7 @@ function buildCustomers(bookings: any[], notes: any[]): Customer[] {
 }
 
 export default function CustomersPage() {
-  const [business, setBusiness] = useState<any>(null);
+  const { business, checked } = useBusiness();
   const [bookings, setBookings] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,26 +108,24 @@ export default function CustomersPage() {
   const router = useRouter();
 
   useEffect(() => {
+    if (!checked) return;
+    if (!business) {
+      router.push("/account/login");
+      return;
+    }
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/account/login");
-        return;
-      }
-      const { data: biz } = await supabase.from("businesses").select("id, name").eq("owner_id", user.id).single();
-      if (biz) {
-        setBusiness(biz);
-        const [{ data: bks }, { data: notesRows }] = await Promise.all([
-          supabase.from("bookings").select("*").eq("business_id", biz.id),
-          supabase.from("customer_notes").select("*").eq("business_id", biz.id),
-        ]);
-        setBookings(bks || []);
-        setNotes(notesRows || []);
-      }
+      const [{ data: bks }, { data: notesRows }] = await Promise.all([
+        supabase.from("bookings").select("*").eq("business_id", business.id),
+        supabase.from("customer_notes").select("*").eq("business_id", business.id),
+      ]);
+      setBookings(bks || []);
+      setNotes(notesRows || []);
       setLoading(false);
     }
     load();
-  }, [router]);
+    // Keyed on business?.id, not the business object itself, so a content-only
+    // update to the shared context doesn't retrigger this effect for nothing.
+  }, [checked, business?.id, router]);
 
   const customers = useMemo(() => buildCustomers(bookings, notes), [bookings, notes]);
 

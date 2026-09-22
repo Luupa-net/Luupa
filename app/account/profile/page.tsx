@@ -83,45 +83,57 @@ function ProfileContent() {
         router.push("/account/login?next=/account/profile");
         return;
       }
-      const { data } = await supabase
+      // These three only depend on session.user.id, not on each other — kick
+      // off all three at once (supabase-js query builders are lazy and don't
+      // actually fire until awaited/then()'d, so this .then() chain — not a
+      // shared `await Promise.all(...)` — is what makes them concurrent)
+      // and let each update its own loading state the moment IT resolves,
+      // instead of gating the fast "customer" fetch on the slowest of the three.
+      supabase
         .from("customers")
         .select("id, name, email, phone")
         .eq("id", session.user.id)
-        .single();
-      if (data) {
-        setCustomer(data);
-        setName(data.name || "");
-        setPhone(data.phone || "");
-      }
-      setLoading(false);
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setCustomer(data);
+            setName(data.name || "");
+            setPhone(data.phone || "");
+          }
+          setLoading(false);
+        });
 
-      const { data: bookingRows } = await supabase
+      supabase
         .from("bookings")
         .select("id, business_id, service, preferred_date, preferred_time, status, vehicle_make, vehicle_model, created_at")
         .eq("customer_id", session.user.id)
-        .order("created_at", { ascending: false });
-      const rows = (bookingRows ?? []) as Booking[];
-      setBookings(rows);
+        .order("created_at", { ascending: false })
+        .then(async ({ data: bookingRows }) => {
+          const rows = (bookingRows ?? []) as Booking[];
+          setBookings(rows);
+          setBookingsLoading(false);
 
-      const ids = Array.from(new Set(rows.map((b) => b.business_id)));
-      if (ids.length > 0) {
-        const { data: bizRows } = await supabase
-          .from("businesses_public")
-          .select("id, name, areas")
-          .in("id", ids);
-        const map: Record<string, BusinessLite> = {};
-        (bizRows ?? []).forEach((b: any) => { map[b.id] = b; });
-        setBusinesses(map);
-      }
-      setBookingsLoading(false);
+          const ids = Array.from(new Set(rows.map((b) => b.business_id)));
+          if (ids.length > 0) {
+            const { data: bizRows } = await supabase
+              .from("businesses_public")
+              .select("id, name, areas")
+              .in("id", ids);
+            const map: Record<string, BusinessLite> = {};
+            (bizRows ?? []).forEach((b: any) => { map[b.id] = b; });
+            setBusinesses(map);
+          }
+        });
 
-      const { data: vehicleRows } = await supabase
+      supabase
         .from("vehicles")
         .select("*")
         .eq("customer_id", session.user.id)
-        .order("created_at");
-      setVehicles((vehicleRows ?? []) as Vehicle[]);
-      setVehiclesLoading(false);
+        .order("created_at")
+        .then(({ data: vehicleRows }) => {
+          setVehicles((vehicleRows ?? []) as Vehicle[]);
+          setVehiclesLoading(false);
+        });
     }
     load();
   }, [router]);

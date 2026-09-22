@@ -4,73 +4,47 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useBusiness } from "@/lib/BusinessContext";
 import { isEffectivelyVerified } from "@/lib/verification";
 import {
   Menu, X, Home, ChevronDown, LayoutDashboard, BadgeCheck, LogOut, Eye,
   CalendarClock, User, UserCircle, CalendarCheck,
 } from "lucide-react";
 
-type BusinessSession = {
-  id: string;
-  name: string;
-  logo_url: string | null;
-  verified: boolean;
-  verified_until: string | null;
-  status: "pending" | "active" | "suspended";
-};
-
 export default function Navbar() {
   const [open, setOpen] = useState(false);
-  const [business, setBusiness] = useState<BusinessSession | null>(null);
+  const { business, userId, checked } = useBusiness();
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [checked, setChecked] = useState(false);
   const [pendingBookingsCount, setPendingBookingsCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  async function loadBusiness() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-      setBusiness(null);
+  // The business lookup itself now lives in BusinessContext, shared with every
+  // business page — this only handles the two things specific to the navbar:
+  // the pending-bookings badge, and (for non-business sessions) the
+  // customer's display name.
+  useEffect(() => {
+    if (!checked) return;
+    if (business) {
       setCustomerName(null);
-      setChecked(true);
-      return;
-    }
-    const { data } = await supabase
-      .from("businesses")
-      .select("id, name, logo_url, verified, verified_until, status")
-      .eq("owner_id", session.user.id)
-      .single();
-    setBusiness(data ?? null);
-    setChecked(true);
-
-    if (data) {
-      setCustomerName(null);
-      const { count: pending } = await supabase
+      supabase
         .from("bookings")
         .select("*", { count: "exact", head: true })
-        .eq("business_id", data.id)
-        .eq("status", "pending");
-      setPendingBookingsCount(pending || 0);
-    } else {
-      // Not a business owner — check whether this session belongs to a customer account instead.
-      const { data: customer } = await supabase
+        .eq("business_id", business.id)
+        .eq("status", "pending")
+        .then(({ count }) => setPendingBookingsCount(count || 0));
+    } else if (userId) {
+      supabase
         .from("customers")
         .select("name")
-        .eq("id", session.user.id)
-        .single();
-      setCustomerName(customer?.name ?? null);
+        .eq("id", userId)
+        .single()
+        .then(({ data }) => setCustomerName(data?.name ?? null));
+    } else {
+      setCustomerName(null);
     }
-  }
-
-  useEffect(() => {
-    loadBusiness();
-    // Keeps the navbar in sync the instant someone logs in or out, even though
-    // this component itself doesn't remount when navigating between pages
-    const { data: listener } = supabase.auth.onAuthStateChange(() => loadBusiness());
-    return () => listener.subscription.unsubscribe();
-  }, []);
+  }, [business, userId, checked]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
