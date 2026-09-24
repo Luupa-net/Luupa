@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
@@ -16,17 +16,30 @@ export default function StaffLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  // A real (visually hidden) input sits over the dots so a staff member on a
+  // laptop can just type their PIN with a keyboard, not only click the pad —
+  // the on-screen keypad stays for a shared touch front-desk device.
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    hiddenInputRef.current?.focus();
+  }, []);
+
+  function setDigits(next: string) {
+    setError(null);
+    setPin(next.replace(/\D/g, "").slice(0, PIN_LENGTH));
+  }
 
   function pressDigit(d: string) {
     if (loading) return;
-    setError(null);
-    setPin((prev) => (prev.length < PIN_LENGTH ? prev + d : prev));
+    setDigits(pin.length < PIN_LENGTH ? pin + d : pin);
+    hiddenInputRef.current?.focus();
   }
 
   function backspace() {
     if (loading) return;
-    setError(null);
-    setPin((prev) => prev.slice(0, -1));
+    setDigits(pin.slice(0, -1));
+    hiddenInputRef.current?.focus();
   }
 
   async function handleSubmit() {
@@ -41,9 +54,22 @@ export default function StaffLoginPage() {
       password: pinToPassword(pin),
     });
     if (signInError || !data.user) {
-      setError("That phone number and PIN don't match. Check with your manager.");
+      // Don't flatten every failure into "PIN doesn't match" — a disabled
+      // provider or a rate limit looks nothing like a wrong PIN, and staff
+      // (and whoever they call for help) need to know which one it is.
+      const code = (signInError as { code?: string } | null)?.code;
+      if (code === "phone_provider_disabled" || code === "sms_send_failed") {
+        setError("Staff sign-in isn't turned on yet for this business — ask your manager to check the login setup.");
+      } else if (code === "over_request_rate_limit" || code === "over_sms_send_rate_limit") {
+        setError("Too many attempts — wait a bit and try again.");
+      } else if (signInError && !/invalid.*credentials/i.test(signInError.message)) {
+        setError(signInError.message);
+      } else {
+        setError("That phone number and PIN don't match. Check with your manager.");
+      }
       setPin("");
       setLoading(false);
+      hiddenInputRef.current?.focus();
       return;
     }
     router.push("/business/bookings");
@@ -59,22 +85,42 @@ export default function StaffLoginPage() {
           <PhoneInput value={phone} onChange={setPhone} />
         </div>
 
-        {/* PIN dots — filled as digits are entered, not the digits themselves */}
-        <div className="flex items-center justify-center gap-2.5 mt-6 mb-2 h-4">
-          {Array.from({ length: Math.max(pin.length, 4) }).map((_, i) => (
-            <span
-              key={i}
-              className={`w-3 h-3 rounded-full border-2 transition-colors ${
-                i < pin.length ? "bg-navy border-navy" : "border-stone-line"
-              }`}
-            />
-          ))}
+        {/* PIN dots — filled as digits are entered, not the digits themselves.
+            Always renders all 6 slots (the max PIN length) so a 4-digit PIN
+            doesn't look "finished" two digits early. The real input is this
+            transparent, keyboard-focusable field layered on top: clicking
+            anywhere in the row, or just typing, both work. */}
+        <div className="relative mt-6 mb-2 h-8">
+          <input
+            ref={hiddenInputRef}
+            type="tel"
+            inputMode="numeric"
+            autoComplete="off"
+            value={pin}
+            onChange={(e) => setDigits(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSubmit();
+            }}
+            disabled={loading}
+            aria-label="PIN"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-text"
+          />
+          <div className="pointer-events-none flex items-center justify-center gap-2.5 h-full">
+            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+              <span
+                key={i}
+                className={`w-3 h-3 rounded-full border-2 transition-colors ${
+                  i < pin.length ? "bg-navy border-navy" : "border-stone-line"
+                }`}
+              />
+            ))}
+          </div>
         </div>
 
         {error && <p className="text-sm text-red-600 text-center mt-2">{error}</p>}
 
-        {/* Touch-friendly numeric pad — built for a shared front-desk device,
-            not a keyboard. Digits, 0 centered on the bottom row, backspace. */}
+        {/* Touch-friendly numeric pad for a shared front-desk device — the
+            hidden input above covers keyboard entry, this covers touch. */}
         <div className="grid grid-cols-3 gap-2.5 mt-5">
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
             <button

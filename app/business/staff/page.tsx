@@ -14,6 +14,7 @@ type Staff = {
   name: string;
   phone: string | null;
   role: string | null;
+  national_id: string | null;
   active: boolean;
   auth_user_id: string | null;
   created_at: string;
@@ -23,6 +24,7 @@ export default function StaffPage() {
   const { business, role, checked } = useBusiness();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [pinTarget, setPinTarget] = useState<Staff | null>(null);
   const router = useRouter();
@@ -41,7 +43,8 @@ export default function StaffPage() {
       return;
     }
     async function load() {
-      const { data: rows } = await supabase.from("staff").select("*").eq("business_id", business.id).order("created_at");
+      const { data: rows, error } = await supabase.from("staff").select("*").eq("business_id", business.id).order("created_at");
+      setLoadError(!!error);
       setStaff(rows || []);
       setLoading(false);
     }
@@ -102,7 +105,11 @@ export default function StaffPage() {
         </div>
 
         <div className="mt-6 bg-white rounded-2xl border border-stone-line shadow-sm overflow-hidden">
-          {staff.length === 0 ? (
+          {loadError ? (
+            <p className="text-sm text-red-600 text-center py-16 px-8">
+              Couldn't load your staff — try refreshing the page.
+            </p>
+          ) : staff.length === 0 ? (
             <p className="text-sm text-stone text-center py-16 px-8">
               No staff added yet — add your team so you can assign bookings to them.
             </p>
@@ -127,6 +134,9 @@ export default function StaffPage() {
                     <span className="block text-xs text-stone mt-0.5 sm:hidden truncate">
                       {s.role || "—"}{s.phone ? ` · +${s.phone}` : ""}
                     </span>
+                    {s.national_id && (
+                      <span className="block text-xs text-stone/70 mt-0.5 truncate">CPR {s.national_id}</span>
+                    )}
                   </span>
                   <span className="hidden sm:block w-32 shrink-0 text-sm text-ink truncate">{s.role || "—"}</span>
                   <span className="hidden sm:block w-36 shrink-0 text-sm text-stone truncate">{s.phone ? `+${s.phone}` : "—"}</span>
@@ -314,27 +324,33 @@ function AddStaffModal({
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [phone, setPhone] = useState("");
+  const [nationalId, setNationalId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const { data, error } = await supabase
+    setError(null);
+    const { data, error: insertError } = await supabase
       .from("staff")
       .insert({
         business_id: businessId,
         name,
         role: role || null,
         phone: phone || null,
+        national_id: nationalId || null,
         active: true,
       })
       .select()
       .single();
     setSaving(false);
-    if (!error && data) {
-      onAdded(data);
-      onClose();
+    if (insertError || !data) {
+      setError(insertError?.message || "Couldn't add that staff member — try again.");
+      return;
     }
+    onAdded(data);
+    onClose();
   }
 
   return (
@@ -348,7 +364,19 @@ function AddStaffModal({
         <form onSubmit={handleSubmit} className="space-y-2.5">
           <input required placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} className="input" />
           <input placeholder="Role (e.g. Detailer, Washer)" value={role} onChange={(e) => setRole(e.target.value)} className="input" />
-          <PhoneInput value={phone} onChange={setPhone} placeholder="Phone (optional)" />
+          <div>
+            <PhoneInput value={phone} onChange={setPhone} placeholder="Phone number" />
+            <p className="text-xs text-stone mt-1.5">
+              Needed if this staff member will sign in — required to set up their login PIN.
+            </p>
+          </div>
+          <input
+            placeholder="National ID / CPR (optional)"
+            value={nationalId}
+            onChange={(e) => setNationalId(e.target.value)}
+            className="input"
+          />
+          {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             disabled={saving || !name.trim()}
             className="w-full h-11 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim transition-colors disabled:opacity-60"
