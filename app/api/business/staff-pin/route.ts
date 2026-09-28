@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
   }
 
   const { staffId, pin } = await req.json();
-  if (!staffId || typeof pin !== "string" || !/^\d{4,6}$/.test(pin)) {
-    return NextResponse.json({ error: "PIN must be 4-6 digits." }, { status: 400 });
+  if (!staffId || typeof pin !== "string" || !/^\d{6}$/.test(pin)) {
+    return NextResponse.json({ error: "PIN must be 6 digits." }, { status: 400 });
   }
 
   const { data: staffRow, error: staffError } = await supabaseAdmin
@@ -51,6 +51,10 @@ export async function POST(req: NextRequest) {
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 400 });
     }
+    // An owner resetting the PIN is vouching for this staff member — clear
+    // any lockout from app/api/staff-login/route.ts so it doesn't stay stuck
+    // after they've just proven who they are.
+    await supabaseAdmin.from("staff").update({ failed_pin_attempts: 0, locked_until: null }).eq("id", staffRow.id);
     return NextResponse.json({ ok: true, created: false, authUserId: staffRow.auth_user_id });
   }
 

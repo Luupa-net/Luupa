@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
-import { pinToPassword } from "@/lib/staffPin";
 import PhoneInput from "@/components/PhoneInput";
-import { Delete } from "lucide-react";
+import { Delete, KeyRound, AlertCircle, Loader2 } from "lucide-react";
 
 const PIN_LENGTH = 6; // upper bound — a shorter PIN still submits fine, this just caps the dots/keys
 
@@ -49,27 +48,30 @@ export default function StaffLoginPage() {
     }
     setLoading(true);
     setError(null);
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      phone: normalizeWhatsAppNumber(phone),
-      password: pinToPassword(pin),
+    // Goes through a server route (not supabase.auth.signInWithPassword
+    // directly) so failed attempts can be tracked and locked out per staff
+    // account — see app/api/staff-login/route.ts for why and the error-code
+    // handling this used to do client-side.
+    const res = await fetch("/api/staff-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: normalizeWhatsAppNumber(phone), pin }),
     });
-    if (signInError || !data.user) {
-      // Don't flatten every failure into "PIN doesn't match" — a disabled
-      // provider or a rate limit looks nothing like a wrong PIN, and staff
-      // (and whoever they call for help) need to know which one it is.
-      const code = (signInError as { code?: string } | null)?.code;
-      if (code === "phone_provider_disabled" || code === "sms_send_failed") {
-        setError("Staff sign-in isn't turned on yet for this business — ask your manager to check the login setup.");
-      } else if (code === "over_request_rate_limit" || code === "over_sms_send_rate_limit") {
-        setError("Too many attempts — wait a bit and try again.");
-      } else if (signInError && !/invalid.*credentials/i.test(signInError.message)) {
-        setError(signInError.message);
-      } else {
-        setError("That phone number and PIN don't match. Check with your manager.");
-      }
+    const result = await res.json();
+    if (!res.ok || !result.ok) {
+      setError(result.error || "Something went wrong — try again.");
       setPin("");
       setLoading(false);
       hiddenInputRef.current?.focus();
+      return;
+    }
+    const { error: setSessionError } = await supabase.auth.setSession({
+      access_token: result.access_token,
+      refresh_token: result.refresh_token,
+    });
+    if (setSessionError) {
+      setError("Signed in, but couldn't start your session — try again.");
+      setLoading(false);
       return;
     }
     router.push("/business/bookings");
@@ -77,7 +79,10 @@ export default function StaffLoginPage() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-canvas2 flex items-center justify-center px-5 py-10">
-      <div className="w-full max-w-sm bg-white rounded-2xl border border-stone-line shadow-sm p-6 sm:p-8">
+      <div className="w-full max-w-sm bg-white rounded-2xl border border-stone-line shadow-sm p-6 sm:p-8 fade-up">
+        <div className="w-12 h-12 rounded-full bg-navy/10 flex items-center justify-center mx-auto mb-3">
+          <KeyRound size={20} className="text-navy" />
+        </div>
         <h1 className="font-display text-2xl font-semibold text-ink text-center">Staff sign-in</h1>
         <p className="text-sm text-stone text-center mt-1.5">Enter your phone number and PIN.</p>
 
@@ -117,7 +122,12 @@ export default function StaffLoginPage() {
           </div>
         </div>
 
-        {error && <p className="text-sm text-red-600 text-center mt-2">{error}</p>}
+        {error && (
+          <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-red-50 px-4 py-3.5">
+            <AlertCircle size={16} className="text-red-600 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
 
         {/* Touch-friendly numeric pad for a shared front-desk device — the
             hidden input above covers keyboard entry, this covers touch. */}
@@ -153,8 +163,9 @@ export default function StaffLoginPage() {
         <button
           onClick={handleSubmit}
           disabled={loading || !phone || pin.length < 4}
-          className="w-full h-12 rounded-full bg-teal text-white font-semibold hover:bg-teal-dim active:scale-95 transition-all disabled:opacity-40 mt-6"
+          className="w-full h-12 rounded-full bg-teal text-white font-semibold hover:bg-teal-dim active:scale-95 transition-all disabled:opacity-40 mt-6 flex items-center justify-center gap-2"
         >
+          {loading && <Loader2 size={16} className="animate-spin" />}
           {loading ? "Signing in…" : "Sign in"}
         </button>
       </div>
