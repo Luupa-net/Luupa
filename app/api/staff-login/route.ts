@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createStaffAuthClient } from "@/lib/supabaseAuthClient";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
-import { pinToPassword } from "@/lib/staffPin";
+import { pinToPassword, staffAuthEmail } from "@/lib/staffPin";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
@@ -12,10 +12,7 @@ const LOCKOUT_MINUTES = 15;
 // one. Centralizes the error-code handling that used to live client-side in
 // app/staff/login/page.tsx.
 const SYSTEM_ERROR_MESSAGES: Record<string, string> = {
-  phone_provider_disabled: "Staff sign-in isn't turned on yet for this business — ask your manager to check the login setup.",
-  sms_send_failed: "Staff sign-in isn't turned on yet for this business — ask your manager to check the login setup.",
   over_request_rate_limit: "Too many attempts — wait a bit and try again.",
-  over_sms_send_rate_limit: "Too many attempts — wait a bit and try again.",
 };
 
 const GENERIC_INVALID = {
@@ -72,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   const authClient = createStaffAuthClient();
   const { data, error: signInError } = await authClient.auth.signInWithPassword({
-    phone: normalizedPhone,
+    email: staffAuthEmail(staffRow.id),
     password: pinToPassword(pin),
   });
 

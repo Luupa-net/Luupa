@@ -6,6 +6,7 @@ import { useBusiness } from "@/lib/BusinessContext";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
+import BusinessLoadError from "@/components/BusinessLoadError";
 import {
   ArrowLeft, Phone, Mail, CalendarClock, Wallet, Sparkles, Car, StickyNote,
   Tag as TagIcon, ClipboardList,
@@ -52,7 +53,7 @@ function StatusChip({ status }: { status: string }) {
 export default function CustomerDetailPage() {
   const params = useParams<{ phone: string }>();
   const phone = params.phone;
-  const { business, role, checked } = useBusiness();
+  const { business, role, checked, loadError: businessLoadError, refresh } = useBusiness();
   const [bookings, setBookings] = useState<any[]>([]);
   const [tag, setTag] = useState("");
   const [note, setNote] = useState("");
@@ -64,6 +65,10 @@ export default function CustomerDetailPage() {
 
   useEffect(() => {
     if (!checked) return;
+    if (businessLoadError) {
+      setLoading(false);
+      return;
+    }
     if (!business) {
       router.push("/account/login");
       return;
@@ -101,7 +106,7 @@ export default function CustomerDetailPage() {
     load();
     // Keyed on business?.id, not the business object itself, so a content-only
     // update to the shared context doesn't retrigger this effect for nothing.
-  }, [checked, business?.id, role, router, phone]);
+  }, [checked, businessLoadError, business?.id, role, router, phone]);
 
   const sorted = useMemo(
     () => [...bookings].sort((a, b) => visitDate(b).getTime() - visitDate(a).getTime()),
@@ -169,6 +174,7 @@ export default function CustomerDetailPage() {
       </div>
     );
   }
+  if (businessLoadError) return <BusinessLoadError onRetry={refresh} />;
   if (!business) return <div className="max-w-4xl mx-auto px-6 py-16 text-stone">No listing found.</div>;
 
   if (bookings.length === 0) {

@@ -5,14 +5,19 @@ import { supabase } from "@/lib/supabase";
 // the email/password signup flow, which inserts it explicitly. Call this
 // once right after an OAuth redirect lands, so a Google sign-in ends up
 // with the same customer profile a manual signup would have.
-export async function ensureCustomerAccount(userId: string, meta: { email?: string | null; name?: string | null }) {
-  const { data: existing } = await supabase.from("customers").select("id").eq("id", userId).maybeSingle();
-  if (existing) return;
+export async function ensureCustomerAccount(
+  userId: string,
+  meta: { email?: string | null; name?: string | null }
+): Promise<{ error: string | null }> {
+  const { data: existing, error: lookupError } = await supabase.from("customers").select("id").eq("id", userId).maybeSingle();
+  if (lookupError) return { error: lookupError.message };
+  if (existing) return { error: null };
 
-  await supabase.from("customers").insert({
+  const { error: insertError } = await supabase.from("customers").insert({
     id: userId,
     name: meta.name || meta.email?.split("@")[0] || "New customer",
     email: meta.email ?? null,
     phone: "",
   });
+  return { error: insertError?.message ?? null };
 }

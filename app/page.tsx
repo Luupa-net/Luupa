@@ -35,7 +35,7 @@ export default async function HomePage() {
   // it already projects down to a public-safe column list and only ever
   // contains active rows, so this is safe against direct REST access with
   // the anon key too, not just against what this page happens to ask for.
-  const { data } = await supabase
+  const { data, error: featuredError } = await supabase
     .from("businesses_public")
     .select("id, name, photos, areas, verified, verified_until, tier")
     .order("verified", { ascending: false })
@@ -136,7 +136,11 @@ export default async function HomePage() {
               Browse all <ArrowUpRight size={14} />
             </Link>
           </div>
-          {featured.length === 0 ? (
+          {featuredError ? (
+            <div className="rounded-xl border border-dashed border-stone-line p-10 text-center">
+              <p className="text-stone text-sm">Couldn't load featured businesses right now — check back shortly.</p>
+            </div>
+          ) : featured.length === 0 ? (
             <div className="rounded-xl border border-dashed border-stone-line p-10 text-center">
               <p className="text-stone text-sm">No businesses featured yet — the first ones to join get seen first.</p>
               <Link href="/business/signup" className="text-teal font-bodyAlt font-bold text-sm mt-1.5 inline-block">

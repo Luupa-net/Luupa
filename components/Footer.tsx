@@ -14,9 +14,12 @@ export default function Footer() {
           <h4 className="text-white font-semibold mb-3">Explore</h4>
           <ul className="space-y-2">
             <li><Link href="/browse" className="hover:text-white">Browse businesses</Link></li>
-            <li><Link href="/browse?area=manama" className="hover:text-white">Manama</Link></li>
-            <li><Link href="/browse?area=riffa" className="hover:text-white">Riffa</Link></li>
-            <li><Link href="/browse?area=muharraq" className="hover:text-white">Muharraq</Link></li>
+            {/* AREAS in lib/taxonomy.ts (and the browse page's filter) are
+                case-sensitive title-case ("Manama") — these must match
+                exactly, or the link silently returns zero results. */}
+            <li><Link href="/browse?area=Manama" className="hover:text-white">Manama</Link></li>
+            <li><Link href="/browse?area=Riffa" className="hover:text-white">Riffa</Link></li>
+            <li><Link href="/browse?area=Muharraq" className="hover:text-white">Muharraq</Link></li>
             <li><Link href="/account/login" className="hover:text-white">Log in</Link></li>
           </ul>
         </div>

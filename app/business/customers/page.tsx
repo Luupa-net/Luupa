@@ -6,6 +6,7 @@ import { useBusiness } from "@/lib/BusinessContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
+import BusinessLoadError from "@/components/BusinessLoadError";
 import { ArrowLeft, Search, X, SlidersHorizontal } from "lucide-react";
 
 type Customer = {
@@ -99,7 +100,7 @@ function buildCustomers(bookings: any[], notes: any[]): Customer[] {
 }
 
 export default function CustomersPage() {
-  const { business, role, checked } = useBusiness();
+  const { business, role, checked, loadError: businessLoadError, refresh } = useBusiness();
   const [bookings, setBookings] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +110,10 @@ export default function CustomersPage() {
 
   useEffect(() => {
     if (!checked) return;
+    if (businessLoadError) {
+      setLoading(false);
+      return;
+    }
     if (!business) {
       router.push("/account/login");
       return;
@@ -131,7 +136,7 @@ export default function CustomersPage() {
     load();
     // Keyed on business?.id, not the business object itself, so a content-only
     // update to the shared context doesn't retrigger this effect for nothing.
-  }, [checked, business?.id, role, router]);
+  }, [checked, businessLoadError, business?.id, role, router]);
 
   const customers = useMemo(() => buildCustomers(bookings, notes), [bookings, notes]);
 
@@ -167,6 +172,7 @@ export default function CustomersPage() {
       </div>
     );
   }
+  if (businessLoadError) return <BusinessLoadError onRetry={refresh} />;
   if (!business) return <div className="max-w-4xl mx-auto px-6 py-16 text-stone">No listing found.</div>;
 
   return (

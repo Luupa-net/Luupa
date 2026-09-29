@@ -53,8 +53,17 @@ export default function PhotoUploader({
     e.target.value = "";
   }
 
-  function removePhoto(url: string) {
+  async function removePhoto(url: string) {
     onChange(photos.filter((p) => p !== url));
+    // Best-effort: pull the storage path back out of the public URL
+    // (".../object/public/business-photos/<path>") so the underlying file is
+    // actually deleted, not just unlinked from this listing — otherwise every
+    // removed photo leaks in the bucket forever. A failure here doesn't block
+    // the removal the owner just asked for; it only leaves an orphaned file.
+    const path = url.split("/business-photos/")[1];
+    if (!path) return;
+    const { error: removeError } = await supabase.storage.from("business-photos").remove([path]);
+    if (removeError) setError("Photo removed, but the file couldn't be deleted from storage.");
   }
 
   return (

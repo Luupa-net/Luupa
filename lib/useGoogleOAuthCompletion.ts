@@ -49,10 +49,15 @@ export function useGoogleOAuthCompletion(next: string, hadExplicitNext: boolean)
       const provider = session.user.app_metadata?.provider;
       if (provider !== "google") return;
       setCompletingOAuth(true);
-      await ensureCustomerAccount(session.user.id, {
+      const { error } = await ensureCustomerAccount(session.user.id, {
         email: session.user.email,
         name: (session.user.user_metadata?.full_name as string) || (session.user.user_metadata?.name as string) || null,
       });
+      if (error) {
+        setCompletingOAuth(false);
+        setOauthError("We couldn't finish setting up your account — try signing in again.");
+        return;
+      }
       const dest = await resolveLoginRedirect(session.user.id, next, hadExplicitNext);
       router.push(dest);
     });

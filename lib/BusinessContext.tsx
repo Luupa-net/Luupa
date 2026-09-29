@@ -13,6 +13,10 @@ type BusinessContextValue = {
   // True once the initial auth+business lookup has resolved (either way) —
   // lets consumers tell "still checking" apart from "checked, no business."
   checked: boolean;
+  // True when the lookup itself failed (network/DB error) rather than
+  // legitimately finding no business — consumers must show a retryable error
+  // instead of treating this the same as "not logged in" and redirecting.
+  loadError: boolean;
   refresh: () => Promise<void>;
   // Merges a partial update into the cached business without a round trip —
   // e.g. after the dashboard saves changes, so the navbar picks up the new
@@ -35,6 +39,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
   const [staffProfile, setStaffProfile] = useState<any | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -43,37 +48,58 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
       setBusiness(null);
       setRole(null);
       setStaffProfile(null);
+      setLoadError(false);
       setChecked(true);
       return;
     }
 
-    const { data: ownedBusiness } = await supabase.from("businesses").select("*").eq("owner_id", user.id).maybeSingle();
+    const { data: ownedBusiness, error: ownedError } = await supabase.from("businesses").select("*").eq("owner_id", user.id).maybeSingle();
+    if (ownedError) {
+      // A real failure here must NOT fall through to "check staff instead" —
+      // that path would very likely fail too and this owner would end up
+      // bounced to /account/login as if their listing had vanished.
+      setLoadError(true);
+      setChecked(true);
+      return;
+    }
     if (ownedBusiness) {
       setBusiness(ownedBusiness);
       setRole("owner");
       setStaffProfile(null);
+      setLoadError(false);
       setChecked(true);
       return;
     }
 
-    const { data: staffRow } = await supabase
+    const { data: staffRow, error: staffError } = await supabase
       .from("staff")
       .select("*")
       .eq("auth_user_id", user.id)
       .eq("active", true)
       .maybeSingle();
+    if (staffError) {
+      setLoadError(true);
+      setChecked(true);
+      return;
+    }
     if (staffRow) {
       setStaffProfile(staffRow);
       setRole("staff");
       // businesses_public is grant-select to any authenticated user for active
       // businesses — no owner-only fields, exactly the safe subset staff need
       // for display (name/logo/hours), same view the public directory uses.
-      const { data: publicBiz } = await supabase
+      const { data: publicBiz, error: publicBizError } = await supabase
         .from("businesses_public")
         .select("*")
         .eq("id", staffRow.business_id)
         .maybeSingle();
+      if (publicBizError) {
+        setLoadError(true);
+        setChecked(true);
+        return;
+      }
       setBusiness(publicBiz ?? null);
+      setLoadError(false);
       setChecked(true);
       return;
     }
@@ -81,6 +107,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     setBusiness(null);
     setRole(null);
     setStaffProfile(null);
+    setLoadError(false);
     setChecked(true);
   }, []);
 
@@ -95,7 +122,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <BusinessContext.Provider value={{ business, role, staffProfile, userId, checked, refresh: load, patchBusiness }}>
+    <BusinessContext.Provider value={{ business, role, staffProfile, userId, checked, loadError, refresh: load, patchBusiness }}>
       {children}
     </BusinessContext.Provider>
   );

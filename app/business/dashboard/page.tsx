@@ -16,11 +16,14 @@ import PhotoUploader from "@/components/PhotoUploader";
 import LogoUploader from "@/components/LogoUploader";
 import CompletenessRing from "@/components/CompletenessRing";
 import PaymentQRUploader from "@/components/PaymentQRUploader";
+import StatCard from "@/components/StatCard";
+import BookingStatusBadge from "@/components/BookingStatusBadge";
+import BusinessLoadError from "@/components/BusinessLoadError";
 import {
   Clock, CheckCircle2, XCircle, Eye, BadgeCheck, ImageIcon, Wrench,
   ShieldCheck, ExternalLink, User, FolderClock, LayoutDashboard,
   Wallet, CalendarClock, ArrowRight, Plus, Sparkles, MapPin, Phone, Clock4,
-  FileText, Building2, Users, UsersRound,
+  FileText, Building2, Users, UsersRound, AlertCircle,
 } from "lucide-react";
 
 // Internal/verification info — never shown to customers, so no review needed.
@@ -34,8 +37,22 @@ const TABS = [
   { key: "Verification", icon: ShieldCheck },
 ] as const;
 
+// Which tab each getting-started item belongs to, plus a small icon — keyed
+// by the item's label from computeCompleteness() (lib/completeness.ts) so a
+// tap on an unfinished item jumps straight to where it's fixed, instead of
+// leaving the owner to hunt across tabs for it.
+const CHECKLIST_META: Record<string, { icon: React.ReactNode; tab: (typeof TABS)[number]["key"] }> = {
+  "Add a logo": { icon: <ImageIcon size={13} />, tab: "Profile" },
+  "Add at least one photo": { icon: <ImageIcon size={13} />, tab: "Photos" },
+  "Write a description (20+ characters)": { icon: <FileText size={13} />, tab: "Profile" },
+  "List at least one service": { icon: <Wrench size={13} />, tab: "Services" },
+  "Add your business hours": { icon: <Clock4 size={13} />, tab: "Profile" },
+  "Add a CR number or social link": { icon: <ShieldCheck size={13} />, tab: "Verification" },
+  "Business contact info": { icon: <Phone size={13} />, tab: "Profile" },
+};
+
 export default function Dashboard() {
-  const { business, role, checked, patchBusiness } = useBusiness();
+  const { business, role, checked, loadError, refresh, patchBusiness } = useBusiness();
   const [liveRow, setLiveRow] = useState<any>(null); // untouched, as-fetched — source of truth for status/banners
   const [form, setForm] = useState<any>(null);        // the editable draft the business is working on
   const [saved, setSaved] = useState(false);
@@ -45,10 +62,15 @@ export default function Dashboard() {
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("Overview");
   const [bookingStats, setBookingStats] = useState({ monthCount: 0, pendingCount: 0, revenueMonth: 0 });
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
+  const [bookingsLoadError, setBookingsLoadError] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     if (!checked) return;
+    if (loadError) {
+      setLoading(false);
+      return;
+    }
     if (!business) {
       router.push("/account/login");
       return;
@@ -65,12 +87,13 @@ export default function Dashboard() {
       // Draft starts from whatever's pending, falling back to the live version
       setForm({ ...normalized, ...(normalized.pending_changes || {}) });
 
-      const { data: bks } = await supabase
+      const { data: bks, error: bookingsError } = await supabase
         .from("bookings")
         .select("id, customer_name, service, status, created_at, preferred_date, preferred_time, amount, paid")
         .eq("business_id", business.id)
         .order("created_at", { ascending: false })
         .limit(200);
+      setBookingsLoadError(!!bookingsError);
       const all = bks || [];
       const { start, end } = getPeriodBounds("month", 0);
       const inMonth = all.filter((b) => new Date(b.created_at) >= start && new Date(b.created_at) < end);
@@ -88,7 +111,7 @@ export default function Dashboard() {
     // context value. If this effect depended on the object identity, every
     // save would retrigger it — resetting the in-progress `form` draft back
     // to the just-saved snapshot and firing a redundant bookings refetch.
-  }, [checked, business?.id, role, router]);
+  }, [checked, loadError, business?.id, role, router]);
 
   function toggle(key: "subcategories" | "areas", value: string) {
     const current: string[] = form[key] || [];
@@ -152,6 +175,7 @@ export default function Dashboard() {
       </div>
     );
   }
+  if (loadError) return <BusinessLoadError onRetry={refresh} />;
   if (!liveRow) return <div className="max-w-4xl mx-auto px-6 py-16 text-stone">No listing found.</div>;
 
   const { percent, items } = computeCompleteness(form);
@@ -281,10 +305,10 @@ export default function Dashboard() {
               <div className="space-y-5">
                 {/* KPIs */}
                 <div className="flex sm:grid sm:grid-cols-4 gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0 sm:overflow-visible">
-                  <KpiCard icon={<Eye size={16} />} tint="navy" label="Profile views" value={liveRow.view_count ?? 0} />
-                  <KpiCard icon={<CalendarClock size={16} />} tint="teal" label="Bookings this month" value={bookingStats.monthCount} />
-                  <KpiCard icon={<Clock size={16} />} tint="stone" label="Pending confirmations" value={bookingStats.pendingCount} />
-                  <KpiCard icon={<Wallet size={16} />} tint="emerald" label="Revenue this month" value={`BHD ${bookingStats.revenueMonth.toFixed(bookingStats.revenueMonth % 1 === 0 ? 0 : 2)}`} />
+                  <StatCard icon={<Eye size={16} />} tint="navy" label="Profile views" value={liveRow.view_count ?? 0} />
+                  <StatCard icon={<CalendarClock size={16} />} tint="teal" label="Bookings this month" value={bookingStats.monthCount} />
+                  <StatCard icon={<Clock size={16} />} tint="stone" label="Pending confirmations" value={bookingStats.pendingCount} />
+                  <StatCard icon={<Wallet size={16} />} tint="emerald" label="Revenue this month" value={`BHD ${bookingStats.revenueMonth.toFixed(bookingStats.revenueMonth % 1 === 0 ? 0 : 2)}`} />
                 </div>
 
                 {/* Quick actions */}
@@ -310,18 +334,48 @@ export default function Dashboard() {
                 {/* Getting-started checklist */}
                 {percent < 100 && (
                   <div className="rounded-2xl bg-white border border-stone-line p-5 sm:p-6">
-                    <p className="text-sm font-semibold text-ink mb-3">Finish setting up your profile</p>
-                    <div className="space-y-2">
-                      {items.map((item) => (
-                        <div key={item.label} className="flex items-center gap-2.5 text-sm">
-                          {item.done ? (
-                            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                          ) : (
-                            <span className="w-4 h-4 rounded-full border-2 border-stone-line shrink-0" />
-                          )}
-                          <span className={item.done ? "text-stone line-through" : "text-ink"}>{item.label}</span>
-                        </div>
-                      ))}
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center shrink-0">
+                          <Sparkles size={15} className="text-teal-dim" />
+                        </span>
+                        <p className="font-display text-lg font-semibold text-ink">Finish setting up your profile</p>
+                      </div>
+                      <span className="text-xs font-semibold text-stone shrink-0">{percent}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-stone-line/70 overflow-hidden mt-3.5">
+                      <div
+                        className="h-full bg-teal rounded-full transition-all duration-500"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                    <div className="mt-2.5 divide-y divide-stone-line">
+                      {items.map((item) => {
+                        const meta = CHECKLIST_META[item.label];
+                        return (
+                          <button
+                            key={item.label}
+                            type="button"
+                            disabled={item.done}
+                            onClick={() => meta && setTab(meta.tab)}
+                            className={`w-full flex items-center gap-3 py-2.5 px-1.5 -mx-1.5 rounded-lg text-left transition-colors ${
+                              item.done ? "cursor-default" : "hover:bg-canvas2"
+                            }`}
+                          >
+                            <span
+                              className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                                item.done ? "bg-emerald-100 text-emerald-700" : "bg-teal/10 text-teal-dim"
+                              }`}
+                            >
+                              {item.done ? <CheckCircle2 size={14} /> : meta?.icon}
+                            </span>
+                            <span className={`flex-1 text-sm ${item.done ? "text-stone line-through" : "text-ink font-medium"}`}>
+                              {item.label}
+                            </span>
+                            {!item.done && <ArrowRight size={13} className="text-stone shrink-0" />}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -334,7 +388,11 @@ export default function Dashboard() {
                       View all <ArrowRight size={12} />
                     </Link>
                   </div>
-                  {recentBookings.length === 0 ? (
+                  {bookingsLoadError ? (
+                    <p className="flex items-center justify-center gap-2 text-sm text-red-600 py-4">
+                      <AlertCircle size={14} /> Couldn't load your bookings — try refreshing the page.
+                    </p>
+                  ) : recentBookings.length === 0 ? (
                     <p className="text-sm text-stone py-4 text-center">No bookings yet — once customers start booking, they'll show up here.</p>
                   ) : (
                     <div className="space-y-2">
@@ -351,7 +409,7 @@ export default function Dashboard() {
                             <span className="block text-sm font-medium text-ink truncate">{b.customer_name}</span>
                             <span className="block text-xs text-stone truncate">{b.service || "No service specified"}</span>
                           </span>
-                          <RecentStatusChip status={b.status} />
+                          <BookingStatusBadge status={b.status} />
                         </Link>
                       ))}
                     </div>
@@ -517,22 +575,6 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function KpiCard({ icon, label, value, tint }: { icon: React.ReactNode; label: string; value: string | number; tint: "navy" | "teal" | "emerald" | "stone" }) {
-  const tints = {
-    navy: "bg-navy/10 text-navy",
-    teal: "bg-teal/10 text-teal-dim",
-    emerald: "bg-emerald-100 text-emerald-700",
-    stone: "bg-stone-line text-stone",
-  }[tint];
-  return (
-    <div className="shrink-0 w-[160px] sm:w-auto rounded-2xl bg-white border border-stone-line px-4 py-4 shadow-sm shadow-black/[0.02] transition-shadow hover:shadow-md">
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tints}`}>{icon}</div>
-      <p className="font-display text-2xl font-semibold text-ink mt-2.5">{value}</p>
-      <p className="text-xs text-stone mt-0.5">{label}</p>
-    </div>
-  );
-}
-
 function QuickAction({ href, icon, label, primary, external }: { href: string; icon: React.ReactNode; label: string; primary?: boolean; external?: boolean }) {
   return (
     <Link
@@ -545,24 +587,6 @@ function QuickAction({ href, icon, label, primary, external }: { href: string; i
     >
       {icon} {label}
     </Link>
-  );
-}
-
-function RecentStatusChip({ status }: { status: string }) {
-  const tones: Record<string, string> = {
-    pending: "bg-teal/10 text-teal-dim",
-    confirmed: "bg-navy/10 text-navy",
-    arrived: "bg-skyblue/10 text-skyblue-dim",
-    in_progress: "bg-skyblue/10 text-skyblue-dim",
-    completed: "bg-emerald-100 text-emerald-700",
-    declined: "bg-stone-line text-stone",
-    no_show: "bg-gray-100 text-gray-600",
-    cancelled: "bg-red-50 text-red-600",
-  };
-  return (
-    <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${tones[status] || "bg-stone-line text-stone"}`}>
-      {status.replace("_", " ")}
-    </span>
   );
 }
 

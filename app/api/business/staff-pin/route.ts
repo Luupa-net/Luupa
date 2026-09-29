@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { normalizeWhatsAppNumber } from "@/lib/validation";
-import { pinToPassword } from "@/lib/staffPin";
+import { pinToPassword, staffAuthEmail } from "@/lib/staffPin";
 
 // Sets or resets a staff member's login PIN. Staff sign in with
-// supabase.auth.signInWithPassword({ phone, password: pin }) — a real
-// Supabase Auth session, same as owners get with email+password. Supabase
-// hashes and stores the PIN itself; nothing custom to manage here.
+// supabase.auth.signInWithPassword({ email: staffAuthEmail(id), password: pin })
+// — a real Supabase Auth session, same as owners get with email+password,
+// just under a synthetic internal email rather than their real phone (see
+// staffAuthEmail() for why). Supabase hashes and stores the PIN itself;
+// nothing custom to manage here.
 export async function POST(req: NextRequest) {
   // SECURITY: require a real logged-in session, then confirm it's the owner
   // of the business the target staff row belongs to — same pattern as
@@ -43,7 +44,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Add a phone number for this staff member first." }, { status: 400 });
   }
 
-  const phone = normalizeWhatsAppNumber(staffRow.phone);
   const password = pinToPassword(pin);
 
   if (staffRow.auth_user_id) {
@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-    phone,
+    email: staffAuthEmail(staffRow.id),
     password,
-    phone_confirm: true,
+    email_confirm: true,
     user_metadata: { staff_id: staffRow.id },
   });
   if (createError || !created.user) {

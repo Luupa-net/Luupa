@@ -12,3 +12,17 @@
 export function pinToPassword(pin: string): string {
   return `Sp1!${pin}qR`;
 }
+
+// The Supabase Auth identity for a staff account. Deliberately an email, not
+// the staff member's real phone number: Supabase's Phone auth provider can't
+// be turned on without first configuring a paid third-party SMS provider
+// (Twilio/MessageBird/Vonage/TextLocal), even though staff sign-in never
+// sends an SMS — accounts are created via the admin API with
+// email_confirm: true and signed in with a password, no OTP involved. A
+// synthetic internal email sidesteps that dependency entirely and is
+// deterministic from staff.id, so it never needs to change even if the
+// staff member's real phone number does. Never shown to the staff member —
+// they only ever see phone + PIN.
+export function staffAuthEmail(staffId: string): string {
+  return `staff-${staffId}@staff.luupa.internal`;
+}

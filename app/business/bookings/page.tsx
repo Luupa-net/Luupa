@@ -9,11 +9,12 @@ import { periodComparison, getPeriodBounds } from "@/lib/bookingPeriods";
 import { getMonthGrid, getWeekDays, addDays, addMonths, toKey, isSameDay, WEEKDAY_LABELS } from "@/lib/calendarGrid";
 import ManualBookingForm from "@/components/ManualBookingForm";
 import BookingDrawer from "@/components/BookingDrawer";
+import BusinessLoadError from "@/components/BusinessLoadError";
 import { useRealtimeBookings } from "@/lib/useRealtimeBookings";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Plus, TrendingUp, TrendingDown, Minus,
   Search, X, CalendarDays, LayoutGrid, ListChecks, MousePointerClick, SlidersHorizontal,
-  Clock3, Wallet,
+  Clock3, Wallet, AlertCircle,
 } from "lucide-react";
 
 type View = "month" | "week" | "day" | "list";
@@ -31,10 +32,11 @@ const STATUS_FILTERS = [
 ] as const;
 
 export default function BookingsPage() {
-  const { business, role, checked } = useBusiness();
+  const { business, role, checked, loadError: businessLoadError, refresh } = useBusiness();
   const isStaff = role === "staff";
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bookingsLoadError, setBookingsLoadError] = useState(false);
   const [view, setView] = useState<View>("month");
   const [anchor, setAnchor] = useState(new Date());
   const [showAddForm, setShowAddForm] = useState(false);
@@ -47,6 +49,10 @@ export default function BookingsPage() {
 
   useEffect(() => {
     if (!checked) return;
+    if (businessLoadError) {
+      setLoading(false);
+      return;
+    }
     if (!business) {
       router.push("/account/login");
       return;
@@ -56,11 +62,12 @@ export default function BookingsPage() {
       // discount/payment_method are owner-only, even via a direct REST call,
       // not just hidden in this UI (see migration-v23.sql). They read through
       // bookings_operational instead, which leaves those columns out entirely.
-      const { data: bks } = await supabase
+      const { data: bks, error } = await supabase
         .from(isStaff ? "bookings_operational" : "bookings")
         .select("*")
         .eq("business_id", business.id)
         .order("created_at", { ascending: false });
+      setBookingsLoadError(!!error);
       setBookings(bks || []);
       setLoading(false);
     }
@@ -68,7 +75,7 @@ export default function BookingsPage() {
     // Keyed on business?.id, not the business object itself, so a content-only
     // update (e.g. the dashboard patching a saved field into the shared
     // context) doesn't retrigger this effect and refetch bookings for nothing.
-  }, [checked, business?.id, isStaff, router]);
+  }, [checked, businessLoadError, business?.id, isStaff, router]);
 
   // Live updates from Realtime: another tab/device changing a booking (or a
   // customer's own action on their side) shows up here without a refresh.
@@ -151,6 +158,7 @@ export default function BookingsPage() {
       </div>
     );
   }
+  if (businessLoadError) return <BusinessLoadError onRetry={refresh} />;
   if (!business) return <div className="max-w-4xl mx-auto px-6 py-16 text-stone">No listing found.</div>;
 
   const today = periodComparison(bookings, "day");
@@ -193,6 +201,13 @@ export default function BookingsPage() {
             <button onClick={() => setUpdateError(null)} aria-label="Dismiss" className="text-red-600 hover:text-red-800 shrink-0">
               <X size={14} />
             </button>
+          </div>
+        )}
+
+        {bookingsLoadError && (
+          <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+            <AlertCircle size={15} className="text-red-600 shrink-0" />
+            <p className="text-sm text-red-700">Couldn't load your bookings — try refreshing the page.</p>
           </div>
         )}
 

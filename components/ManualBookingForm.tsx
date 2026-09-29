@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { X } from "lucide-react";
+import { X, AlertCircle } from "lucide-react";
 import PhoneInput from "@/components/PhoneInput";
 import PlateInput from "@/components/PlateInput";
 
@@ -28,11 +28,13 @@ export default function ManualBookingForm({
   const [vehicleModel, setVehicleModel] = useState("");
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const { data, error } = await supabase
+    setError(null);
+    const { data, error: insertError } = await supabase
       .from("bookings")
       .insert({
         business_id: businessId,
@@ -50,10 +52,12 @@ export default function ManualBookingForm({
       .select()
       .single();
     setSaving(false);
-    if (!error && data) {
+    if (!insertError && data) {
       onAdded(data);
       onClose();
+      return;
     }
+    setError(insertError?.message || "Couldn't add that booking — try again.");
   }
 
   return (
@@ -77,6 +81,11 @@ export default function ManualBookingForm({
             <input placeholder="Vehicle model" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} className="input" />
           </div>
           <PlateInput value={vehiclePlate} onChange={setVehiclePlate} />
+          {error && (
+            <p className="flex items-center gap-1.5 text-sm text-red-600">
+              <AlertCircle size={14} className="shrink-0" /> {error}
+            </p>
+          )}
           <button
             disabled={saving}
             className="w-full h-11 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim transition-colors disabled:opacity-60"
