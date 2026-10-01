@@ -3,7 +3,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import ConditionalFooter from "@/components/ConditionalFooter";
 import { BusinessProvider } from "@/lib/BusinessContext";
 
 export const metadata: Metadata = {
@@ -33,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BusinessProvider>
           <Navbar />
           <main>{children}</main>
-          <Footer />
+          <ConditionalFooter />
         </BusinessProvider>
       </body>
     </html>
