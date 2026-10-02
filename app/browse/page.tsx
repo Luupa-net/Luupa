@@ -12,6 +12,14 @@ function sanitizeSearchTerm(input: string): string {
   return input.replace(/[,()%]/g, "").slice(0, 100);
 }
 
+// searchParams usage already forces this route to render dynamically per
+// request, but Next's fetch cache (which wraps supabase-js's underlying
+// fetch calls too) still honors this as the default cache window for the
+// Supabase reads below — repeat navigations to the same filter combo within
+// 30s reuse the cached result instead of hitting the DB again. Same pattern
+// as app/page.tsx's featured-listings query.
+export const revalidate = 30;
+
 export default async function BrowsePage({
   searchParams,
 }: {

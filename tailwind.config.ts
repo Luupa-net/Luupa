@@ -44,11 +44,13 @@ const config: Config = {
         cream: "#FFFDF8",
       },
       fontFamily: {
-        display: ["'Barlow Condensed'", "sans-serif"],
-        body: ["'Inter'", "sans-serif"],
+        // CSS vars come from next/font (lib/fonts.ts), applied on <html> in
+        // app/layout.tsx — self-hosted, not a Google Fonts <link> anymore.
+        display: ["var(--font-barlow-condensed)", "sans-serif"],
+        body: ["var(--font-inter)", "sans-serif"],
         // Homepage refresh only
-        displayAlt: ["'Space Grotesk'", "sans-serif"],
-        bodyAlt: ["'Sora'", "sans-serif"],
+        displayAlt: ["var(--font-space-grotesk)", "sans-serif"],
+        bodyAlt: ["var(--font-sora)", "sans-serif"],
       },
       borderRadius: {
         sm: "4px",

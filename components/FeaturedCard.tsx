@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { BadgeCheck, MapPin, Car } from "lucide-react";
 import { isEffectivelyVerified } from "@/lib/verification";
 import type { Listing } from "@/components/ListingCard";
@@ -16,7 +17,7 @@ export default function FeaturedCard({ listing }: { listing: Listing }) {
     >
       <div className="aspect-square bg-canvas2 relative">
         {thumbnail ? (
-          <img src={thumbnail} alt="" className="w-full h-full object-cover" />
+          <Image src={thumbnail} alt="" fill sizes="(min-width: 1024px) 22vw, (min-width: 640px) 30vw, 45vw" className="object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-stone-dim font-display text-2xl">
             {listing.name?.[0]?.toUpperCase()}

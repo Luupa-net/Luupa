@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useBusiness } from "@/lib/BusinessContext";
@@ -95,7 +96,7 @@ export default function Navbar() {
               >
                 <span className={`relative w-7 h-7 rounded-full bg-navy/10 overflow-hidden flex items-center justify-center shrink-0 ring-2 ${statusRing}`}>
                   {business.logo_url ? (
-                    <img src={business.logo_url} alt="" className="w-full h-full object-cover" />
+                    <Image src={business.logo_url} alt="" fill sizes="32px" className="object-cover" />
                   ) : (
                     <span className="text-navy text-xs font-semibold">{business.name?.[0]?.toUpperCase()}</span>
                   )}
@@ -249,7 +250,7 @@ export default function Navbar() {
               <div className="flex items-center gap-2.5 py-3 border-b border-stone-line">
                 <span className={`relative w-8 h-8 rounded-full bg-navy/10 overflow-hidden flex items-center justify-center shrink-0 ring-2 ${statusRing}`}>
                   {business.logo_url ? (
-                    <img src={business.logo_url} alt="" className="w-full h-full object-cover" />
+                    <Image src={business.logo_url} alt="" fill sizes="32px" className="object-cover" />
                   ) : (
                     <span className="text-navy text-xs font-semibold">{business.name?.[0]?.toUpperCase()}</span>
                   )}

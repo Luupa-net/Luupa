@@ -1,8 +1,18 @@
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { isEffectivelyVerified } from "@/lib/verification";
 import { BadgeCheck, Phone, MapPin, Clock, Car, MessageCircle, AlertCircle, Wrench, Building2 } from "lucide-react";
 import { notFound } from "next/navigation";
 import BookingForm from "@/components/BookingForm";
+
+// params usage already forces this route to render dynamically per request,
+// but Next's fetch cache (which wraps supabase-js's underlying fetch calls
+// too) still honors this as the default cache window for the listing read
+// below — repeat views within 30s reuse the cached result instead of
+// hitting the DB again. Same pattern as app/page.tsx/app/browse/page.tsx.
+// Doesn't affect the increment_view_count call below (a write, never
+// cached).
+export const revalidate = 30;
 
 export default async function ListingPage({ params }: { params: Promise<{ id: string }> }) {
   // Next.js 15+: params is now a Promise and must be awaited
@@ -57,7 +67,7 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
           <div className="relative flex items-start gap-4 sm:gap-5 flex-wrap">
             <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 border-2 border-white/20 overflow-hidden flex items-center justify-center shrink-0">
               {listing.logo_url ? (
-                <img src={listing.logo_url} alt="" className="w-full h-full object-cover" />
+                <Image src={listing.logo_url} alt="" fill sizes="96px" className="object-cover" />
               ) : (
                 <span className="text-white font-display text-3xl font-semibold">{listing.name?.[0]?.toUpperCase()}</span>
               )}
@@ -88,8 +98,18 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
         {photos.length > 0 && (
           <div className="grid grid-cols-3 gap-2.5 mt-6">
             {photos.slice(0, 6).map((url, i) => (
-              <div key={i} className={`rounded-xl overflow-hidden bg-stone-line ${i === 0 ? "col-span-3 aspect-[2/1]" : "aspect-square"}`}>
-                <img src={url} alt="" className="w-full h-full object-cover" />
+              <div
+                key={i}
+                className={`relative rounded-xl overflow-hidden bg-stone-line ${i === 0 ? "col-span-3 aspect-[2/1]" : "aspect-square"}`}
+              >
+                <Image
+                  src={url}
+                  alt=""
+                  fill
+                  sizes={i === 0 ? "(min-width: 1024px) 1024px, 100vw" : "(min-width: 1024px) 340px, 33vw"}
+                  className="object-cover"
+                  priority={i === 0}
+                />
               </div>
             ))}
           </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { BadgeCheck, MapPin, Car } from "lucide-react";
 import { isEffectivelyVerified } from "@/lib/verification";
 
@@ -28,8 +29,8 @@ export default function ListingCard({ listing }: { listing: Listing }) {
       }`}
     >
       {thumbnail && (
-        <div className="aspect-[16/9] bg-canvas2">
-          <img src={thumbnail} alt="" className="w-full h-full object-cover" />
+        <div className="relative aspect-[16/9] bg-canvas2">
+          <Image src={thumbnail} alt="" fill sizes="(min-width: 640px) 45vw, 90vw" className="object-cover" />
         </div>
       )}
       <div className="p-5">

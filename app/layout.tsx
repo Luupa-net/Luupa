@@ -5,6 +5,7 @@ import type { Metadata, Viewport } from "next";
 import Navbar from "@/components/Navbar";
 import ConditionalFooter from "@/components/ConditionalFooter";
 import { BusinessProvider } from "@/lib/BusinessContext";
+import { barlowCondensed, inter, spaceGrotesk, sora } from "@/lib/fonts";
 
 export const metadata: Metadata = {
   title: "Luupa — Bahrain's trusted car care directory",
@@ -17,18 +18,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        {/* Preconnect lets the browser open the connection early, then the stylesheet
-            loads in parallel with everything else — unlike @import, which blocks
-            the page from rendering until it finishes fetching. */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=Sora:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html
+      lang="en"
+      className={`${barlowCondensed.variable} ${inter.variable} ${spaceGrotesk.variable} ${sora.variable}`}
+    >
       <body>
         <BusinessProvider>
           <Navbar />

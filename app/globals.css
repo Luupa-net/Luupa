@@ -9,7 +9,9 @@ html {
 body {
   background-color: #FFFFFF;
   color: #14181F;
-  font-family: 'Inter', sans-serif;
+  /* --font-inter is set by next/font (lib/fonts.ts) on <html> in
+     app/layout.tsx — self-hosted, not a Google Fonts <link>. */
+  font-family: var(--font-inter), sans-serif;
 }
 
 /* Components layer (see the .input rule below for why) — otherwise this
@@ -17,7 +19,7 @@ body {
    tracking-wide wherever both classes land on the same element. */
 @layer components {
   .font-display {
-    font-family: 'Barlow Condensed', sans-serif;
+    font-family: var(--font-barlow-condensed), sans-serif;
     letter-spacing: 0.01em;
   }
 }
