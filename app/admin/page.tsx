@@ -7,6 +7,7 @@ import {
   AlertCircle, TrendingUp, Star,
 } from "lucide-react";
 import { isEffectivelyVerified, VERIFICATION_DURATIONS, addMonths } from "@/lib/verification";
+import StarRating from "@/components/StarRating";
 
 type Business = {
   id: string;
@@ -70,8 +71,22 @@ const SECTIONS = [
   { key: "businesses", label: "Businesses", icon: Building2 },
   { key: "customers", label: "Customers", icon: Users },
   { key: "bookings", label: "Bookings", icon: CalendarClock },
+  { key: "reviews", label: "Reviews", icon: Star },
 ] as const;
 type Section = (typeof SECTIONS)[number]["key"];
+
+type AdminReview = {
+  id: string;
+  business_id: string;
+  rating: number;
+  body: string | null;
+  author_name: string;
+  status: "visible" | "hidden";
+  owner_reply: string | null;
+  owner_replied_at: string | null;
+  created_at: string;
+  businesses: { name: string } | null;
+};
 
 const BOOKING_STATUS_STYLES: Record<string, string> = {
   pending: "bg-teal/10 text-teal-dim",
@@ -102,6 +117,7 @@ export default function AdminPage() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [reviews, setReviews] = useState<AdminReview[]>([]);
 
   const [bizTab, setBizTab] = useState<"pending" | "active" | "suspended">("pending");
   const [bizSearch, setBizSearch] = useState("");
@@ -111,10 +127,11 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
 
   async function loadAll() {
-    const [bizRes, custRes, bookRes] = await Promise.all([
+    const [bizRes, custRes, bookRes, reviewRes] = await Promise.all([
       fetch("/api/admin/businesses"),
       fetch("/api/admin/customers"),
       fetch("/api/admin/bookings"),
+      fetch("/api/admin/reviews"),
     ]);
     if (!bizRes.ok) {
       setAuthed(false);
@@ -123,6 +140,7 @@ export default function AdminPage() {
     setBusinesses((await bizRes.json()).businesses ?? []);
     if (custRes.ok) setCustomers((await custRes.json()).customers ?? []);
     if (bookRes.ok) setBookings((await bookRes.json()).bookings ?? []);
+    if (reviewRes.ok) setReviews((await reviewRes.json()).reviews ?? []);
     setAuthed(true);
   }
 
@@ -167,6 +185,17 @@ export default function AdminPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ businessId, action }),
+    });
+    await loadAll();
+    setLoading(false);
+  }
+
+  async function updateReviewStatus(reviewId: string, status: "visible" | "hidden") {
+    setLoading(true);
+    await fetch("/api/admin/review-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reviewId, status }),
     });
     await loadAll();
     setLoading(false);
@@ -440,6 +469,21 @@ export default function AdminPage() {
                       <p className="mt-0.5">Booked {new Date(b.created_at).toLocaleDateString()}</p>
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {section === "reviews" && (
+            <div>
+              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Reviews</h1>
+              <p className="text-sm text-stone mt-1">{reviews.length} review{reviews.length === 1 ? "" : "s"} across every business</p>
+              <div className="mt-6 space-y-4">
+                {reviews.length === 0 && (
+                  <p className="text-stone text-sm py-10 text-center">No reviews yet.</p>
+                )}
+                {reviews.map((r) => (
+                  <ReviewModerationCard key={r.id} review={r} onUpdateStatus={updateReviewStatus} loading={loading} />
                 ))}
               </div>
             </div>
@@ -732,6 +776,64 @@ function BusinessCard({
             className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border border-stone-line text-stone hover:bg-canvas2 transition-colors disabled:opacity-60"
           >
             <Clock size={15} /> Move to pending
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReviewModerationCard({
+  review,
+  onUpdateStatus,
+  loading,
+}: {
+  review: AdminReview;
+  onUpdateStatus: (reviewId: string, status: "visible" | "hidden") => void;
+  loading: boolean;
+}) {
+  const hidden = review.status === "hidden";
+  return (
+    <div className="border border-stone-line rounded-xl p-5 bg-white">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="font-display text-lg font-semibold text-ink truncate">{review.businesses?.name ?? "Unknown business"}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <StarRating value={review.rating} size={13} />
+            <span className="text-sm text-stone">{review.author_name}</span>
+            <span className="text-xs text-stone">· {new Date(review.created_at).toLocaleDateString()}</span>
+          </div>
+        </div>
+        <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize shrink-0 ${hidden ? "bg-red-50 text-red-600" : "bg-navy/10 text-navy"}`}>
+          {review.status}
+        </span>
+      </div>
+
+      {review.body && <p className="text-sm text-ink/80 mt-3 leading-relaxed">{review.body}</p>}
+
+      {review.owner_reply && (
+        <div className="mt-3 ml-1 pl-3 border-l-2 border-teal/30">
+          <p className="text-xs font-semibold text-teal-dim">Business reply</p>
+          <p className="text-sm text-ink/80 mt-0.5 leading-relaxed">{review.owner_reply}</p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-stone-line">
+        {hidden ? (
+          <button
+            disabled={loading}
+            onClick={() => onUpdateStatus(review.id, "visible")}
+            className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-navy text-white hover:bg-navy-light transition-colors disabled:opacity-60"
+          >
+            <CheckCircle2 size={15} /> Restore
+          </button>
+        ) : (
+          <button
+            disabled={loading}
+            onClick={() => onUpdateStatus(review.id, "hidden")}
+            className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-60"
+          >
+            <XCircle size={15} /> Hide
           </button>
         )}
       </div>
