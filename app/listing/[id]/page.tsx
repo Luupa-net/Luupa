@@ -1,9 +1,10 @@
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { isEffectivelyVerified } from "@/lib/verification";
-import { BadgeCheck, Phone, MapPin, Clock, Car, MessageCircle, AlertCircle, Wrench, Building2 } from "lucide-react";
+import { BadgeCheck, Phone, MapPin, Clock, Car, MessageCircle, AlertCircle, Wrench, Building2, Star } from "lucide-react";
 import { notFound } from "next/navigation";
 import BookingForm from "@/components/BookingForm";
+import ReviewsSection from "@/components/ReviewsSection";
 
 // params usage already forces this route to render dynamically per request,
 // but Next's fetch cache (which wraps supabase-js's underlying fetch calls
@@ -25,7 +26,7 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
   // in the view, so this still 404s the same way it did before.
   const { data: listing, error } = await supabase
     .from("businesses_public")
-    .select("id, name, logo_url, subcategories, areas, description, phone, whatsapp, hours, services, photos, is_mobile, verified, verified_until")
+    .select("id, name, logo_url, subcategories, areas, description, phone, whatsapp, hours, services, photos, is_mobile, verified, verified_until, rating_avg, review_count")
     .eq("id", id)
     .single();
 
@@ -54,6 +55,12 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
   const waMessage = encodeURIComponent(`Hi ${listing.name}, I found you on Luupa and I'd like to ask about ${subcategories[0] || "your services"}.`);
   const photos: string[] = listing.photos || [];
   const services = (listing.services as { name: string; price?: string }[] | null) || [];
+
+  const { data: reviewRows, error: reviewsError } = await supabase
+    .from("reviews_public")
+    .select("id, rating, body, author_name, owner_reply, owner_replied_at, created_at")
+    .eq("business_id", listing.id)
+    .order("created_at", { ascending: false });
 
   return (
     <div className="bg-canvas2 min-h-screen">
@@ -84,6 +91,12 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
                   <span className="flex items-center gap-1 text-xs font-semibold text-white bg-white/15 px-2.5 py-1 rounded-full shrink-0">
                     <BadgeCheck size={12} />
                     {listing.verified_until ? `Verified until ${new Date(listing.verified_until).toLocaleDateString()}` : "Verified"}
+                  </span>
+                )}
+                {listing.review_count > 0 && (
+                  <span className="flex items-center gap-1 text-xs font-semibold text-white bg-white/15 px-2.5 py-1 rounded-full shrink-0">
+                    <Star size={12} className="fill-current" />
+                    {listing.rating_avg} ({listing.review_count})
                   </span>
                 )}
               </div>
@@ -175,6 +188,10 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
               <p className="text-sm text-stone">No services listed yet — message on WhatsApp to ask what's available.</p>
             )}
           </div>
+        </div>
+
+        <div className="mt-6">
+          <ReviewsSection reviews={reviewRows || []} loadError={!!reviewsError} />
         </div>
       </div>
     </div>

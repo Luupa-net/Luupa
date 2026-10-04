@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { BadgeCheck, MapPin, Car } from "lucide-react";
+import { BadgeCheck, MapPin, Car, Star } from "lucide-react";
 import { isEffectivelyVerified } from "@/lib/verification";
 
 export type Listing = {
@@ -15,6 +15,10 @@ export type Listing = {
   tier: "free" | "standard" | "featured";
   photos?: string[];
   is_mobile?: boolean;
+  // Optional: app/page.tsx's narrower select() doesn't fetch these, so its
+  // cards simply show no rating badge rather than needing a second query.
+  rating_avg?: number | null;
+  review_count?: number;
 };
 
 export default function ListingCard({ listing }: { listing: Listing }) {
@@ -50,6 +54,13 @@ export default function ListingCard({ listing }: { listing: Listing }) {
           </div>
         </div>
         <p className="text-xs uppercase tracking-wide text-stone mt-1.5">{(listing.subcategories || []).join(" · ")}</p>
+        {(listing.review_count ?? 0) > 0 && (
+          <div className="flex items-center gap-1 text-sm text-ink/80 mt-1.5">
+            <Star size={13} className="text-teal fill-current" />
+            <span className="font-medium">{listing.rating_avg}</span>
+            <span className="text-stone">({listing.review_count})</span>
+          </div>
+        )}
         {listing.tier !== "free" && (
           <p className="text-sm text-ink/70 mt-2 leading-relaxed line-clamp-2">{listing.description}</p>
         )}

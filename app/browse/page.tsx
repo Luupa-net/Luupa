@@ -12,6 +12,23 @@ function sanitizeSearchTerm(input: string): string {
   return input.replace(/[,()%]/g, "").slice(0, 100);
 }
 
+// Preserves every existing filter while swapping just the sort — this page
+// has no client JS, so sort has to be a plain Link like everything else here.
+function withSort(
+  params: { q?: string; sub?: string; area?: string; verified?: string; mobile?: string },
+  sort?: string
+): string {
+  const qs = new URLSearchParams();
+  if (params.q) qs.set("q", params.q);
+  if (params.sub) qs.set("sub", params.sub);
+  if (params.area) qs.set("area", params.area);
+  if (params.verified) qs.set("verified", params.verified);
+  if (params.mobile) qs.set("mobile", params.mobile);
+  if (sort) qs.set("sort", sort);
+  const s = qs.toString();
+  return `/browse${s ? `?${s}` : ""}`;
+}
+
 // searchParams usage already forces this route to render dynamically per
 // request, but Next's fetch cache (which wraps supabase-js's underlying
 // fetch calls too) still honors this as the default cache window for the
@@ -23,7 +40,7 @@ export const revalidate = 30;
 export default async function BrowsePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sub?: string; area?: string; verified?: string; mobile?: string }>;
+  searchParams: Promise<{ q?: string; sub?: string; area?: string; verified?: string; mobile?: string; sort?: string }>;
 }) {
   // Next.js 15+: searchParams is now a Promise and must be awaited
   const params = await searchParams;
@@ -34,7 +51,7 @@ export default async function BrowsePage({
   // this page happens to ask for. No need to re-filter status here.
   let query = supabase
     .from("businesses_public")
-    .select("id, name, subcategories, areas, description, verified, verified_until, tier, photos, is_mobile");
+    .select("id, name, subcategories, areas, description, verified, verified_until, tier, photos, is_mobile, rating_avg, review_count");
 
   // subcategories/areas are arrays now — .contains() checks the array includes this value
   if (params.sub) query = query.contains("subcategories", [params.sub]);
@@ -51,10 +68,14 @@ export default async function BrowsePage({
     query = query.eq("is_mobile", true);
   }
 
-  // Verified businesses surface first by default, then higher tiers
-  const { data, error } = await query
-    .order("verified", { ascending: false })
-    .order("tier", { ascending: false });
+  // Verified businesses surface first by default, then higher tiers — unless
+  // the visitor asked for highest-rated instead. nullsFirst:false so
+  // zero-review businesses sort to the bottom, not the top.
+  query =
+    params.sort === "rating"
+      ? query.order("rating_avg", { ascending: false, nullsFirst: false })
+      : query.order("verified", { ascending: false }).order("tier", { ascending: false });
+  const { data, error } = await query;
   // `as unknown as` here because the explicit column list above (deliberately
   // narrower than select("*") — see the SECURITY comment) no longer structurally
   // matches Listing's `featured` field, which isn't a real businesses column and
@@ -66,9 +87,29 @@ export default async function BrowsePage({
       <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">
         {params.q ? `Results for "${params.q}"` : "Browse car care businesses"}
       </h1>
-      <p className="text-stone mt-1 text-sm">
-        {listings.length} {listings.length === 1 ? "business" : "businesses"} found
-      </p>
+      <div className="flex items-center justify-between flex-wrap gap-2.5 mt-1">
+        <p className="text-stone text-sm">
+          {listings.length} {listings.length === 1 ? "business" : "businesses"} found
+        </p>
+        <div className="flex items-center gap-1 bg-white border border-stone-line rounded-lg p-1">
+          <Link
+            href={withSort(params, undefined)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+              !params.sort ? "bg-navy text-white" : "text-ink/70 hover:text-ink"
+            }`}
+          >
+            Recommended
+          </Link>
+          <Link
+            href={withSort(params, "rating")}
+            className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+              params.sort === "rating" ? "bg-navy text-white" : "text-ink/70 hover:text-ink"
+            }`}
+          >
+            Highest rated
+          </Link>
+        </div>
+      </div>
 
       {/* Know exactly who you're looking for? Small, low-key search — not a
           replacement for the category browse below, just a shortcut past it. */}
