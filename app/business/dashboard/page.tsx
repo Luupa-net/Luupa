@@ -19,11 +19,12 @@ import PaymentQRUploader from "@/components/PaymentQRUploader";
 import StatCard from "@/components/StatCard";
 import BookingStatusBadge from "@/components/BookingStatusBadge";
 import BusinessLoadError from "@/components/BusinessLoadError";
+import ReviewsSection, { type PublicReview } from "@/components/ReviewsSection";
 import {
   Clock, CheckCircle2, XCircle, Eye, BadgeCheck, ImageIcon, Wrench,
   ShieldCheck, ExternalLink, User, FolderClock, LayoutDashboard,
   Wallet, CalendarClock, ArrowRight, Plus, Sparkles, MapPin, Phone, Clock4,
-  FileText, Building2, Users, UsersRound, AlertCircle,
+  FileText, Building2, Users, UsersRound, AlertCircle, Star,
 } from "lucide-react";
 
 // Internal/verification info — never shown to customers, so no review needed.
@@ -35,6 +36,7 @@ const TABS = [
   { key: "Photos", icon: ImageIcon },
   { key: "Services", icon: Wrench },
   { key: "Verification", icon: ShieldCheck },
+  { key: "Reviews", icon: Star },
 ] as const;
 
 // Which tab each getting-started item belongs to, plus a small icon — keyed
@@ -63,6 +65,9 @@ export default function Dashboard() {
   const [bookingStats, setBookingStats] = useState({ monthCount: 0, pendingCount: 0, revenueMonth: 0 });
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
   const [bookingsLoadError, setBookingsLoadError] = useState(false);
+  const [reviews, setReviews] = useState<PublicReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsLoadError, setReviewsLoadError] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -104,6 +109,15 @@ export default function Dashboard() {
       });
       setRecentBookings(all.slice(0, 5));
       setLoading(false);
+
+      const { data: reviewRows, error: reviewsError } = await supabase
+        .from("reviews_public")
+        .select("id, rating, body, author_name, owner_reply, owner_replied_at, created_at")
+        .eq("business_id", business.id)
+        .order("created_at", { ascending: false });
+      setReviewsLoadError(!!reviewsError);
+      setReviews(reviewRows || []);
+      setReviewsLoading(false);
     }
     load();
     // Keyed on business?.id rather than the business object itself: handleSave
@@ -163,6 +177,27 @@ export default function Dashboard() {
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/");
+  }
+
+  async function handleReply(reviewId: string, reply: string) {
+    const { data: { session } } = await supabase.auth.getSession();
+    try {
+      const res = await fetch("/api/business/review-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ reviewId, reply }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        return { error: result.error || "Couldn't post that reply — try again." };
+      }
+      setReviews((prev) =>
+        prev.map((r) => (r.id === reviewId ? { ...r, owner_reply: reply, owner_replied_at: new Date().toISOString() } : r))
+      );
+      return {};
+    } catch {
+      return { error: "Couldn't reach the server — try again." };
+    }
   }
 
   if (loading) {
@@ -304,11 +339,12 @@ export default function Dashboard() {
             {tab === "Overview" && (
               <div className="space-y-5">
                 {/* KPIs */}
-                <div className="flex sm:grid sm:grid-cols-4 gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0 sm:overflow-visible">
+                <div className="flex sm:grid sm:grid-cols-5 gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0 sm:overflow-visible">
                   <StatCard icon={<Eye size={16} />} tint="navy" label="Profile views" value={liveRow.view_count ?? 0} />
                   <StatCard icon={<CalendarClock size={16} />} tint="teal" label="Bookings this month" value={bookingStats.monthCount} />
                   <StatCard icon={<Clock size={16} />} tint="stone" label="Pending confirmations" value={bookingStats.pendingCount} />
                   <StatCard icon={<Wallet size={16} />} tint="emerald" label="Revenue this month" value={`BHD ${bookingStats.revenueMonth.toFixed(bookingStats.revenueMonth % 1 === 0 ? 0 : 2)}`} />
+                  <StatCard icon={<Star size={16} />} tint="teal" label="Average rating" value={liveRow.rating_avg ?? "—"} />
                 </div>
 
                 {/* Quick actions */}
@@ -418,7 +454,11 @@ export default function Dashboard() {
               </div>
             )}
 
-            {tab !== "Overview" && (
+            {tab === "Reviews" && (
+              <ReviewsSection reviews={reviews} loading={reviewsLoading} loadError={reviewsLoadError} onReply={handleReply} />
+            )}
+
+            {tab !== "Overview" && tab !== "Reviews" && (
               <div className="bg-white rounded-2xl border border-stone-line shadow-sm shadow-black/[0.02] overflow-hidden">
                 <fieldset disabled={suspended} className={suspended ? "opacity-50 pointer-events-none" : ""}>
                   <form onSubmit={handleSave} className="p-6 sm:p-7">
