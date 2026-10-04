@@ -7,9 +7,11 @@ import { supabase } from "@/lib/supabase";
 import PhoneInput from "@/components/PhoneInput";
 import PlateInput from "@/components/PlateInput";
 import BookingStepper from "@/components/BookingStepper";
+import StarRating from "@/components/StarRating";
 import { useRealtimeBookings } from "@/lib/useRealtimeBookings";
+import { formatRelativeTime } from "@/lib/formatRelativeTime";
 import {
-  User, Check, Loader2, CalendarClock, MapPin, Car, ChevronRight, Pencil, Trash2, Lock, ClipboardList,
+  User, Check, Loader2, CalendarClock, MapPin, Car, ChevronRight, Pencil, Trash2, Lock, ClipboardList, Star,
 } from "lucide-react";
 
 type Customer = { id: string; name: string; email: string | null; phone: string | null };
@@ -32,6 +34,16 @@ type Vehicle = {
   model: string | null;
   plate: string | null;
   nickname: string | null;
+  created_at: string;
+};
+type Review = {
+  id: string;
+  business_id: string;
+  booking_id: string;
+  rating: number;
+  body: string | null;
+  owner_reply: string | null;
+  owner_replied_at: string | null;
   created_at: string;
 };
 
@@ -75,6 +87,20 @@ function ProfileContent() {
   const [editPlate, setEditPlate] = useState("");
   const [editNickname, setEditNickname] = useState("");
   const [savingVehicleEdit, setSavingVehicleEdit] = useState(false);
+
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsLoadError, setReviewsLoadError] = useState(false);
+  const [reviewFormBookingId, setReviewFormBookingId] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewBody, setReviewBody] = useState("");
+  const [savingReview, setSavingReview] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [editReviewRating, setEditReviewRating] = useState(0);
+  const [editReviewBody, setEditReviewBody] = useState("");
+  const [savingReviewEdit, setSavingReviewEdit] = useState(false);
+  const [reviewActionError, setReviewActionError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -133,6 +159,17 @@ function ProfileContent() {
         .then(({ data: vehicleRows }) => {
           setVehicles((vehicleRows ?? []) as Vehicle[]);
           setVehiclesLoading(false);
+        });
+
+      supabase
+        .from("reviews")
+        .select("id, business_id, booking_id, rating, body, owner_reply, owner_replied_at, created_at")
+        .eq("customer_id", session.user.id)
+        .order("created_at", { ascending: false })
+        .then(({ data: reviewRows, error: reviewsError }) => {
+          setReviewsLoadError(!!reviewsError);
+          setReviews((reviewRows ?? []) as Review[]);
+          setReviewsLoading(false);
         });
     }
     load();
@@ -285,6 +322,65 @@ function ProfileContent() {
     setVehicles((prev) => prev.filter((v) => v.id !== vehicle.id));
     const { error } = await supabase.from("vehicles").delete().eq("id", vehicle.id);
     if (error) setVehicles(previous);
+  }
+
+  async function handleSubmitReview(booking: Booking) {
+    if (!customer || reviewRating === 0) return;
+    setSavingReview(true);
+    setReviewError(null);
+    const { data, error } = await supabase
+      .from("reviews")
+      .insert({
+        business_id: booking.business_id,
+        booking_id: booking.id,
+        customer_id: customer.id,
+        rating: reviewRating,
+        body: reviewBody.trim() || null,
+      })
+      .select("id, business_id, booking_id, rating, body, owner_reply, owner_replied_at, created_at")
+      .single();
+    setSavingReview(false);
+    if (error || !data) {
+      setReviewError(error?.message || "Couldn't submit your review — try again.");
+      return;
+    }
+    setReviews((prev) => [data as Review, ...prev]);
+    setReviewFormBookingId(null);
+    setReviewRating(0);
+    setReviewBody("");
+  }
+
+  async function handleSaveReviewEdit(reviewId: string) {
+    setSavingReviewEdit(true);
+    setReviewActionError(null);
+    const { data, error } = await supabase
+      .from("reviews")
+      .update({ rating: editReviewRating, body: editReviewBody.trim() || null })
+      .eq("id", reviewId)
+      .select("id, business_id, booking_id, rating, body, owner_reply, owner_replied_at, created_at")
+      .single();
+    setSavingReviewEdit(false);
+    if (error || !data) {
+      setReviewActionError(error?.message || "Couldn't save your changes — try again.");
+      return;
+    }
+    setReviews((prev) => prev.map((r) => (r.id === reviewId ? (data as Review) : r)));
+    setEditingReviewId(null);
+  }
+
+  async function handleDeleteReview(review: Review) {
+    if (!window.confirm("Delete this review?")) return;
+    setReviewActionError(null);
+    const previous = reviews;
+    setReviews((prev) => prev.filter((r) => r.id !== review.id));
+    // Unlike vehicles' silent-revert delete, this one surfaces the message —
+    // a delete here CAN genuinely fail (block_review_delete_after_reply()
+    // raises once owner_replied_at is set), not just hypothetically.
+    const { error } = await supabase.from("reviews").delete().eq("id", review.id);
+    if (error) {
+      setReviews(previous);
+      setReviewActionError(error.message || "Couldn't delete that review — try again.");
+    }
   }
 
   if (loading) {
@@ -447,44 +543,193 @@ function ProfileContent() {
           ) : (
             bookings.map((b) => {
               const biz = businesses[b.business_id];
+              const hasReview = reviews.some((r) => r.booking_id === b.id);
+              const eligibleForReview = b.status === "completed" && !reviewsLoading && !reviewsLoadError && !hasReview;
               return (
-                <Link
-                  key={b.id}
-                  href={biz ? `/listing/${b.business_id}` : "#"}
-                  className="flex items-center justify-between gap-4 rounded-xl border border-stone-line p-4 hover:border-teal/40 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-150 bg-white"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium text-ink truncate">{biz?.name ?? "Business"}</p>
-                    <p className="text-sm text-stone mt-0.5 truncate">{b.service || "Service not specified"}</p>
-                    <div className="flex items-center gap-3 text-xs text-stone mt-1.5 flex-wrap">
-                      {b.preferred_date && (
-                        <span className="flex items-center gap-1"><CalendarClock size={12} /> {new Date(b.preferred_date).toLocaleDateString()}{b.preferred_time ? ` · ${b.preferred_time}` : ""}</span>
-                      )}
-                      {biz?.areas?.[0] && (
-                        <span className="flex items-center gap-1"><MapPin size={12} /> {biz.areas[0]}</span>
-                      )}
-                      {(b.vehicle_make || b.vehicle_model) && (
-                        <span className="flex items-center gap-1"><Car size={12} /> {[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ")}</span>
-                      )}
+                <div key={b.id}>
+                  <Link
+                    href={biz ? `/listing/${b.business_id}` : "#"}
+                    className="flex items-center justify-between gap-4 rounded-xl border border-stone-line p-4 hover:border-teal/40 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-150 bg-white"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-ink truncate">{biz?.name ?? "Business"}</p>
+                      <p className="text-sm text-stone mt-0.5 truncate">{b.service || "Service not specified"}</p>
+                      <div className="flex items-center gap-3 text-xs text-stone mt-1.5 flex-wrap">
+                        {b.preferred_date && (
+                          <span className="flex items-center gap-1"><CalendarClock size={12} /> {new Date(b.preferred_date).toLocaleDateString()}{b.preferred_time ? ` · ${b.preferred_time}` : ""}</span>
+                        )}
+                        {biz?.areas?.[0] && (
+                          <span className="flex items-center gap-1"><MapPin size={12} /> {biz.areas[0]}</span>
+                        )}
+                        {(b.vehicle_make || b.vehicle_model) && (
+                          <span className="flex items-center gap-1"><Car size={12} /> {[b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ")}</span>
+                        )}
+                      </div>
+                      {/* BookingStepper hardcodes white text/translucent fills — it
+                          was designed to sit on the navy gradient drawer header
+                          (see BookingDrawer.tsx's bg-white/5 wrapper), not on a
+                          plain white card. Reusing that same dark-background
+                          treatment here so labels stay legible, without touching
+                          the component itself. It also still renders at drawer
+                          width/scale — a bit dense/tight for this compact list
+                          row — but no size variant exists on it yet and it's used
+                          unchanged elsewhere, so left as-is rather than risking
+                          that other usage. */}
+                      <div className="mt-2 rounded-lg bg-navy px-3 py-2.5">
+                        <BookingStepper status={b.status} />
+                      </div>
                     </div>
-                    {/* BookingStepper hardcodes white text/translucent fills — it
-                        was designed to sit on the navy gradient drawer header
-                        (see BookingDrawer.tsx's bg-white/5 wrapper), not on a
-                        plain white card. Reusing that same dark-background
-                        treatment here so labels stay legible, without touching
-                        the component itself. It also still renders at drawer
-                        width/scale — a bit dense/tight for this compact list
-                        row — but no size variant exists on it yet and it's used
-                        unchanged elsewhere, so left as-is rather than risking
-                        that other usage. */}
-                    <div className="mt-2 rounded-lg bg-navy px-3 py-2.5">
-                      <BookingStepper status={b.status} />
-                    </div>
-                  </div>
-                  <ChevronRight size={18} className="text-stone shrink-0" />
-                </Link>
+                    <ChevronRight size={18} className="text-stone shrink-0" />
+                  </Link>
+
+                  {/* Sibling to the Link, not nested inside it — an <a> containing
+                      buttons/inputs is invalid HTML and breaks keyboard/a11y. */}
+                  {eligibleForReview && (
+                    reviewFormBookingId === b.id ? (
+                      <div className="mt-2 rounded-xl border border-teal/30 bg-teal/5 p-4 space-y-3">
+                        <StarRating value={reviewRating} onChange={setReviewRating} size={22} />
+                        <textarea
+                          value={reviewBody}
+                          onChange={(e) => setReviewBody(e.target.value)}
+                          placeholder="Share your experience (optional)"
+                          maxLength={2000}
+                          className="input h-20 py-2"
+                        />
+                        {reviewError && <p className="text-sm text-red-600">{reviewError}</p>}
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            disabled={savingReview || reviewRating === 0}
+                            onClick={() => handleSubmitReview(b)}
+                            className="px-5 h-9 rounded-full bg-teal text-white text-sm font-semibold hover:bg-teal-dim active:scale-95 transition-colors disabled:opacity-60 flex items-center gap-2"
+                          >
+                            {savingReview && <Loader2 size={14} className="animate-spin" />}
+                            {savingReview ? "Submitting…" : "Submit review"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setReviewFormBookingId(null); setReviewRating(0); setReviewBody(""); setReviewError(null); }}
+                            className="text-sm text-stone hover:text-ink"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setReviewFormBookingId(b.id)}
+                        className="mt-2 flex items-center gap-1.5 text-sm font-medium text-teal-dim hover:text-teal px-1"
+                      >
+                        <Star size={14} /> Leave a review
+                      </button>
+                    )
+                  )}
+                </div>
               );
             })
+          )}
+
+          {!bookingsLoading && bookings.length > 0 && (
+            <div className="pt-4">
+              <div className="flex items-center gap-2.5 mb-3">
+                <span className="w-8 h-8 rounded-lg bg-teal/10 flex items-center justify-center shrink-0">
+                  <Star size={15} className="text-teal-dim" />
+                </span>
+                <h2 className="font-display text-lg font-semibold text-ink">Your reviews</h2>
+              </div>
+              {reviewActionError && <p className="text-sm text-red-600 mb-3">{reviewActionError}</p>}
+              {reviewsLoadError ? (
+                <p className="text-sm text-red-600 py-2">Couldn't load your reviews — try refreshing the page.</p>
+              ) : reviewsLoading ? (
+                <div className="h-20 rounded-xl bg-white border border-stone-line animate-pulse" />
+              ) : reviews.length === 0 ? (
+                <p className="text-sm text-stone py-2">You haven't reviewed anything yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {reviews.map((r) => {
+                    const biz = businesses[r.business_id];
+                    const bizName = biz?.name ?? "the business";
+                    const locked = !!r.owner_replied_at;
+                    const editing = editingReviewId === r.id;
+                    return (
+                      <div key={r.id} className="rounded-xl border border-stone-line bg-white p-4">
+                        <p className="font-medium text-ink text-sm truncate">{bizName}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <StarRating value={r.rating} size={13} />
+                          <span className="text-xs text-stone">{formatRelativeTime(r.created_at)}</span>
+                        </div>
+
+                        {editing ? (
+                          <div className="mt-3 space-y-2.5">
+                            <StarRating value={editReviewRating} onChange={setEditReviewRating} size={20} />
+                            <textarea
+                              value={editReviewBody}
+                              onChange={(e) => setEditReviewBody(e.target.value)}
+                              maxLength={2000}
+                              className="input h-20 py-2"
+                            />
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                disabled={savingReviewEdit || editReviewRating === 0}
+                                onClick={() => handleSaveReviewEdit(r.id)}
+                                className="px-5 h-9 rounded-full bg-teal text-white text-sm font-semibold hover:bg-teal-dim active:scale-95 transition-colors disabled:opacity-60 flex items-center gap-2"
+                              >
+                                {savingReviewEdit && <Loader2 size={14} className="animate-spin" />}
+                                {savingReviewEdit ? "Saving…" : "Save"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { setEditingReviewId(null); setReviewActionError(null); }}
+                                className="text-sm text-stone hover:text-ink"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {r.body && <p className="text-sm text-ink/80 mt-2 leading-relaxed">{r.body}</p>}
+                            {r.owner_reply && (
+                              <div className="mt-3 ml-1 pl-3 border-l-2 border-teal/30">
+                                <p className="text-xs font-semibold text-teal-dim">{bizName} replied</p>
+                                <p className="text-sm text-ink/80 mt-0.5 leading-relaxed">{r.owner_reply}</p>
+                              </div>
+                            )}
+                            {locked ? (
+                              <p className="flex items-start gap-1.5 text-xs text-stone mt-3">
+                                <Lock size={12} className="shrink-0 mt-0.5" />
+                                This review is locked because {bizName} replied, so it can no longer be edited or deleted.
+                              </p>
+                            ) : (
+                              <div className="flex items-center gap-1 mt-3 -ml-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => { setEditingReviewId(r.id); setEditReviewRating(r.rating); setEditReviewBody(r.body || ""); setReviewActionError(null); }}
+                                  aria-label="Edit review"
+                                  className="text-stone hover:text-ink transition-colors p-1.5"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteReview(r)}
+                                  aria-label="Delete review"
+                                  className="text-stone hover:text-red-600 transition-colors p-1.5"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
         </div>
       ) : (
