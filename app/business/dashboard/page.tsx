@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useBusiness } from "@/lib/BusinessContext";
 import { useRouter } from "next/navigation";
@@ -92,6 +93,23 @@ export default function Dashboard() {
       // Draft starts from whatever's pending, falling back to the live version
       setForm({ ...normalized, ...(normalized.pending_changes || {}) });
 
+      // Independent reads, fired together rather than one after another —
+      // supabase-js query builders are lazy and don't actually send the
+      // request until awaited/then()'d, so this .then() chain (not a shared
+      // `await Promise.all(...)`) is what makes them concurrent instead of
+      // the Reviews tab's fetch adding its own extra round-trip on top of
+      // bookings'. Same pattern already used in account/profile/page.tsx.
+      supabase
+        .from("reviews_public")
+        .select("id, rating, body, author_name, owner_reply, owner_replied_at, created_at")
+        .eq("business_id", business.id)
+        .order("created_at", { ascending: false })
+        .then(({ data: reviewRows, error: reviewsError }) => {
+          setReviewsLoadError(!!reviewsError);
+          setReviews(reviewRows || []);
+          setReviewsLoading(false);
+        });
+
       const { data: bks, error: bookingsError } = await supabase
         .from("bookings")
         .select("id, customer_name, service, status, created_at, preferred_date, preferred_time, amount, paid")
@@ -109,15 +127,6 @@ export default function Dashboard() {
       });
       setRecentBookings(all.slice(0, 5));
       setLoading(false);
-
-      const { data: reviewRows, error: reviewsError } = await supabase
-        .from("reviews_public")
-        .select("id, rating, body, author_name, owner_reply, owner_replied_at, created_at")
-        .eq("business_id", business.id)
-        .order("created_at", { ascending: false });
-      setReviewsLoadError(!!reviewsError);
-      setReviews(reviewRows || []);
-      setReviewsLoading(false);
     }
     load();
     // Keyed on business?.id rather than the business object itself: handleSave
@@ -229,7 +238,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-4">
               <div className="relative w-16 h-16 rounded-full bg-white/10 border-2 border-white/20 overflow-hidden flex items-center justify-center shrink-0">
                 {liveRow.logo_url ? (
-                  <img src={liveRow.logo_url} alt="" className="w-full h-full object-cover" />
+                  <Image src={liveRow.logo_url} alt="" fill sizes="64px" className="object-cover" />
                 ) : (
                   <span className="text-white font-display text-xl font-semibold">{liveRow.name?.[0]?.toUpperCase()}</span>
                 )}

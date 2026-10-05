@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { Loader2, Upload } from "lucide-react";
 
@@ -49,9 +50,9 @@ export default function LogoUploader({
 
   return (
     <div className="flex items-center gap-4">
-      <div className="w-16 h-16 rounded-full bg-canvas2 border border-stone-line overflow-hidden flex items-center justify-center shrink-0">
+      <div className="relative w-16 h-16 rounded-full bg-canvas2 border border-stone-line overflow-hidden flex items-center justify-center shrink-0">
         {logoUrl ? (
-          <img src={logoUrl} alt="" className="w-full h-full object-cover" />
+          <Image src={logoUrl} alt="" fill sizes="64px" className="object-cover" />
         ) : (
           <span className="text-stone text-xs">No logo</span>
         )}

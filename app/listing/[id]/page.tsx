@@ -24,11 +24,23 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
   // against direct REST access with the anon key, not just against what
   // this page happens to ask for. A non-active/nonexistent id simply isn't
   // in the view, so this still 404s the same way it did before.
-  const { data: listing, error } = await supabase
-    .from("businesses_public")
-    .select("id, name, logo_url, subcategories, areas, description, phone, whatsapp, hours, services, photos, is_mobile, verified, verified_until, rating_avg, review_count")
-    .eq("id", id)
-    .single();
+  // Fired together, not one after another — the reviews query only needs
+  // `id` from params, not anything from the listing lookup's result, so
+  // there's no real dependency forcing these into two round-trips. If the
+  // id turns out not to belong to a real listing, reviewRows just comes
+  // back empty and is discarded below along with everything else.
+  const [{ data: listing, error }, { data: reviewRows, error: reviewsError }] = await Promise.all([
+    supabase
+      .from("businesses_public")
+      .select("id, name, logo_url, subcategories, areas, description, phone, whatsapp, hours, services, photos, is_mobile, verified, verified_until, rating_avg, review_count")
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("reviews_public")
+      .select("id, rating, body, author_name, owner_reply, owner_replied_at, created_at")
+      .eq("business_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   // A transient DB/network failure must not read as "this listing doesn't
   // exist" — notFound() renders an identical 404 either way from the
@@ -55,12 +67,6 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
   const waMessage = encodeURIComponent(`Hi ${listing.name}, I found you on Luupa and I'd like to ask about ${subcategories[0] || "your services"}.`);
   const photos: string[] = listing.photos || [];
   const services = (listing.services as { name: string; price?: string }[] | null) || [];
-
-  const { data: reviewRows, error: reviewsError } = await supabase
-    .from("reviews_public")
-    .select("id, rating, body, author_name, owner_reply, owner_replied_at, created_at")
-    .eq("business_id", listing.id)
-    .order("created_at", { ascending: false });
 
   return (
     <div className="bg-canvas2 min-h-screen">

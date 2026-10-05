@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { X, Upload, Loader2 } from "lucide-react";
 
@@ -71,7 +72,7 @@ export default function PhotoUploader({
       <div className="grid grid-cols-3 gap-2.5">
         {photos.map((url) => (
           <div key={url} className="relative aspect-square rounded-lg overflow-hidden bg-stone-line group">
-            <img src={url} alt="" className="w-full h-full object-cover" />
+            <Image src={url} alt="" fill sizes="(min-width: 640px) 200px, 33vw" className="object-cover" />
             <button
               onClick={() => removePhoto(url)}
               className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"

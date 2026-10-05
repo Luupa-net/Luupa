@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { Loader2, Upload, QrCode } from "lucide-react";
 
@@ -54,9 +55,9 @@ export default function PaymentQRUploader({
         Upload your own BenefitPay QR code and it'll be included on every invoice you send — customers pay you directly, Luupa never touches the money.
       </p>
       <div className="flex items-center gap-4">
-        <div className="w-20 h-20 rounded-lg bg-white border border-stone-line overflow-hidden flex items-center justify-center shrink-0">
+        <div className="relative w-20 h-20 rounded-lg bg-white border border-stone-line overflow-hidden flex items-center justify-center shrink-0">
           {qrUrl ? (
-            <img src={qrUrl} alt="" className="w-full h-full object-contain" />
+            <Image src={qrUrl} alt="" fill sizes="80px" className="object-contain" />
           ) : (
             <QrCode size={22} className="text-stone-dim" />
           )}

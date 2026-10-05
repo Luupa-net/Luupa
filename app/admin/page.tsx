@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import {
   CheckCircle2, XCircle, Clock, ShieldCheck, LogOut, ExternalLink,
   LayoutDashboard, Building2, Users, CalendarClock, Search, Eye,
@@ -620,7 +621,9 @@ function BusinessCard({
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0">
           {b.logo_url ? (
-            <img src={b.logo_url} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0 border border-stone-line" />
+            <div className="relative w-11 h-11 rounded-lg shrink-0 border border-stone-line overflow-hidden">
+              <Image src={b.logo_url} alt="" fill sizes="44px" className="object-cover" />
+            </div>
           ) : (
             <div className="w-11 h-11 rounded-lg bg-navy/10 text-navy flex items-center justify-center shrink-0 font-display font-semibold">
               {b.name?.[0]?.toUpperCase()}
