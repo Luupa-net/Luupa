@@ -14,7 +14,7 @@ import { useRealtimeBookings } from "@/lib/useRealtimeBookings";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Plus, TrendingUp, TrendingDown, Minus,
   Search, X, CalendarDays, LayoutGrid, ListChecks, MousePointerClick, SlidersHorizontal,
-  Clock3, Wallet, AlertCircle,
+  Clock3, Wallet, AlertCircle, CalendarPlus,
 } from "lucide-react";
 
 type View = "month" | "week" | "day" | "list";
@@ -45,6 +45,7 @@ export default function BookingsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<{ id: string; booking: any }[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -88,7 +89,17 @@ export default function BookingsPage() {
   // no-op instead of holding open a channel that never fires.
   useRealtimeBookings("business_id", isStaff ? undefined : business?.id, ({ eventType, new: newRow, old: oldRow }) => {
     if (eventType === "INSERT") {
+      // Only toast for bookings genuinely new to this tab — a booking this
+      // same tab just created via ManualBookingForm already arrived through
+      // its own optimistic prepend, so this would otherwise double-announce
+      // the owner's own action back at them.
+      const isNew = !bookings.some((b) => b.id === newRow.id);
       setBookings((prev) => (prev.some((b) => b.id === newRow.id) ? prev : [newRow, ...prev]));
+      if (isNew) {
+        const toastId = `${newRow.id}-${Date.now()}`;
+        setToasts((prev) => [...prev, { id: toastId, booking: newRow }]);
+        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toastId)), 8000);
+      }
     } else if (eventType === "UPDATE") {
       setBookings((prev) => prev.map((b) => (b.id === newRow.id ? newRow : b)));
       setSelected((prev: any) => (prev?.id === newRow.id ? newRow : prev));
@@ -393,6 +404,37 @@ export default function BookingsPage() {
           onClose={() => setShowAddForm(false)}
         />
       )}
+
+      {toasts.length > 0 && (
+        <div className="fixed top-20 right-4 sm:right-6 z-[60] w-[calc(100%-2rem)] sm:w-80 space-y-2.5">
+          {toasts.map((t) => (
+            <NewBookingToast
+              key={t.id}
+              booking={t.booking}
+              onOpen={() => { setSelected(t.booking); setToasts((prev) => prev.filter((x) => x.id !== t.id)); }}
+              onDismiss={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NewBookingToast({ booking, onOpen, onDismiss }: { booking: any; onOpen: () => void; onDismiss: () => void }) {
+  return (
+    <div className="fade-up bg-white rounded-xl border border-teal/30 shadow-lg shadow-black/10 p-3.5 flex items-start gap-3">
+      <span className="w-9 h-9 rounded-full bg-teal/10 text-teal-dim flex items-center justify-center shrink-0">
+        <CalendarPlus size={16} />
+      </span>
+      <button onClick={onOpen} className="flex-1 min-w-0 text-left">
+        <p className="text-xs font-semibold text-teal-dim uppercase tracking-wide">New booking</p>
+        <p className="text-sm font-medium text-ink truncate mt-0.5">{booking.customer_name}</p>
+        <p className="text-xs text-stone truncate">{booking.service || "No service specified"}</p>
+      </button>
+      <button onClick={onDismiss} aria-label="Dismiss" className="text-stone hover:text-ink shrink-0 p-0.5">
+        <X size={14} />
+      </button>
     </div>
   );
 }
