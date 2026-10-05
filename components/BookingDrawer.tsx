@@ -198,7 +198,7 @@ export default function BookingDrawer({
         <div key={tab} className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4 fade-up" style={{ animationDuration: "0.2s" }}>
           {tab === "details" && <BookingDrawerDetailsTab key={booking.id} booking={booking} businessId={business.id} onUpdate={onUpdate} />}
           {tab === "payment" && !isStaff && <BookingDrawerPaymentTab key={booking.id} booking={booking} businessName={businessName} businessId={business.id} paymentQrUrl={paymentQrUrl} onUpdate={onUpdate} />}
-          {tab === "history" && <BookingDrawerHistoryTab key={booking.id} booking={booking} onUpdate={onUpdate} />}
+          {tab === "history" && <BookingDrawerHistoryTab key={booking.id} booking={booking} />}
           {tab === "notes" && <BookingDrawerNotesTab key={booking.id} booking={booking} onUpdate={onUpdate} />}
         </div>
       </div>
