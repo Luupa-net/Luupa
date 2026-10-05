@@ -1,7 +1,7 @@
 // All native Date math — deliberately no new date library added, so this
 // doesn't depend on an npm install that couldn't be verified this session.
 
-import { startOfWeekSat } from "./calendarGrid";
+import { startOfWeekSat, toKey } from "./calendarGrid";
 
 function startOfDay(d: Date) {
   const x = new Date(d);
@@ -62,7 +62,10 @@ export function periodComparison(bookings: any[], period: "day" | "week" | "mont
 export function groupByDate(bookings: any[]): { date: string; items: any[] }[] {
   const groups: Record<string, any[]> = {};
   for (const b of bookings) {
-    const key = b.preferred_date || new Date(b.created_at).toISOString().slice(0, 10);
+    // toKey(), not toISOString().slice(0,10) — the latter converts to UTC
+    // first, shifting bookings created after 9pm UTC back a calendar day for
+    // anyone in Bahrain (UTC+3). Same reasoning as calendarGrid.ts's toKey().
+    const key = b.preferred_date || toKey(new Date(b.created_at));
     if (!groups[key]) groups[key] = [];
     groups[key].push(b);
   }

@@ -26,8 +26,9 @@ function escapeHtml(value: unknown): string {
 // instead of breaking the approval/verification flow — email is a nice-to-have
 // on top of the core feature, not a dependency of it.
 
-export async function sendApprovalEmail(to: string, businessName: string) {
+export async function sendApprovalEmail(to: string, businessNameRaw: string) {
   if (!resend) return;
+  const businessName = escapeHtml(businessNameRaw);
   try {
     await resend.emails.send({
       from: FROM,
@@ -48,8 +49,9 @@ export async function sendApprovalEmail(to: string, businessName: string) {
   }
 }
 
-export async function sendVerifiedEmail(to: string, businessName: string, verifiedUntil: string | null) {
+export async function sendVerifiedEmail(to: string, businessNameRaw: string, verifiedUntil: string | null) {
   if (!resend) return;
+  const businessName = escapeHtml(businessNameRaw);
   const untilText = verifiedUntil
     ? ` through ${new Date(verifiedUntil).toLocaleDateString()}`
     : "";

@@ -148,7 +148,16 @@ export default function BookingDrawerPaymentTab({
       .from("booking_items")
       .update({ description: row.description, qty: row.qty, unit_price: row.unit_price })
       .eq("id", id);
-    if (error) setItemsError("Couldn't save that item — try again.");
+    if (error) {
+      setItemsError("Couldn't save that item — try again.");
+      // The optimistic edit from updateItemField() is still showing on
+      // screen even though it never made it to the DB — Subtotal and "Use
+      // suggested amount" would otherwise compute off a value that doesn't
+      // exist server-side. Re-read the real row rather than trying to
+      // reconstruct "what it was before," which this component never kept.
+      const { data: fresh } = await supabase.from("booking_items").select("*").eq("id", id).single();
+      if (fresh) setItems((prev) => prev.map((it) => (it.id === id ? fresh : it)));
+    }
   }
 
   async function addItem() {

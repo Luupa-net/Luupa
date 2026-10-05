@@ -34,12 +34,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "You've already replied to this review." }, { status: 400 });
   }
 
-  const { error: updateError } = await supabaseAdmin
+  // The check above is a fast path, not the real guard — two near-simultaneous
+  // requests could both pass it before either write lands. `.is(...)` makes
+  // the claim itself atomic (same idiom as reminder_sent_at in
+  // send-reminders/route.ts): only the request that actually flips
+  // owner_replied_at from null wins, the other gets zero rows back.
+  const { data: updated, error: updateError } = await supabaseAdmin
     .from("reviews")
     .update({ owner_reply: reply.trim(), owner_replied_at: new Date().toISOString() })
-    .eq("id", reviewId);
+    .eq("id", reviewId)
+    .is("owner_replied_at", null)
+    .select("id");
   if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 400 });
+    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  }
+  if (!updated || updated.length === 0) {
+    return NextResponse.json({ error: "You've already replied to this review." }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true });

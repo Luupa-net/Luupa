@@ -25,9 +25,29 @@ export default function BookingDrawerDetailsTab({
   onUpdate: (id: string, changes: Record<string, any>) => void | Promise<void>;
 }) {
   const [bk, setBk] = useState(booking);
+  // Fields the user has actually edited locally but not yet saved — on every
+  // fresh `booking` prop (e.g. a realtime update from another device), we
+  // resync everything EXCEPT these, so an in-progress edit survives a
+  // concurrent change elsewhere instead of either silently overwriting it
+  // (the old behavior) or being clobbered by it.
+  const [touched, setTouched] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [activeStaff, setActiveStaff] = useState<{ id: string; name: string }[]>([]);
   const [staffLoading, setStaffLoading] = useState(true);
+
+  useEffect(() => {
+    setBk((prev: any) => {
+      const next = { ...booking };
+      touched.forEach((field) => { next[field] = prev[field]; });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booking]);
+
+  function setField(field: string, value: any) {
+    setBk((prev: any) => ({ ...prev, [field]: value }));
+    setTouched((prev) => new Set(prev).add(field));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -60,13 +80,17 @@ export default function BookingDrawerDetailsTab({
 
   async function saveDetails() {
     setSaving(true);
-    await onUpdate(bk.id, {
-      vehicle_make: bk.vehicle_make,
-      vehicle_model: bk.vehicle_model,
-      vehicle_plate: bk.vehicle_plate,
-      customer_email: bk.customer_email,
-      customer_contact: bk.customer_contact,
-    });
+    // Only the fields the user actually touched — never the whole local
+    // snapshot, which may hold stale values for anything that changed
+    // elsewhere while this tab was open (see the resync effect above).
+    const payload: Record<string, any> = {};
+    for (const field of ["vehicle_make", "vehicle_model", "vehicle_plate", "customer_email", "customer_contact"]) {
+      if (touched.has(field)) payload[field] = bk[field];
+    }
+    if (Object.keys(payload).length > 0) {
+      await onUpdate(bk.id, payload);
+      setTouched(new Set());
+    }
     setSaving(false);
   }
 
@@ -108,7 +132,7 @@ export default function BookingDrawerDetailsTab({
         <p className={sectionTitle}><ClipboardList size={14} /> Booking details</p>
         <div>
           <p className="text-xs text-stone mb-1">Contact</p>
-          <PhoneInput value={bk.customer_contact || ""} onChange={(v) => setBk({ ...bk, customer_contact: v })} />
+          <PhoneInput value={bk.customer_contact || ""} onChange={(v) => setField("customer_contact", v)} />
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm bg-canvas2 rounded-xl p-3.5 mt-3">
           <Info label="Service" value={bk.service || "—"} />
@@ -142,11 +166,11 @@ export default function BookingDrawerDetailsTab({
       <div className={cardCls}>
         <p className={sectionTitle}><Car size={14} /> Vehicle</p>
         <div className="grid grid-cols-2 gap-2.5">
-          <input placeholder="Make" value={bk.vehicle_make || ""} onChange={(e) => setBk({ ...bk, vehicle_make: e.target.value })} className="input" />
-          <input placeholder="Model" value={bk.vehicle_model || ""} onChange={(e) => setBk({ ...bk, vehicle_model: e.target.value })} className="input" />
+          <input placeholder="Make" value={bk.vehicle_make || ""} onChange={(e) => setField("vehicle_make", e.target.value)} className="input" />
+          <input placeholder="Model" value={bk.vehicle_model || ""} onChange={(e) => setField("vehicle_model", e.target.value)} className="input" />
         </div>
         <div className="mt-2.5">
-          <PlateInput value={bk.vehicle_plate || ""} onChange={(formatted) => setBk({ ...bk, vehicle_plate: formatted })} />
+          <PlateInput value={bk.vehicle_plate || ""} onChange={(formatted) => setField("vehicle_plate", formatted)} />
         </div>
       </div>
 
@@ -157,12 +181,12 @@ export default function BookingDrawerDetailsTab({
           type="email"
           placeholder="Optional — needed to send an email invoice"
           value={bk.customer_email || ""}
-          onChange={(e) => setBk({ ...bk, customer_email: e.target.value })}
+          onChange={(e) => setField("customer_email", e.target.value)}
           className="input"
         />
       </div>
 
-      <button onClick={saveDetails} disabled={saving} className="text-sm font-semibold text-teal-dim hover:text-teal disabled:opacity-60 transition-colors">
+      <button onClick={saveDetails} disabled={saving || touched.size === 0} className="text-sm font-semibold text-teal-dim hover:text-teal disabled:opacity-60 transition-colors">
         {saving ? "Saving…" : "Save details"}
       </button>
     </>

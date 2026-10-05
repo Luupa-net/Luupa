@@ -7,6 +7,12 @@ import { supabase } from "@/lib/supabase";
 // dashboard when this account turns out to own a business.
 export async function resolveLoginRedirect(userId: string, next: string, hadExplicitNext: boolean): Promise<string> {
   if (hadExplicitNext) return next;
-  const { data } = await supabase.from("businesses").select("id").eq("owner_id", userId).maybeSingle();
+  const { data, error } = await supabase.from("businesses").select("id").eq("owner_id", userId).maybeSingle();
+  // A transient failure here must not look identical to "not a business
+  // owner" — that silently sent real owners to the customer destination
+  // with nothing to explain why. Logged rather than surfaced in the UI:
+  // there's no good place to show an error mid-OAuth-redirect, and `next`
+  // remains a safe fallback either way.
+  if (error) console.error("resolveLoginRedirect: ownership lookup failed", error.message);
   return data ? "/business/dashboard" : next;
 }

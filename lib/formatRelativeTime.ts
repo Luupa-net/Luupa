@@ -14,5 +14,10 @@ export function formatRelativeTime(iso: string | null): string {
   if (weeks < 5) return `${weeks}w ago`;
   const months = Math.floor(days / 30);
   if (months < 12) return `${months}mo ago`;
-  return `${Math.floor(days / 365)}y ago`;
+  // Deriving years from `days / 365` directly (instead of from `months`)
+  // used to round down to 0 for 360-364 day gaps — the exact range just
+  // past the `months < 12` cutoff above, so "a year ago" briefly displayed
+  // as "0y ago". Deriving from `months` keeps this consistent with the
+  // branch right above it.
+  return `${Math.max(1, Math.floor(months / 12))}y ago`;
 }

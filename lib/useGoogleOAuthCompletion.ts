@@ -44,6 +44,7 @@ export function useGoogleOAuthCompletion(next: string, hadExplicitNext: boolean)
     // and the redirect never ran. Meanwhile Navbar's own listener reacts to
     // ANY auth event, so the header correctly showed the user as signed in
     // while this page stayed stuck showing the login form underneath it.
+    let cancelled = false;
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if ((event !== "SIGNED_IN" && event !== "INITIAL_SESSION") || !session?.user) return;
       const provider = session.user.app_metadata?.provider;
@@ -53,15 +54,20 @@ export function useGoogleOAuthCompletion(next: string, hadExplicitNext: boolean)
         email: session.user.email,
         name: (session.user.user_metadata?.full_name as string) || (session.user.user_metadata?.name as string) || null,
       });
+      if (cancelled) return;
       if (error) {
         setCompletingOAuth(false);
         setOauthError("We couldn't finish setting up your account — try signing in again.");
         return;
       }
       const dest = await resolveLoginRedirect(session.user.id, next, hadExplicitNext);
+      if (cancelled) return;
       router.push(dest);
     });
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [next, hadExplicitNext, router]);
 

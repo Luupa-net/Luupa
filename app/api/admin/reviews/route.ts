@@ -12,7 +12,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("reviews")
-    .select("*, businesses(name)")
+    .select("id, business_id, rating, body, author_name, status, owner_reply, owner_replied_at, created_at, businesses(name)")
     .order("created_at", { ascending: false });
 
   if (error) {
