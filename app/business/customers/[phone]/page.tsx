@@ -2,18 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useBusiness } from "@/lib/BusinessContext";
-import { useRouter, useParams } from "next/navigation";
+import { useBusinessGuard } from "@/lib/useBusinessGuard";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
+import { formatBhd } from "@/lib/money";
 import BusinessLoadError from "@/components/BusinessLoadError";
+import NotBusinessAccount from "@/components/NotBusinessAccount";
+import BookingStatusBadge from "@/components/BookingStatusBadge";
+import ManualBookingForm from "@/components/ManualBookingForm";
 import {
   ArrowLeft, Phone, Mail, CalendarClock, Wallet, Sparkles, Car, StickyNote,
-  Tag as TagIcon, ClipboardList,
+  Tag as TagIcon, ClipboardList, MessageCircle, CalendarPlus, Check, AlertCircle, ChevronRight,
 } from "lucide-react";
 
 function visitDate(b: any): Date {
-  return new Date(b.preferred_date || b.created_at);
+  return b.preferred_date ? new Date(`${b.preferred_date}T00:00:00`) : new Date(b.created_at);
 }
 
 function mode(values: string[]): string | null {
@@ -28,53 +32,26 @@ function mode(values: string[]): string | null {
   return best;
 }
 
-// Same status → color mapping used in app/business/bookings/page.tsx's
-// StatusChip — kept in sync rather than shared via import so this page
-// doesn't reach across into a sibling route's file for a small local piece.
-const STATUS_TONES: Record<string, string> = {
-  pending: "bg-teal/10 text-teal-dim",
-  confirmed: "bg-navy/10 text-navy",
-  arrived: "bg-skyblue/10 text-skyblue-dim",
-  in_progress: "bg-skyblue/10 text-skyblue-dim",
-  completed: "bg-emerald-100 text-emerald-700",
-  declined: "bg-stone-line text-stone",
-  no_show: "bg-gray-100 text-gray-600",
-  cancelled: "bg-red-50 text-red-600",
-};
-
-function StatusChip({ status }: { status: string }) {
-  return (
-    <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${STATUS_TONES[status] || "bg-stone-line text-stone"}`}>
-      {status.replace("_", " ")}
-    </span>
-  );
-}
+const QUICK_TAGS = ["VIP", "Regular", "Fleet", "New", "At risk"];
 
 export default function CustomerDetailPage() {
   const params = useParams<{ phone: string }>();
   const phone = params.phone;
-  const { business, role, checked, loadError: businessLoadError, refresh } = useBusiness();
+  const { business, state: guardState, refresh } = useBusinessGuard({ ownerOnly: true });
   const [bookings, setBookings] = useState<any[]>([]);
+  const [noteId, setNoteId] = useState<string | null>(null);
   const [tag, setTag] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
+  const [loadError, setLoadError] = useState(false);
+  const [showBook, setShowBook] = useState(false);
 
   useEffect(() => {
-    if (!checked) return;
-    if (businessLoadError) {
-      setLoading(false);
-      return;
-    }
-    if (!business) {
-      router.push("/account/login");
-      return;
-    }
-    if (role === "staff") {
-      router.push("/business/bookings");
+    if (guardState !== "ready") {
+      if (guardState !== "checking") setLoading(false);
       return;
     }
     async function load() {
@@ -85,7 +62,12 @@ export default function CustomerDetailPage() {
       // Fetch every booking for this business, then filter client-side by
       // normalized phone — bookings.customer_id is null for walk-ins, so
       // phone is the only key that works for every booking.
-      const { data: bks } = await supabase.from("bookings").select("*").eq("business_id", business.id);
+      const { data: bks, error } = await supabase.from("bookings").select("*").eq("business_id", business.id);
+      if (error) {
+        setLoadError(true);
+        setLoading(false);
+        return;
+      }
       const matches = (bks || []).filter(
         (b) => b.customer_contact && normalizeWhatsAppNumber(b.customer_contact) === phone
       );
@@ -95,9 +77,10 @@ export default function CustomerDetailPage() {
       const noteQuery = supabase.from("customer_notes").select("*").eq("business_id", business.id);
       const { data: existingNote } = await (customerId
         ? noteQuery.eq("customer_id", customerId)
-        : noteQuery.eq("customer_phone", phone)
+        : noteQuery.is("customer_id", null).eq("customer_phone", phone)
       ).maybeSingle();
       if (existingNote) {
+        setNoteId(existingNote.id);
         setTag(existingNote.tag || "");
         setNote(existingNote.note || "");
       }
@@ -106,7 +89,8 @@ export default function CustomerDetailPage() {
     load();
     // Keyed on business?.id, not the business object itself, so a content-only
     // update to the shared context doesn't retrigger this effect for nothing.
-  }, [checked, businessLoadError, business?.id, role, router, phone]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardState, business?.id, phone]);
 
   const sorted = useMemo(
     () => [...bookings].sort((a, b) => visitDate(b).getTime() - visitDate(a).getTime()),
@@ -115,10 +99,6 @@ export default function CustomerDetailPage() {
   const mostRecent = sorted[0];
   const customerId = useMemo(() => bookings.find((b) => b.customer_id)?.customer_id || null, [bookings]);
   const email = useMemo(() => sorted.find((b) => b.customer_email)?.customer_email || null, [sorted]);
-  // Fallback lifetime value: sums bookings.amount where paid, since that's
-  // the only ledger that exists for older bookings today. Once
-  // booking_payments has real entries for this customer, a future pass
-  // could prefer summing that table's rows instead of this column snapshot.
   const lifetimeValue = useMemo(
     () => bookings.filter((b) => b.paid).reduce((sum, b) => sum + Number(b.amount || 0), 0),
     [bookings]
@@ -140,20 +120,28 @@ export default function CustomerDetailPage() {
     return list;
   }, [bookings]);
 
+  // BUG FIX: this used to upsert with onConflict "business_id,customer_id"
+  // (or "...,customer_phone"), but those unique indexes are PARTIAL (WHERE
+  // customer_id IS [NOT] NULL), and Postgres can't match a plain ON CONFLICT
+  // column list to a partial index — every save failed. Plain update-or-insert
+  // against the row we already know about instead.
   async function handleSave() {
     if (!business || !phone) return;
     setSaving(true);
     setSaveError(null);
-    const payload: Record<string, any> = {
-      business_id: business.id,
-      customer_phone: phone,
-      customer_id: customerId || null,
-      tag: tag.trim() || null,
-      note: note.trim() || null,
-    };
-    const { error } = await supabase
-      .from("customer_notes")
-      .upsert(payload, { onConflict: customerId ? "business_id,customer_id" : "business_id,customer_phone" });
+    const fields = { tag: tag.trim() || null, note: note.trim() || null };
+    let error;
+    if (noteId) {
+      ({ error } = await supabase.from("customer_notes").update(fields).eq("id", noteId));
+    } else {
+      const res = await supabase
+        .from("customer_notes")
+        .insert({ business_id: business.id, customer_id: customerId, customer_phone: phone, ...fields })
+        .select("id")
+        .single();
+      error = res.error;
+      if (res.data) setNoteId(res.data.id);
+    }
     setSaving(false);
     if (error) {
       setSaveError("Couldn't save — please try again.");
@@ -174,15 +162,16 @@ export default function CustomerDetailPage() {
       </div>
     );
   }
-  if (businessLoadError) return <BusinessLoadError onRetry={refresh} />;
-  if (!business) return <div className="max-w-4xl mx-auto px-6 py-16 text-stone">No listing found.</div>;
+  if (guardState === "error") return <BusinessLoadError onRetry={refresh} />;
+  if (guardState === "not_business") return <NotBusinessAccount />;
+  if (!business || guardState !== "ready") return null;
 
-  if (bookings.length === 0) {
+  if (loadError || bookings.length === 0) {
     return (
       <div className="bg-canvas2 min-h-screen">
         <div className="max-w-4xl mx-auto px-5 sm:px-6 py-16 text-center">
-          <p className="text-sm font-medium text-ink">Customer not found</p>
-          <p className="text-xs text-stone mt-1.5">No bookings match this phone number.</p>
+          <p className="text-sm font-medium text-ink">{loadError ? "Couldn't load this customer" : "Customer not found"}</p>
+          <p className="text-xs text-stone mt-1.5">{loadError ? "Something went wrong — try refreshing the page." : "No bookings match this phone number."}</p>
           <Link href="/business/customers" className="inline-flex items-center gap-1.5 text-sm text-navy font-medium mt-4">
             <ArrowLeft size={14} /> Back to customers
           </Link>
@@ -190,6 +179,8 @@ export default function CustomerDetailPage() {
       </div>
     );
   }
+
+  const first = String(mostRecent.customer_name || "").split(" ")[0] || "there";
 
   return (
     <div className="bg-canvas2 min-h-screen">
@@ -199,23 +190,52 @@ export default function CustomerDetailPage() {
         </Link>
 
         {/* Header */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <span className="w-14 h-14 rounded-full bg-navy/10 text-navy font-display text-xl font-semibold flex items-center justify-center shrink-0">
-            {mostRecent.customer_name?.[0]?.toUpperCase() || "?"}
-          </span>
-          <div>
-            <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">{mostRecent.customer_name}</h1>
-            <div className="flex items-center gap-3 flex-wrap text-sm text-stone mt-1">
-              <span className="flex items-center gap-1"><Phone size={13} /> +{phone}</span>
-              {email && <span className="flex items-center gap-1"><Mail size={13} /> {email}</span>}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-navy to-navy-dim px-6 py-6 sm:px-7 fade-up">
+          <div className="absolute -top-12 -right-8 w-44 h-44 rounded-full bg-teal/25 blur-3xl pointer-events-none" />
+          <div className="relative flex items-center gap-4 flex-wrap">
+            <span className="w-14 h-14 rounded-full bg-white/10 border border-white/15 text-white font-display text-xl font-semibold flex items-center justify-center shrink-0">
+              {mostRecent.customer_name?.[0]?.toUpperCase() || "?"}
+            </span>
+            <div className="flex-1 min-w-[180px]">
+              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-white">{mostRecent.customer_name}</h1>
+              <div className="flex items-center gap-3 flex-wrap text-sm text-white/60 mt-1">
+                <span className="flex items-center gap-1"><Phone size={13} /> +{phone}</span>
+                {email && <span className="flex items-center gap-1"><Mail size={13} /> {email}</span>}
+                {customerId && <span className="text-[10px] font-semibold uppercase tracking-wide bg-white/10 text-white/80 px-2 py-0.5 rounded-full">Luupa account</span>}
+              </div>
             </div>
+          </div>
+          {/* Quick actions — the things you actually do with a customer. */}
+          <div className="relative flex flex-wrap gap-2 mt-5">
+            <button
+              onClick={() => setShowBook(true)}
+              className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-white text-navy hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.97] transition-all"
+            >
+              <CalendarPlus size={14} /> New booking
+            </button>
+            <a
+              href={`https://wa.me/${phone}?text=${encodeURIComponent(`Hi ${first}, this is ${business.name}. `)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors"
+            >
+              <MessageCircle size={14} /> WhatsApp
+            </a>
+            <a href={`tel:+${phone}`} className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors">
+              <Phone size={14} /> Call
+            </a>
+            {email && (
+              <a href={`mailto:${email}`} className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors">
+                <Mail size={14} /> Email
+              </a>
+            )}
           </div>
         </div>
 
         {/* Stats */}
         <div className="flex sm:grid sm:grid-cols-4 gap-3 mt-6 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:overflow-visible">
           <StatCard icon={<CalendarClock size={14} />} label="Total bookings" value={bookings.length} />
-          <StatCard icon={<Wallet size={14} />} label="Lifetime value" value={`BHD ${lifetimeValue.toFixed(lifetimeValue % 1 === 0 ? 0 : 2)}`} />
+          <StatCard icon={<Wallet size={14} />} label="Lifetime value" value={formatBhd(lifetimeValue)} />
           <StatCard icon={<Sparkles size={14} />} label="Favorite service" value={favoriteService || "—"} />
           <StatCard
             icon={<CalendarClock size={14} />}
@@ -248,18 +268,24 @@ export default function CustomerDetailPage() {
               <p className="flex items-center gap-1.5 text-sm font-semibold text-ink mb-3"><ClipboardList size={14} /> Booking history</p>
               <div className="space-y-2">
                 {sorted.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between gap-3 text-sm bg-canvas2 rounded-lg px-3.5 py-2.5">
+                  <Link
+                    key={b.id}
+                    href={`/business/bookings?open=${b.id}`}
+                    className="flex items-center justify-between gap-3 text-sm bg-canvas2 rounded-lg px-3.5 py-2.5 hover:bg-stone-line/50 transition-colors"
+                  >
                     <div className="min-w-0">
                       <p className="text-ink font-medium truncate">{b.service || "No service specified"}</p>
                       <p className="text-xs text-stone mt-0.5">
                         {visitDate(b).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                        {b.preferred_time ? ` · ${b.preferred_time}` : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {b.paid && b.amount != null && <span className="text-xs font-medium text-ink">BHD {b.amount}</span>}
-                      <StatusChip status={b.status} />
+                      {b.paid && b.amount != null && <span className="text-xs font-medium text-ink">{formatBhd(b.amount)}</span>}
+                      <BookingStatusBadge status={b.status} />
+                      <ChevronRight size={14} className="text-stone" />
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -271,17 +297,31 @@ export default function CustomerDetailPage() {
             <input
               value={tag}
               onChange={(e) => setTag(e.target.value)}
+              maxLength={40}
               placeholder="e.g. VIP, at risk, frequent…"
               className="input"
             />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {QUICK_TAGS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTag(t)}
+                  className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${tag === t ? "bg-navy border-navy text-white" : "border-stone-line text-ink/70 hover:border-navy/30"}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
             <p className="flex items-center gap-1.5 text-sm font-semibold text-ink mt-4 mb-3"><StickyNote size={14} /> Note</p>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
+              maxLength={2000}
               placeholder="Anything worth remembering about this customer…"
               className="input h-28 py-2"
             />
-            {saveError && <p className="text-sm text-red-600 mt-3">{saveError}</p>}
+            {saveError && <p className="flex items-center gap-1.5 text-sm text-red-600 mt-3"><AlertCircle size={14} /> {saveError}</p>}
             <div className="flex items-center gap-3 mt-4">
               <button
                 onClick={handleSave}
@@ -290,11 +330,22 @@ export default function CustomerDetailPage() {
               >
                 {saving ? "Saving…" : "Save"}
               </button>
-              {saved && <span className="text-sm text-green-700">Saved</span>}
+              {saved && <span className="flex items-center gap-1 text-sm text-teal-dim"><Check size={14} /> Saved</span>}
             </div>
           </div>
         </div>
       </div>
+
+      {showBook && (
+        <ManualBookingForm
+          businessId={business.id}
+          initialName={mostRecent.customer_name || ""}
+          initialContact={phone}
+          initialEmail={email || ""}
+          onAdded={(b) => setBookings((prev) => [b, ...prev])}
+          onClose={() => setShowBook(false)}
+        />
+      )}
     </div>
   );
 }

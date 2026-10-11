@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import { loadStaffDirectory } from "@/lib/staffDirectory";
 import PlateInput from "@/components/PlateInput";
 import PhoneInput from "@/components/PhoneInput";
 import {
-  Car, Mail, ClipboardList, UsersRound, CheckCircle2, UserCheck, Wrench, Check, Ban, UserX,
+  Car, Mail, ClipboardList, UsersRound, CheckCircle2, UserCheck, Wrench, Check, Ban, UserX, Wallet,
 } from "lucide-react";
 
 const cardCls = "rounded-2xl bg-white border border-stone-line p-4 transition-shadow hover:shadow-sm";
@@ -18,11 +18,15 @@ const btnDanger = "flex items-center justify-center gap-1.5 text-sm font-medium 
 export default function BookingDrawerDetailsTab({
   booking,
   businessId,
+  isStaff,
   onUpdate,
+  onRequestCheckout,
 }: {
   booking: any;
   businessId: string;
+  isStaff?: boolean;
   onUpdate: (id: string, changes: Record<string, any>) => void | Promise<void>;
+  onRequestCheckout: () => void;
 }) {
   const [bk, setBk] = useState(booking);
   // Fields the user has actually edited locally but not yet saved — on every
@@ -32,6 +36,7 @@ export default function BookingDrawerDetailsTab({
   // (the old behavior) or being clobbered by it.
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [activeStaff, setActiveStaff] = useState<{ id: string; name: string }[]>([]);
   const [staffLoading, setStaffLoading] = useState(true);
 
@@ -52,14 +57,9 @@ export default function BookingDrawerDetailsTab({
   useEffect(() => {
     let cancelled = false;
     async function loadStaff() {
-      const { data } = await supabase
-        .from("staff")
-        .select("id, name")
-        .eq("business_id", businessId)
-        .eq("active", true)
-        .order("name");
+      const rows = await loadStaffDirectory(businessId, { activeOnly: true });
       if (!cancelled) {
-        setActiveStaff(data || []);
+        setActiveStaff(rows);
         setStaffLoading(false);
       }
     }
@@ -90,6 +90,8 @@ export default function BookingDrawerDetailsTab({
     if (Object.keys(payload).length > 0) {
       await onUpdate(bk.id, payload);
       setTouched(new Set());
+      setSavedAt(Date.now());
+      setTimeout(() => setSavedAt(null), 2000);
     }
     setSaving(false);
   }
@@ -118,8 +120,19 @@ export default function BookingDrawerDetailsTab({
           {bk.status === "arrived" && (
             <button onClick={() => apply({ status: "in_progress" })} className={btnPrimary}><Wrench size={14} /> Car left with us</button>
           )}
-          {bk.status === "in_progress" && (
-            <button onClick={() => apply({ status: "completed" })} className={btnPrimary}><CheckCircle2 size={14} /> Mark completed</button>
+          {/* Payment comes first: an unpaid booking completes through
+              checkout (one tap there takes payment, completes, and sends the
+              receipt). Already paid upfront → complete directly. */}
+          {["arrived", "in_progress"].includes(bk.status) && (
+            bk.paid ? (
+              <button onClick={() => apply({ status: "completed" })} className={btnPrimary}><CheckCircle2 size={14} /> Mark completed</button>
+            ) : isStaff ? (
+              <span className="flex items-center gap-1.5 text-xs text-stone bg-canvas2 rounded-xl px-3 py-2.5">
+                <Wallet size={13} className="text-navy" /> Ready for checkout — the owner takes payment to complete it.
+              </span>
+            ) : (
+              <button onClick={onRequestCheckout} className={`${btnPrimary} bg-teal hover:bg-teal-dim`}><Wallet size={14} /> Take payment & complete</button>
+            )
           )}
           {["declined", "no_show", "cancelled", "completed"].includes(bk.status) && (
             <span className="text-xs text-stone self-center">Nothing further to do here.</span>
@@ -136,7 +149,7 @@ export default function BookingDrawerDetailsTab({
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm bg-canvas2 rounded-xl p-3.5 mt-3">
           <Info label="Service" value={bk.service || "—"} />
-          <Info label="Date" value={bk.preferred_date ? new Date(bk.preferred_date).toLocaleDateString() : "—"} />
+          <Info label="Date" value={bk.preferred_date ? new Date(`${bk.preferred_date}T00:00:00`).toLocaleDateString() : "—"} />
           <Info label="Time" value={bk.preferred_time || "—"} />
           <Info label="Source" value={bk.source === "manual" ? "Manual entry" : "Luupa"} />
         </div>
@@ -186,9 +199,12 @@ export default function BookingDrawerDetailsTab({
         />
       </div>
 
-      <button onClick={saveDetails} disabled={saving || touched.size === 0} className="text-sm font-semibold text-teal-dim hover:text-teal disabled:opacity-60 transition-colors">
-        {saving ? "Saving…" : "Save details"}
-      </button>
+      <div className="flex items-center gap-3">
+        <button onClick={saveDetails} disabled={saving || touched.size === 0} className="text-sm font-semibold text-teal-dim hover:text-teal disabled:opacity-60 transition-colors">
+          {saving ? "Saving…" : "Save details"}
+        </button>
+        {savedAt && <span className="flex items-center gap-1 text-xs text-teal-dim"><Check size={13} /> Saved</span>}
+      </div>
     </>
   );
 }

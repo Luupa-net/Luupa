@@ -3,13 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useBusiness } from "@/lib/BusinessContext";
 import { isEffectivelyVerified } from "@/lib/verification";
+import { currentPath, loginHref } from "@/lib/authReturn";
+import { useBookingAlerts } from "@/lib/BookingAlertsContext";
+import { BookingAlertBell } from "@/components/BookingAlerts";
 import {
   Menu, X, Home, ChevronDown, LayoutDashboard, BadgeCheck, LogOut, Eye,
-  CalendarClock, User, UserCircle, CalendarCheck,
+  CalendarClock, User, UserCircle, CalendarCheck, Users, UsersRound,
 } from "lucide-react";
 
 export default function Navbar() {
@@ -17,39 +20,39 @@ export default function Navbar() {
   const { business, role, staffProfile, userId, checked } = useBusiness();
   const [customerName, setCustomerName] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [pendingBookingsCount, setPendingBookingsCount] = useState(0);
+  // Live (Realtime for owners, polled for staff) — see BookingAlertsContext.
+  const { pending } = useBookingAlerts();
+  const pendingBookingsCount = pending.length;
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const pathname = usePathname();
+  // "Log in" always means "log in and come back HERE" — a customer who
+  // signs in from a listing page lands back on that listing, not the home
+  // page. Read from window (not useSearchParams, which would force a
+  // Suspense boundary around the whole navbar) and refreshed per route.
+  const [loginLink, setLoginLink] = useState("/account/login");
+  useEffect(() => {
+    setLoginLink(loginHref(currentPath()));
+  }, [pathname]);
 
-  // The business lookup itself now lives in BusinessContext, shared with every
-  // business page — this only handles the two things specific to the navbar:
-  // the pending-bookings badge, and (for non-business sessions) the
-  // customer's display name.
+  // The business lookup itself lives in BusinessContext and the live
+  // pending-bookings count in BookingAlertsContext — this only fetches the
+  // customer's display name for non-business sessions.
   useEffect(() => {
     if (!checked) return;
     if (business) {
       setCustomerName(null);
-      // Staff have no SELECT policy on the base `bookings` table (that's
-      // deliberate — see migration-v23.sql) so this count has to go through
-      // the same revenue-free view their pages use, or it always reads 0.
-      const table = role === "staff" ? "bookings_operational" : "bookings";
-      supabase
-        .from(table)
-        .select("*", { count: "exact", head: true })
-        .eq("business_id", business.id)
-        .eq("status", "pending")
-        .then(({ count }) => setPendingBookingsCount(count || 0));
     } else if (userId) {
       supabase
         .from("customers")
         .select("name")
         .eq("id", userId)
-        .single()
+        .maybeSingle()
         .then(({ data }) => setCustomerName(data?.name ?? null));
     } else {
       setCustomerName(null);
     }
-  }, [business, role, userId, checked]);
+  }, [business, userId, checked]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -88,7 +91,8 @@ export default function Navbar() {
 
           {!checked ? null : role === "owner" && business ? (
             <>
-              <NavIconLink href="/business/bookings" icon={<CalendarClock size={18} />} count={pendingBookingsCount} label="Bookings" />
+              <NavIconLink href="/business/bookings" icon={<CalendarClock size={18} />} count={0} label="Bookings" />
+              <BookingAlertBell />
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen((o) => !o)}
@@ -117,8 +121,11 @@ export default function Navbar() {
                     <p className="text-xs text-stone capitalize mt-0.5">{business.status}{verified ? " · Verified" : ""}</p>
                   </div>
                   <DropdownItem href="/business/dashboard" icon={<LayoutDashboard size={15} />} label="Dashboard" onClick={() => setDropdownOpen(false)} />
+                  <DropdownItem href="/business/bookings" icon={<CalendarClock size={15} />} label="Bookings" onClick={() => setDropdownOpen(false)} />
+                  <DropdownItem href="/business/customers" icon={<Users size={15} />} label="Customers" onClick={() => setDropdownOpen(false)} />
+                  <DropdownItem href="/business/staff" icon={<UsersRound size={15} />} label="Staff" onClick={() => setDropdownOpen(false)} />
                   {business.status === "active" && (
-                    <DropdownItem href="/browse" icon={<Eye size={15} />} label="View live site" onClick={() => setDropdownOpen(false)} />
+                    <DropdownItem href={`/listing/${business.id}`} icon={<Eye size={15} />} label="View my listing" onClick={() => setDropdownOpen(false)} />
                   )}
                   {!verified && (
                     <DropdownItem href="/business/verify" icon={<BadgeCheck size={15} />} label="Get verified" onClick={() => setDropdownOpen(false)} />
@@ -137,7 +144,8 @@ export default function Navbar() {
             // Deliberately narrow: no dashboard link, no verification, no
             // business switcher — staff have exactly one thing to do here.
             <>
-              <NavIconLink href="/business/bookings" icon={<CalendarClock size={18} />} count={pendingBookingsCount} label="Bookings" />
+              <NavIconLink href="/business/bookings" icon={<CalendarClock size={18} />} count={0} label="Bookings" />
+              <BookingAlertBell />
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setDropdownOpen((o) => !o)}
@@ -167,7 +175,7 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              {customerName ? (
+              {userId ? (
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setDropdownOpen((o) => !o)}
@@ -176,13 +184,13 @@ export default function Navbar() {
                     <span className="w-7 h-7 rounded-full bg-teal/10 flex items-center justify-center shrink-0">
                       <User size={14} className="text-teal-dim" />
                     </span>
-                    <span className="text-ink font-medium max-w-[120px] truncate">{customerName.split(" ")[0]}</span>
+                    <span className="text-ink font-medium max-w-[120px] truncate">{customerName ? customerName.split(" ")[0] : "Account"}</span>
                     <ChevronDown size={14} className={`text-stone transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
                   </button>
                   {dropdownOpen && (
                     <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl border border-stone-line shadow-lg shadow-black/5 py-1.5 animate-[fadeUp_0.15s_ease-out]">
                       <div className="px-3.5 py-2.5 border-b border-stone-line">
-                        <p className="text-sm font-medium text-ink truncate">{customerName}</p>
+                        <p className="text-sm font-medium text-ink truncate">{customerName || "Your account"}</p>
                       </div>
                       <DropdownItem href="/account/profile" icon={<UserCircle size={15} />} label="My profile" onClick={() => setDropdownOpen(false)} />
                       <DropdownItem href="/account/profile?tab=bookings" icon={<CalendarCheck size={15} />} label="My bookings" onClick={() => setDropdownOpen(false)} />
@@ -204,7 +212,7 @@ export default function Navbar() {
                     List your business
                   </Link>
                   <Link
-                    href="/account/login"
+                    href={loginLink}
                     className="px-4 py-2 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim transition-colors"
                   >
                     Log in
@@ -225,6 +233,7 @@ export default function Navbar() {
 
         {/* Mobile: home icon + hamburger */}
         <div className="md:hidden flex items-center gap-1">
+          <BookingAlertBell compact />
           <Link href="/" aria-label="Home" className="w-11 h-11 flex items-center justify-center text-ink/70">
             <Home size={20} />
           </Link>
@@ -271,6 +280,17 @@ export default function Navbar() {
               <Link href="/business/dashboard" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
                 Dashboard
               </Link>
+              <Link href="/business/customers" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
+                Customers
+              </Link>
+              <Link href="/business/staff" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
+                Staff
+              </Link>
+              {business.status === "active" && (
+                <Link href={`/listing/${business.id}`} className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
+                  View my listing
+                </Link>
+              )}
               {!verified && (
                 <Link href="/business/verify" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
                   Get verified
@@ -298,13 +318,13 @@ export default function Navbar() {
                 Log out
               </button>
             </>
-          ) : customerName ? (
+          ) : userId ? (
             <>
               <div className="flex items-center gap-2 py-3 border-b border-stone-line">
                 <span className="w-8 h-8 rounded-full bg-teal/10 flex items-center justify-center shrink-0">
                   <User size={16} className="text-teal-dim" />
                 </span>
-                <span className="text-base font-medium text-ink truncate">{customerName}</span>
+                <span className="text-base font-medium text-ink truncate">{customerName || "Your account"}</span>
               </div>
               <Link href="/account/profile" className="py-3 text-base font-medium text-ink border-b border-stone-line" onClick={() => setOpen(false)}>
                 My profile
@@ -322,7 +342,7 @@ export default function Navbar() {
                 List your business
               </Link>
               <Link
-                href="/account/login"
+                href={loginLink}
                 className="mt-3 text-center py-3 rounded-lg bg-teal text-white font-medium"
                 onClick={() => setOpen(false)}
               >

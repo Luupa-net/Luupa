@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { rememberReturnTo } from "@/lib/authReturn";
 import { Loader2 } from "lucide-react";
 
 export default function GoogleAuthButton({
@@ -18,6 +19,10 @@ export default function GoogleAuthButton({
   async function handleClick() {
     setLoading(true);
     onError?.("");
+    // If Supabase can't honour redirectTo (not allow-listed) it falls back
+    // to the bare Site URL and ?next= is lost — this stored copy is what
+    // ReturnToRedirector uses to still finish the trip.
+    rememberReturnTo(next);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {

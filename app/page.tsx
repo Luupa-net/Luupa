@@ -5,6 +5,7 @@ import FeaturedCard from "@/components/FeaturedCard";
 import Reveal from "@/components/Reveal";
 import type { Listing } from "@/components/ListingCard";
 import { supabase } from "@/lib/supabase";
+import { rankListings } from "@/lib/ranking";
 import { SUBCATEGORIES } from "@/lib/taxonomy";
 import {
   ArrowUpRight, Check, Search as SearchIcon, MessageCircle, BadgeCheck,
@@ -37,11 +38,10 @@ export default async function HomePage() {
   // the anon key too, not just against what this page happens to ask for.
   const { data, error: featuredError } = await supabase
     .from("businesses_public")
-    .select("id, name, photos, areas, verified, verified_until, tier")
-    .order("verified", { ascending: false })
-    .order("tier", { ascending: false })
-    .limit(8);
-  const featured = (data ?? []) as unknown as Listing[];
+    .select("id, name, photos, areas, verified, verified_until, tier, is_mobile, rating_avg, review_count")
+    .limit(200);
+  // Ranked in code (see lib/ranking.ts for why SQL ordering on `tier` was wrong).
+  const featured = rankListings((data ?? []) as unknown as Listing[]).slice(0, 8);
 
   return (
     <div className="bg-cream">
@@ -165,8 +165,8 @@ export default async function HomePage() {
         <div className="grid sm:grid-cols-3 gap-8 text-center">
           {[
             { icon: SearchIcon, title: "Search your area", body: "Tell us what you need and where." },
-            { icon: Check, title: "Compare real profiles", body: "Photos, prices, and a verified badge." },
-            { icon: MessageCircle, title: "Message on WhatsApp", body: "Straight to the business, no middleman." },
+            { icon: Check, title: "Compare real profiles", body: "Photos, prices, real reviews and a verified badge." },
+            { icon: MessageCircle, title: "Book in a minute", body: "Request a slot online or message them on WhatsApp — no middleman." },
           ].map((step, i) => (
             <div key={step.title}>
               <div className="w-14 h-14 rounded-2xl bg-teal text-white font-displayAlt font-bold text-xl flex items-center justify-center mx-auto mb-5">
@@ -190,7 +190,7 @@ export default async function HomePage() {
               <div className="flex-1">
                 <p className="font-displayAlt font-bold text-lg text-ink mb-1.5">What the verified badge means</p>
                 <p className="text-sm text-stone font-bodyAlt leading-relaxed">
-                  A blue checkmark on a listing means that business has been personally checked, not just self-submitted — it's the clearest sign on Luupa that who you're contacting is real and trustworthy.
+                  The verified badge on a listing means that business has been personally checked, not just self-submitted — it's the clearest sign on Luupa that who you're contacting is real and trustworthy.
                 </p>
               </div>
             </div>

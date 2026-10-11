@@ -1,32 +1,34 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { supabase } from "@/lib/supabase";
-import ListingCard, { Listing } from "@/components/ListingCard";
+import type { Listing } from "@/components/ListingCard";
+import { BrowseSortProvider, BrowseSortToggle, SortedListings } from "@/components/BrowseResults";
 import HeroSearch from "@/components/HeroSearch";
 import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
-import { BadgeCheck, Car } from "lucide-react";
+import { rankListings } from "@/lib/ranking";
+import { BadgeCheck, Car, MapPin, X } from "lucide-react";
 
 // SECURITY: the search query gets pasted into a raw PostgREST filter string
 // below — without escaping, someone could put a comma or parenthesis in the
-// search box to inject extra filter clauses. This strips those out first.
+// search box to inject extra filter clauses. This strips those out first
+// (plus PostgREST's own * wildcard and quote/backslash characters).
 function sanitizeSearchTerm(input: string): string {
-  return input.replace(/[,()%]/g, "").slice(0, 100);
+  return input.replace(/[,()%*"\\]/g, "").slice(0, 100);
 }
 
-// Preserves every existing filter while swapping just the sort — this page
-// has no client JS, so sort has to be a plain Link like everything else here.
-function withSort(
-  params: { q?: string; sub?: string; area?: string; verified?: string; mobile?: string },
-  sort?: string
-): string {
-  const qs = new URLSearchParams();
-  if (params.q) qs.set("q", params.q);
-  if (params.sub) qs.set("sub", params.sub);
-  if (params.area) qs.set("area", params.area);
-  if (params.verified) qs.set("verified", params.verified);
-  if (params.mobile) qs.set("mobile", params.mobile);
-  if (sort) qs.set("sort", sort);
-  const s = qs.toString();
-  return `/browse${s ? `?${s}` : ""}`;
+type Params = { q?: string; sub?: string; area?: string; verified?: string; mobile?: string; sort?: string };
+
+// Filters combine: picking an area keeps the chosen service (and vice versa)
+// instead of every link resetting the page to a single filter. Clicking the
+// active value again removes just that filter.
+function hrefWith(params: Params, changes: Partial<Params>): string {
+  const next: Record<string, string> = {};
+  (["q", "sub", "area", "verified", "mobile", "sort"] as const).forEach((k) => {
+    const value = k in changes ? changes[k] : params[k];
+    if (value) next[k] = value;
+  });
+  const qs = new URLSearchParams(next).toString();
+  return qs ? `/browse?${qs}` : "/browse";
 }
 
 // searchParams usage already forces this route to render dynamically per
@@ -37,11 +39,16 @@ function withSort(
 // as app/page.tsx's featured-listings query.
 export const revalidate = 30;
 
-export default async function BrowsePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string; sub?: string; area?: string; verified?: string; mobile?: string; sort?: string }>;
-}) {
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Params> }): Promise<Metadata> {
+  const p = await searchParams;
+  const what = p.sub || (p.q ? `"${p.q.slice(0, 40)}"` : "Car care");
+  return {
+    title: `${what}${p.area ? ` in ${p.area}` : " in Bahrain"} — Luupa`,
+    description: `Compare ${p.sub ? p.sub.toLowerCase() : "car care"} businesses${p.area ? ` in ${p.area}` : " across Bahrain"} — real prices, real reviews, book online.`,
+  };
+}
+
+export default async function BrowsePage({ searchParams }: { searchParams: Promise<Params> }) {
   // Next.js 15+: searchParams is now a Promise and must be awaited
   const params = await searchParams;
   // SECURITY: query the businesses_public VIEW, not the businesses table —
@@ -56,8 +63,8 @@ export default async function BrowsePage({
   // subcategories/areas are arrays now — .contains() checks the array includes this value
   if (params.sub) query = query.contains("subcategories", [params.sub]);
   if (params.area) query = query.contains("areas", [params.area]);
-  if (params.q) {
-    const term = sanitizeSearchTerm(params.q);
+  const term = params.q ? sanitizeSearchTerm(params.q) : "";
+  if (term) {
     query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%`);
   }
   if (params.verified === "true") {
@@ -68,47 +75,45 @@ export default async function BrowsePage({
     query = query.eq("is_mobile", true);
   }
 
-  // Verified businesses surface first by default, then higher tiers — unless
-  // the visitor asked for highest-rated instead. nullsFirst:false so
-  // zero-review businesses sort to the bottom, not the top.
-  query =
-    params.sort === "rating"
-      ? query.order("rating_avg", { ascending: false, nullsFirst: false })
-      : query.order("verified", { ascending: false }).order("tier", { ascending: false });
-  const { data, error } = await query;
-  // `as unknown as` here because the explicit column list above (deliberately
-  // narrower than select("*") — see the SECURITY comment) no longer structurally
-  // matches Listing's `featured` field, which isn't a real businesses column and
-  // was already never populated at runtime even under the old select("*").
-  const listings = (data ?? []) as unknown as Listing[];
+  const { data, error } = await query.limit(500);
+  // Ranked in code ("recommended"): see lib/ranking.ts for why ordering by
+  // `tier` in SQL put featured businesses last. "Highest rated" is applied
+  // client-side by SortedListings — instant to switch, no round trip.
+  // `as unknown as` because the explicit column list (deliberately narrower
+  // than select("*")) doesn't structurally match Listing.
+  const listings = rankListings((data ?? []) as unknown as Listing[]);
+  const hasFilters = !!(params.q || params.sub || params.area || params.verified || params.mobile);
+
+  const chip = (active: boolean, tone: "navy" | "teal" = "navy") =>
+    `shrink-0 flex items-center gap-1 text-sm px-4 py-2 rounded-full border-2 whitespace-nowrap transition-colors ${
+      active
+        ? tone === "teal"
+          ? "bg-teal border-teal text-white font-semibold"
+          : "bg-navy border-navy text-white font-semibold"
+        : "bg-white border-stone-line text-ink/70 hover:border-navy/30"
+    }`;
+  const sideLink = (active: boolean) =>
+    `flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 -mx-2.5 transition-colors ${
+      active ? "bg-teal/10 text-teal-dim font-semibold" : "hover:text-teal-dim hover:bg-canvas2"
+    }`;
 
   return (
+    <BrowseSortProvider initialSort={params.sort === "rating" ? "rating" : "recommended"}>
     <div className="max-w-6xl mx-auto px-5 py-6 sm:py-10">
       <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">
-        {params.q ? `Results for "${params.q}"` : "Browse car care businesses"}
+        {params.q ? `Results for "${params.q}"` : params.sub ? params.sub : "Browse car care businesses"}
       </h1>
       <div className="flex items-center justify-between flex-wrap gap-2.5 mt-1">
-        <p className="text-stone text-sm">
+        <p className="text-stone text-sm flex items-center gap-2 flex-wrap">
           {listings.length} {listings.length === 1 ? "business" : "businesses"} found
+          {params.area && <span className="flex items-center gap-1"><MapPin size={12} /> {params.area}</span>}
+          {hasFilters && (
+            <Link href={params.sort ? `/browse?sort=${params.sort}` : "/browse"} className="flex items-center gap-1 text-xs font-semibold text-teal-dim hover:text-teal">
+              <X size={12} /> Clear all
+            </Link>
+          )}
         </p>
-        <div className="flex items-center gap-1 bg-white border border-stone-line rounded-lg p-1">
-          <Link
-            href={withSort(params, undefined)}
-            className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
-              !params.sort ? "bg-navy text-white" : "text-ink/70 hover:text-ink"
-            }`}
-          >
-            Recommended
-          </Link>
-          <Link
-            href={withSort(params, "rating")}
-            className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
-              params.sort === "rating" ? "bg-navy text-white" : "text-ink/70 hover:text-ink"
-            }`}
-          >
-            Highest rated
-          </Link>
-        </div>
+        <BrowseSortToggle />
       </div>
 
       {/* Know exactly who you're looking for? Small, low-key search — not a
@@ -119,37 +124,22 @@ export default async function BrowsePage({
 
       {/* Mobile: horizontal scrolling filter chips. Desktop: sidebar (below) */}
       <div className="md:hidden mt-4 -mx-5 px-5 flex gap-2 overflow-x-auto no-scrollbar">
-        <Link
-          href={params.verified === "true" ? "/browse" : "/browse?verified=true"}
-          className={`shrink-0 flex items-center gap-1 text-sm px-4 py-2 rounded-full border-2 whitespace-nowrap ${
-            params.verified === "true"
-              ? "bg-navy border-navy text-white font-semibold"
-              : "bg-white border-stone-line text-ink/70"
-          }`}
-        >
+        <Link href={hrefWith(params, { verified: params.verified === "true" ? undefined : "true" })} className={chip(params.verified === "true")}>
           <BadgeCheck size={14} /> Verified only
         </Link>
-        <Link
-          href={params.mobile === "true" ? "/browse" : "/browse?mobile=true"}
-          className={`shrink-0 flex items-center gap-1 text-sm px-4 py-2 rounded-full border-2 whitespace-nowrap ${
-            params.mobile === "true"
-              ? "bg-navy border-navy text-white font-semibold"
-              : "bg-white border-stone-line text-ink/70"
-          }`}
-        >
+        <Link href={hrefWith(params, { mobile: params.mobile === "true" ? undefined : "true" })} className={chip(params.mobile === "true")}>
           <Car size={14} /> Comes to you
         </Link>
         {SUBCATEGORIES.map((s) => (
-          <Link
-            key={s}
-            href={`/browse?sub=${encodeURIComponent(s)}`}
-            className={`shrink-0 text-sm px-4 py-2 rounded-full border-2 whitespace-nowrap ${
-              params.sub === s
-                ? "bg-teal border-teal text-white font-semibold"
-                : "bg-white border-stone-line text-ink/70"
-            }`}
-          >
+          <Link key={s} href={hrefWith(params, { sub: params.sub === s ? undefined : s })} className={chip(params.sub === s, "teal")}>
             {s}
+          </Link>
+        ))}
+      </div>
+      <div className="md:hidden mt-2 -mx-5 px-5 flex gap-2 overflow-x-auto no-scrollbar">
+        {AREAS.map((a) => (
+          <Link key={a} href={hrefWith(params, { area: params.area === a ? undefined : a })} className={`${chip(params.area === a)} !text-xs !px-3 !py-1.5`}>
+            <MapPin size={12} /> {a}
           </Link>
         ))}
       </div>
@@ -159,38 +149,42 @@ export default async function BrowsePage({
         <aside className="hidden md:block space-y-6">
           <div>
             <Link
-              href={params.verified === "true" ? "/browse" : "/browse?verified=true"}
+              href={hrefWith(params, { verified: params.verified === "true" ? undefined : "true" })}
               className={`flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg ${
-                params.verified === "true" ? "bg-navy text-white" : "bg-canvas2 text-ink"
+                params.verified === "true" ? "bg-navy text-white" : "bg-canvas2 text-ink hover:bg-stone-line/60"
               }`}
             >
               <BadgeCheck size={14} /> Verified only
             </Link>
             <Link
-              href={params.mobile === "true" ? "/browse" : "/browse?mobile=true"}
+              href={hrefWith(params, { mobile: params.mobile === "true" ? undefined : "true" })}
               className={`flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg mt-1.5 ${
-                params.mobile === "true" ? "bg-navy text-white" : "bg-canvas2 text-ink"
+                params.mobile === "true" ? "bg-navy text-white" : "bg-canvas2 text-ink hover:bg-stone-line/60"
               }`}
             >
               <Car size={14} /> Comes to you
             </Link>
           </div>
           <div>
-            <h4 className="font-semibold text-ink text-sm mb-3">Service</h4>
-            <ul className="space-y-2 text-sm text-stone">
+            <h4 className="font-semibold text-ink text-sm mb-2">Service</h4>
+            <ul className="space-y-0.5 text-sm text-stone">
               {SUBCATEGORIES.map((s) => (
                 <li key={s}>
-                  <Link href={`/browse?sub=${encodeURIComponent(s)}`} className="hover:text-teal-dim">{s}</Link>
+                  <Link href={hrefWith(params, { sub: params.sub === s ? undefined : s })} className={sideLink(params.sub === s)}>
+                    {s} {params.sub === s && <X size={12} />}
+                  </Link>
                 </li>
               ))}
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-ink text-sm mb-3">Area</h4>
-            <ul className="space-y-2 text-sm text-stone">
+            <h4 className="font-semibold text-ink text-sm mb-2">Area</h4>
+            <ul className="space-y-0.5 text-sm text-stone">
               {AREAS.map((a) => (
                 <li key={a}>
-                  <Link href={`/browse?area=${encodeURIComponent(a)}`} className="hover:text-teal-dim">{a}</Link>
+                  <Link href={hrefWith(params, { area: params.area === a ? undefined : a })} className={sideLink(params.area === a)}>
+                    {a} {params.area === a && <X size={12} />}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -198,25 +192,30 @@ export default async function BrowsePage({
         </aside>
 
         {/* Results — single column on mobile, two on larger screens */}
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid sm:grid-cols-2 gap-4 content-start">
           {error && (
             <p className="text-sm text-red-600 col-span-2">
-              Couldn't load listings — check your Supabase connection.
+              Couldn't load listings right now — please try again in a moment.
             </p>
           )}
           {!error && listings.length === 0 && (
             <div className="col-span-2 text-center py-16 border-2 border-dashed border-stone-line rounded-xl bg-white">
-              <p className="text-stone">No businesses match yet. Be the first to get listed.</p>
-              <Link href="/business/signup" className="text-teal-dim font-semibold mt-2 inline-block">
-                List your business →
-              </Link>
+              <p className="text-stone">{hasFilters ? "No businesses match these filters yet." : "No businesses listed yet. Be the first to get listed."}</p>
+              {hasFilters ? (
+                <Link href="/browse" className="text-teal-dim font-semibold mt-2 inline-block">
+                  See all businesses →
+                </Link>
+              ) : (
+                <Link href="/business/signup" className="text-teal-dim font-semibold mt-2 inline-block">
+                  List your business →
+                </Link>
+              )}
             </div>
           )}
-          {listings.map((l) => (
-            <ListingCard key={l.id} listing={l} />
-          ))}
+          <SortedListings listings={listings} />
         </div>
       </div>
     </div>
+    </BrowseSortProvider>
   );
 }

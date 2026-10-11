@@ -107,3 +107,40 @@ input:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Success tick on payment / review confirmation */
+@keyframes popIn {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.pop-in {
+  animation: popIn 0.45s cubic-bezier(.2, .8, .2, 1.2) both;
+}
+
+/* Fresh booking glow on the bookings board */
+@keyframes newGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(5, 150, 105, 0); }
+}
+.new-glow {
+  animation: newGlow 1.8s ease-out infinite;
+}
+
+/* Bell wiggle while there's an unseen booking */
+@keyframes bellShake {
+  0%, 60%, 100% { transform: rotate(0); }
+  10%, 30% { transform: rotate(14deg); }
+  20%, 40% { transform: rotate(-12deg); }
+  50% { transform: rotate(6deg); }
+}
+
+/* Toast countdown bar */
+@keyframes shrinkX {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop-in, .new-glow { animation: none; }
+}

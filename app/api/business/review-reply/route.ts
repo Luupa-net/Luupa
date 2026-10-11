@@ -1,26 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { sendReviewReplyEmail } from "@/lib/email";
+import { getRequestUser, isUuid, readJson, siteUrl } from "@/lib/serverAuth";
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "");
-  if (!token) {
-    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
-  }
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !user) {
-    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
-  }
+  const auth = await getRequestUser(req);
+  if (!auth) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  const user = auth.user;
 
-  const { reviewId, reply } = await req.json();
-  if (!reviewId || typeof reply !== "string" || !reply.trim() || reply.length > 2000) {
+  const payload = await readJson<{ reviewId?: unknown; reply?: unknown }>(req);
+  const reviewId = payload?.reviewId;
+  const reply = payload?.reply;
+  if (!isUuid(reviewId)) return NextResponse.json({ error: "Invalid review." }, { status: 400 });
+  if (typeof reply !== "string" || !reply.trim() || reply.length > 2000) {
     return NextResponse.json({ error: "Reply must be between 1 and 2000 characters." }, { status: 400 });
   }
 
   const { data: reviewRow, error: reviewError } = await supabaseAdmin
     .from("reviews")
-    .select("id, owner_replied_at, businesses(owner_id)")
+    .select("id, owner_replied_at, customer_id, business_id, businesses(owner_id, name)")
     .eq("id", reviewId)
     .single();
   if (reviewError || !reviewRow) {
@@ -52,5 +50,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "You've already replied to this review." }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true });
+  // Close the loop: let the customer know the business answered. Best
+  // effort — the reply itself is already saved either way.
+  if (reviewRow.customer_id) {
+    const { data: customer } = await supabaseAdmin
+      .from("customers")
+      .select("name, email")
+      .eq("id", reviewRow.customer_id)
+      .maybeSingle();
+    if (customer?.email) {
+      await sendReviewReplyEmail(customer.email, {
+        businessName: (business as any).name || "The business",
+        customerName: customer.name || "there",
+        reply: reply.trim(),
+        listingUrl: `${siteUrl(req)}/listing/${reviewRow.business_id}#reviews`,
+      });
+    }
+  }
+
+  return NextResponse.json({ ok: true, repliedAt: new Date().toISOString() });
 }

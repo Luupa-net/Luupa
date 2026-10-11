@@ -98,7 +98,12 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
         setChecked(true);
         return;
       }
-      setBusiness(publicBiz ?? null);
+      // BUG FIX: businesses_public only holds APPROVED businesses, so staff of
+      // a business still pending review (or suspended) came back with no
+      // business at all and were locked out of the bookings board their owner
+      // can use. Their bookings come from bookings_operational, which only
+      // needs the id — fall back to that rather than nothing.
+      setBusiness(publicBiz ?? { id: staffRow.business_id, name: "Your business", status: null });
       setLoadError(false);
       setChecked(true);
       return;
@@ -113,7 +118,15 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     load();
-    const { data: listener } = supabase.auth.onAuthStateChange(() => load());
+    // Deferred, not awaited: supabase-js awaits every auth listener while it
+    // holds its internal lock, and load() itself calls getUser()/queries
+    // that need that same lock — returning load()'s promise here could stall
+    // sign-in (and token refreshes) until it settled, or deadlock outright.
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      // Token refreshes don't change who's signed in — no need to refetch.
+      if (event === "TOKEN_REFRESHED") return;
+      setTimeout(() => { load(); }, 0);
+    });
     return () => listener.subscription.unsubscribe();
   }, [load]);
 

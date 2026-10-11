@@ -2,12 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useBusiness } from "@/lib/BusinessContext";
-import { useRouter } from "next/navigation";
+import { useBusinessGuard } from "@/lib/useBusinessGuard";
 import Link from "next/link";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
+import { formatBhd } from "@/lib/money";
+import { downloadCsv, phoneCell } from "@/lib/csv";
+import { toKey } from "@/lib/calendarGrid";
 import BusinessLoadError from "@/components/BusinessLoadError";
-import { ArrowLeft, Search, X, SlidersHorizontal } from "lucide-react";
+import NotBusinessAccount from "@/components/NotBusinessAccount";
+import { ArrowLeft, Search, X, SlidersHorizontal, AlertCircle, Download, Users, Repeat, Wallet } from "lucide-react";
 
 type Customer = {
   phone: string;
@@ -36,21 +39,7 @@ function tagPillClass(tag: string) {
 }
 
 function visitDate(b: any): Date {
-  return new Date(b.preferred_date || b.created_at);
-}
-
-function mode(values: string[]): string | null {
-  if (values.length === 0) return null;
-  const counts = new Map<string, number>();
-  values.forEach((v) => counts.set(v, (counts.get(v) || 0) + 1));
-  let best: string | null = null;
-  let bestCount = 0;
-  // Map iteration uses forEach rather than for-of: this project targets ES5
-  // without downlevelIteration, so for-of over a Map fails to compile.
-  counts.forEach((c, v) => {
-    if (c > bestCount) { best = v; bestCount = c; }
-  });
-  return best;
+  return b.preferred_date ? new Date(`${b.preferred_date}T00:00:00`) : new Date(b.created_at);
 }
 
 // Groups every booking by normalized phone so walk-ins (customer_id null,
@@ -67,6 +56,8 @@ function buildCustomers(bookings: any[], notes: any[]): Customer[] {
 
   const result: Customer[] = [];
   groups.forEach((group, phone) => {
+    // A bare country code is "no number", not one shared customer.
+    if (phone.length < 8) return;
     const sorted = [...group].sort((a, b) => visitDate(b).getTime() - visitDate(a).getTime());
     const mostRecent = sorted[0];
     const email = sorted.find((b) => b.customer_email)?.customer_email ?? null;
@@ -100,43 +91,36 @@ function buildCustomers(bookings: any[], notes: any[]): Customer[] {
 }
 
 export default function CustomersPage() {
-  const { business, role, checked, loadError: businessLoadError, refresh } = useBusiness();
+  // Customer lifetime-value figures are revenue-derived — owner/manager only.
+  const { business, state: guardState, refresh } = useBusinessGuard({ ownerOnly: true });
   const [bookings, setBookings] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
-  const router = useRouter();
+  const [sort, setSort] = useState<"recent" | "value" | "visits">("recent");
 
   useEffect(() => {
-    if (!checked) return;
-    if (businessLoadError) {
-      setLoading(false);
-      return;
-    }
-    if (!business) {
-      router.push("/account/login");
-      return;
-    }
-    // Customer lifetime-value figures are revenue-derived — owner/manager only
-    // for this pass (see the staff feature's scope notes).
-    if (role === "staff") {
-      router.push("/business/bookings");
+    if (guardState !== "ready") {
+      if (guardState !== "checking") setLoading(false);
       return;
     }
     async function load() {
-      const [{ data: bks }, { data: notesRows }] = await Promise.all([
+      const [bookingsRes, notesRes] = await Promise.all([
         supabase.from("bookings").select("*").eq("business_id", business.id),
         supabase.from("customer_notes").select("*").eq("business_id", business.id),
       ]);
-      setBookings(bks || []);
-      setNotes(notesRows || []);
+      setLoadError(!!(bookingsRes.error || notesRes.error));
+      setBookings(bookingsRes.data || []);
+      setNotes(notesRes.data || []);
       setLoading(false);
     }
     load();
     // Keyed on business?.id, not the business object itself, so a content-only
     // update to the shared context doesn't retrigger this effect for nothing.
-  }, [checked, businessLoadError, business?.id, role, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardState, business?.id]);
 
   const customers = useMemo(() => buildCustomers(bookings, notes), [bookings, notes]);
 
@@ -148,14 +132,27 @@ export default function CustomersPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return customers.filter((c) => {
+    const list = customers.filter((c) => {
       if (tagFilter !== "all" && c.tag !== tagFilter) return false;
       if (!q) return true;
       return [c.name, c.phone, c.email].some((f) => (f || "").toLowerCase().includes(q));
     });
-  }, [customers, search, tagFilter]);
+    if (sort === "value") return [...list].sort((a, b) => b.lifetimeValue - a.lifetimeValue);
+    if (sort === "visits") return [...list].sort((a, b) => b.bookingCount - a.bookingCount);
+    return list;
+  }, [customers, search, tagFilter, sort]);
 
   const hasActiveFilters = search.trim() !== "" || tagFilter !== "all";
+  const repeatCount = customers.filter((c) => c.bookingCount > 1).length;
+  const totalValue = customers.reduce((s, c) => s + c.lifetimeValue, 0);
+
+  function exportCsv() {
+    downloadCsv(
+      `luupa-customers-${toKey(new Date())}.csv`,
+      ["Name", "Phone", "Email", "Bookings", "Last visit", "Lifetime value (BHD)", "Tag"],
+      filtered.map((c) => [c.name, phoneCell(c.phone), c.email || "", c.bookingCount, toKey(new Date(c.lastVisit)), c.lifetimeValue.toFixed(3), c.tag || ""])
+    );
+  }
 
   if (loading) {
     return (
@@ -172,8 +169,9 @@ export default function CustomersPage() {
       </div>
     );
   }
-  if (businessLoadError) return <BusinessLoadError onRetry={refresh} />;
-  if (!business) return <div className="max-w-4xl mx-auto px-6 py-16 text-stone">No listing found.</div>;
+  if (guardState === "error") return <BusinessLoadError onRetry={refresh} />;
+  if (guardState === "not_business") return <NotBusinessAccount />;
+  if (!business || guardState !== "ready") return null;
 
   return (
     <div className="bg-canvas2 min-h-screen">
@@ -184,7 +182,26 @@ export default function CustomersPage() {
 
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Customers</h1>
-          <p className="text-sm text-stone">{customers.length} total</p>
+          <button
+            onClick={exportCsv}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 h-9 rounded-lg bg-white border border-stone-line text-ink/80 hover:text-ink hover:border-navy/30 transition-colors disabled:opacity-50"
+          >
+            <Download size={13} /> Export
+          </button>
+        </div>
+
+        {loadError && (
+          <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+            <AlertCircle size={15} className="text-red-600 shrink-0" />
+            <p className="text-sm text-red-700">Couldn't load your customers — try refreshing the page.</p>
+          </div>
+        )}
+
+        <div className="flex sm:grid sm:grid-cols-3 gap-3 mt-6 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:overflow-visible">
+          <MiniStat icon={<Users size={14} />} label="Customers" value={customers.length} />
+          <MiniStat icon={<Repeat size={14} />} label="Came back more than once" value={customers.length ? `${repeatCount} · ${Math.round((repeatCount / customers.length) * 100)}%` : "0"} />
+          <MiniStat icon={<Wallet size={14} />} label="Lifetime revenue" value={formatBhd(totalValue)} />
         </div>
 
         {/* Toolbar — search + tag filter, mirrors the bookings page pattern */}
@@ -214,6 +231,16 @@ export default function CustomersPage() {
             </select>
             <SlidersHorizontal size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone pointer-events-none" />
           </div>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as typeof sort)}
+            aria-label="Sort customers"
+            className="input bg-white appearance-none w-auto pr-7"
+          >
+            <option value="recent">Most recent</option>
+            <option value="value">Highest value</option>
+            <option value="visits">Most visits</option>
+          </select>
           {hasActiveFilters && (
             <button
               onClick={() => { setSearch(""); setTagFilter("all"); }}
@@ -269,7 +296,7 @@ export default function CustomersPage() {
                     {new Date(c.lastVisit).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                   </span>
                   <span className="hidden sm:block w-28 text-right shrink-0 text-sm font-medium text-ink">
-                    BHD {c.lifetimeValue.toFixed(c.lifetimeValue % 1 === 0 ? 0 : 2)}
+                    {formatBhd(c.lifetimeValue)}
                   </span>
                 </Link>
               ))}
@@ -277,6 +304,16 @@ export default function CustomersPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function MiniStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
+  return (
+    <div className="shrink-0 w-[170px] sm:w-auto rounded-xl bg-white border border-stone-line px-4 py-3.5">
+      <span className="inline-flex items-center justify-center w-6 h-6 rounded-md mb-1.5 text-navy bg-navy/10">{icon}</span>
+      <p className="font-display text-xl font-semibold text-ink leading-tight truncate">{value}</p>
+      <p className="text-xs text-stone mt-0.5">{label}</p>
     </div>
   );
 }

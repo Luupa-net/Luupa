@@ -1,21 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useBusiness } from "@/lib/BusinessContext";
-import { useRouter } from "next/navigation";
+import { useBusinessGuard } from "@/lib/useBusinessGuard";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { periodComparison, getPeriodBounds } from "@/lib/bookingPeriods";
+import { periodComparison, revenueInPeriod } from "@/lib/bookingPeriods";
 import { getMonthGrid, getWeekDays, addDays, addMonths, toKey, isSameDay, WEEKDAY_LABELS } from "@/lib/calendarGrid";
 import ManualBookingForm from "@/components/ManualBookingForm";
-import BookingDrawer from "@/components/BookingDrawer";
+import dynamic from "next/dynamic";
 import BusinessLoadError from "@/components/BusinessLoadError";
+import NotBusinessAccount from "@/components/NotBusinessAccount";
 import { useRealtimeBookings } from "@/lib/useRealtimeBookings";
+import { useBookingAlerts, formatWhen } from "@/lib/BookingAlertsContext";
+import { notifyCustomerOfStatus } from "@/lib/notifyCustomer";
+import { formatBhd, PAYMENT_METHOD_LABEL, receiptNumber } from "@/lib/money";
+import { downloadCsv, phoneCell } from "@/lib/csv";
 import {
   ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Plus, TrendingUp, TrendingDown, Minus,
   Search, X, CalendarDays, LayoutGrid, ListChecks, MousePointerClick, SlidersHorizontal,
-  Clock3, Wallet, AlertCircle, CalendarPlus,
+  Clock3, Wallet, AlertCircle, Check, Loader2, BellRing, Download,
 } from "lucide-react";
+
+// The drawer (details/checkout/history/notes) is the heaviest part of this
+// page and only matters once a booking is opened — split into its own chunk
+// and warmed up in the background right after the board renders, so the
+// first open is still instant.
+const loadDrawer = () => import("@/components/BookingDrawer");
+const BookingDrawer = dynamic(loadDrawer, { ssr: false });
 
 type View = "month" | "week" | "day" | "list";
 
@@ -32,7 +44,15 @@ const STATUS_FILTERS = [
 ] as const;
 
 export default function BookingsPage() {
-  const { business, role, checked, loadError: businessLoadError, refresh } = useBusiness();
+  return (
+    <Suspense>
+      <BookingsBoard />
+    </Suspense>
+  );
+}
+
+function BookingsBoard() {
+  const { business, role, state: guardState, refresh } = useBusinessGuard();
   const isStaff = role === "staff";
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,17 +65,21 @@ export default function BookingsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [updateError, setUpdateError] = useState<string | null>(null);
-  const [toasts, setToasts] = useState<{ id: string; booking: any }[]>([]);
+  // Bookings that arrived while this page was open — glow until opened.
+  const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const openId = searchParams.get("open");
+  const alerts = useBookingAlerts();
 
   useEffect(() => {
-    if (!checked) return;
-    if (businessLoadError) {
-      setLoading(false);
-      return;
-    }
-    if (!business) {
-      router.push("/account/login");
+    const idle = (window as any).requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 600));
+    idle(() => { loadDrawer(); });
+  }, []);
+
+  useEffect(() => {
+    if (guardState !== "ready") {
+      if (guardState !== "checking") setLoading(false);
       return;
     }
     async function load() {
@@ -76,7 +100,8 @@ export default function BookingsPage() {
     // Keyed on business?.id, not the business object itself, so a content-only
     // update (e.g. the dashboard patching a saved field into the shared
     // context) doesn't retrigger this effect and refetch bookings for nothing.
-  }, [checked, businessLoadError, business?.id, isStaff, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardState, business?.id, isStaff]);
 
   // Live updates from Realtime: another tab/device changing a booking (or a
   // customer's own action on their side) shows up here without a refresh.
@@ -89,17 +114,11 @@ export default function BookingsPage() {
   // no-op instead of holding open a channel that never fires.
   useRealtimeBookings("business_id", isStaff ? undefined : business?.id, ({ eventType, new: newRow, old: oldRow }) => {
     if (eventType === "INSERT") {
-      // Only toast for bookings genuinely new to this tab — a booking this
-      // same tab just created via ManualBookingForm already arrived through
-      // its own optimistic prepend, so this would otherwise double-announce
-      // the owner's own action back at them.
-      const isNew = !bookings.some((b) => b.id === newRow.id);
+      // The announcement itself (toast, chime, desktop notification) is
+      // handled site-wide by BookingAlertsContext — this just keeps the
+      // board's own list current.
       setBookings((prev) => (prev.some((b) => b.id === newRow.id) ? prev : [newRow, ...prev]));
-      if (isNew) {
-        const toastId = `${newRow.id}-${Date.now()}`;
-        setToasts((prev) => [...prev, { id: toastId, booking: newRow }]);
-        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== toastId)), 8000);
-      }
+      if (newRow.status === "pending") setFreshIds((prev) => new Set(prev).add(newRow.id));
     } else if (eventType === "UPDATE") {
       setBookings((prev) => prev.map((b) => (b.id === newRow.id ? newRow : b)));
       setSelected((prev: any) => (prev?.id === newRow.id ? newRow : prev));
@@ -109,20 +128,110 @@ export default function BookingsPage() {
     }
   });
 
+  // Staff (no Realtime, see above) still see new requests: the alerts layer
+  // polls for them and tells this board. Confirm/Decline from a toast or the
+  // bell inbox also lands here so the calendar reflects it immediately.
+  useEffect(() => {
+    return alerts.subscribe((e) => {
+      if (e.type === "insert") {
+        setBookings((prev) => (prev.some((b) => b.id === e.row.id) ? prev : [e.row, ...prev]));
+        if (e.row.status === "pending") setFreshIds((prev) => new Set(prev).add(e.row.id));
+      } else {
+        setBookings((prev) => prev.map((b) => (b.id === e.id ? { ...b, ...e.changes } : b)));
+        setSelected((prev: any) => (prev?.id === e.id ? { ...prev, ...e.changes } : prev));
+      }
+    });
+  }, [alerts.subscribe]);
+
+  // Deep link: /business/bookings?open=<id> (from a toast, the bell, or the
+  // new-booking email) opens that booking's panel straight away.
+  useEffect(() => {
+    if (!openId || loading) return;
+    const match = bookings.find((b) => b.id === openId);
+    if (match) {
+      selectBooking(match);
+      if (match.preferred_date) setAnchor(new Date(`${match.preferred_date}T00:00:00`));
+    }
+    router.replace("/business/bookings", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId, loading]);
+
+  function selectBooking(b: any) {
+    setSelected(b);
+    if (b && freshIds.has(b.id)) {
+      setFreshIds((prev) => {
+        const next = new Set(prev);
+        next.delete(b.id);
+        return next;
+      });
+    }
+  }
+
+  function friendlyError(message: string | undefined): string {
+    if (message?.includes("PAYMENT_REQUIRED")) return "Take payment first — open the Payment tab to check out and complete this booking.";
+    if (message?.includes("PAYMENT_LOCKED")) return "A completed booking stays paid — record a refund in the Payment tab instead.";
+    return "Couldn't save that change — please try again.";
+  }
+
   async function updateBooking(id: string, changes: Record<string, any>) {
     const previous = bookings.find((b) => b.id === id);
     setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, ...changes } : b)));
     if (selected?.id === id) setSelected((prev: any) => ({ ...prev, ...changes }));
-    // Supabase's query builder is lazy — it only actually sends the request once
-    // awaited/then()'d. Leaving this un-awaited (as it was before) meant the
-    // network call never fired at all: every status change, invoice amount, and
-    // edit here looked saved in the UI but was silently lost on refresh.
-    const { error } = await supabase.from("bookings").update(changes).eq("id", id);
+    setUpdateError(null);
+    // Staff write through the whitelisted RPC (migration v29): a direct
+    // UPDATE from a staff session silently matched 0 rows under RLS, so
+    // every staff status change used to look saved but never was.
+    const { error } = isStaff
+      ? await supabase.rpc("update_booking_operational", { p_booking_id: id, p_changes: changes })
+      : await supabase.from("bookings").update(changes).eq("id", id);
     if (error && previous) {
       setBookings((prev) => prev.map((b) => (b.id === id ? previous : b)));
       if (selected?.id === id) setSelected(previous);
-      setUpdateError("Couldn't save that change — please try again.");
+      setUpdateError(friendlyError(error.message));
+      return;
     }
+    if (!error && "status" in changes) notifyCustomerOfStatus(id, changes.status);
+  }
+
+  function exportCsv() {
+    const sorted = [...filtered].sort((a, b) =>
+      `${b.preferred_date || b.created_at}`.localeCompare(`${a.preferred_date || a.created_at}`)
+    );
+    const header = ["Date", "Time", "Customer", "Phone", "Email", "Service", "Vehicle", "Plate", "Status", "Source"];
+    if (!isStaff) header.push("Total (BHD)", "Paid", "Method", "Receipt");
+    downloadCsv(
+      `luupa-bookings-${toKey(new Date())}.csv`,
+      header,
+      sorted.map((b) => {
+        const row: unknown[] = [
+          b.preferred_date || toKey(new Date(b.created_at)),
+          b.preferred_time || "",
+          b.customer_name,
+          phoneCell(b.customer_contact),
+          b.customer_email || "",
+          b.service || "",
+          [b.vehicle_make, b.vehicle_model].filter(Boolean).join(" "),
+          b.vehicle_plate || "",
+          String(b.status || "").replace("_", " "),
+          b.source === "manual" ? "Manual" : "Luupa",
+        ];
+        if (!isStaff) {
+          row.push(
+            b.amount != null ? Number(b.amount).toFixed(3) : "",
+            b.paid ? "Yes" : "No",
+            b.payment_method ? PAYMENT_METHOD_LABEL[b.payment_method] || b.payment_method : "",
+            b.paid ? receiptNumber(b.id) : ""
+          );
+        }
+        return row;
+      })
+    );
+  }
+
+  // A full row the server already saved (checkout) — merge, no extra write.
+  function patchBooking(row: any) {
+    setBookings((prev) => prev.map((b) => (b.id === row.id ? { ...b, ...row } : b)));
+    setSelected((prev: any) => (prev?.id === row.id ? { ...prev, ...row } : prev));
   }
 
   const filtered = useMemo(() => {
@@ -169,19 +278,17 @@ export default function BookingsPage() {
       </div>
     );
   }
-  if (businessLoadError) return <BusinessLoadError onRetry={refresh} />;
-  if (!business) return <div className="max-w-4xl mx-auto px-6 py-16 text-stone">No listing found.</div>;
+  if (guardState === "error") return <BusinessLoadError onRetry={refresh} />;
+  if (guardState === "not_business") return <NotBusinessAccount />;
+  if (!business || guardState !== "ready") return null;
 
   const today = periodComparison(bookings, "day");
   const week = periodComparison(bookings, "week");
   const month = periodComparison(bookings, "month");
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
-  const monthBounds = getPeriodBounds("month", 0);
   // Not computed at all for staff — bookings_operational doesn't carry
   // `amount`, so this would be meaningless (always 0) rather than just hidden.
-  const revenueThisMonth = isStaff ? 0 : bookings
-    .filter((b) => b.paid && b.amount != null && new Date(b.created_at) >= monthBounds.start && new Date(b.created_at) < monthBounds.end)
-    .reduce((sum, b) => sum + Number(b.amount || 0), 0);
+  const revenueThisMonth = isStaff ? 0 : revenueInPeriod(bookings, "month");
 
   return (
     <div className="bg-canvas2 min-h-screen">
@@ -222,6 +329,17 @@ export default function BookingsPage() {
           </div>
         )}
 
+        {alerts.pending.length > 0 && (
+          <NeedsReply
+            pending={alerts.pending}
+            onRespond={alerts.respond}
+            onOpen={(id) => {
+              const match = bookings.find((b) => b.id === id);
+              if (match) selectBooking(match);
+            }}
+          />
+        )}
+
         {/* Analytics — a horizontally scrollable row on phones, a full grid
             from tablet up. Clickable, jumps the calendar to that view. */}
         <div className={`flex ${isStaff ? "sm:grid-cols-4" : "sm:grid-cols-5"} sm:grid gap-3 mt-6 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 sm:overflow-visible`}>
@@ -230,7 +348,7 @@ export default function BookingsPage() {
           <AnalyticsCard label="This month" data={month} compareLabel="vs last month" onClick={() => jumpTo("month")} />
           <SimpleStatCard icon={<Clock3 size={14} />} label="Pending" value={pendingCount} tint={pendingCount > 0 ? "teal" : "stone"} onClick={() => setStatusFilter("pending")} />
           {!isStaff && (
-            <SimpleStatCard icon={<Wallet size={14} />} label="Revenue (mo.)" value={`BHD ${revenueThisMonth.toFixed(revenueThisMonth % 1 === 0 ? 0 : 2)}`} tint="navy" />
+            <SimpleStatCard icon={<Wallet size={14} />} label="Revenue this month" value={formatBhd(revenueThisMonth)} tint="navy" />
           )}
         </div>
 
@@ -269,6 +387,14 @@ export default function BookingsPage() {
               Clear filters
             </button>
           )}
+          <button
+            onClick={exportCsv}
+            disabled={filtered.length === 0}
+            title="Download these bookings as a spreadsheet (CSV)"
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 h-[38px] rounded-lg bg-white border border-stone-line text-ink/80 hover:text-ink hover:border-navy/30 transition-colors disabled:opacity-50"
+          >
+            <Download size={13} /> Export
+          </button>
           <div className="flex items-center gap-1 bg-white border border-stone-line rounded-lg p-1 ml-auto">
             <ViewToggleBtn active={view === "month"} onClick={() => setView("month")} icon={<LayoutGrid size={13} />} label="Month" />
             <ViewToggleBtn active={view === "week"} onClick={() => setView("week")} icon={<CalendarDays size={13} />} label="Week" />
@@ -303,7 +429,7 @@ export default function BookingsPage() {
                 <div className="absolute top-full left-4 mt-1 bg-white rounded-xl border border-stone-line shadow-lg p-3 flex gap-2 z-20">
                   <select
                     value={anchor.getMonth()}
-                    onChange={(e) => setAnchor(new Date(anchor.getFullYear(), Number(e.target.value), anchor.getDate()))}
+                    onChange={(e) => setAnchor(clampedDate(anchor.getFullYear(), Number(e.target.value), anchor.getDate()))}
                     className="input text-sm"
                   >
                     {Array.from({ length: 12 }, (_, i) => (
@@ -313,17 +439,17 @@ export default function BookingsPage() {
                   {view === "day" && (
                     <select
                       value={anchor.getDate()}
-                      onChange={(e) => setAnchor(new Date(anchor.getFullYear(), anchor.getMonth(), Number(e.target.value)))}
+                      onChange={(e) => setAnchor(clampedDate(anchor.getFullYear(), anchor.getMonth(), Number(e.target.value)))}
                       className="input text-sm"
                     >
-                      {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      {Array.from({ length: daysInMonth(anchor.getFullYear(), anchor.getMonth()) }, (_, i) => i + 1).map((d) => (
                         <option key={d} value={d}>{d}</option>
                       ))}
                     </select>
                   )}
                   <select
                     value={anchor.getFullYear()}
-                    onChange={(e) => setAnchor(new Date(Number(e.target.value), anchor.getMonth(), anchor.getDate()))}
+                    onChange={(e) => setAnchor(clampedDate(Number(e.target.value), anchor.getMonth(), anchor.getDate()))}
                     className="input text-sm"
                   >
                     {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 1 + i).map((y) => (
@@ -350,16 +476,16 @@ export default function BookingsPage() {
           )}
 
           {view === "month" && (
-            <MonthGrid anchor={anchor} bookingsOn={bookingsOn} onSelectDay={(d) => { setAnchor(d); setView("day"); }} />
+            <MonthGrid anchor={anchor} bookingsOn={bookingsOn} freshIds={freshIds} onSelectDay={(d) => { setAnchor(d); setView("day"); }} />
           )}
           {view === "week" && (
-            <WeekGrid anchor={anchor} bookingsOn={bookingsOn} onSelectBooking={setSelected} onSelectDay={(d) => { setAnchor(d); setView("day"); }} />
+            <WeekGrid anchor={anchor} bookingsOn={bookingsOn} freshIds={freshIds} onSelectBooking={selectBooking} onSelectDay={(d) => { setAnchor(d); setView("day"); }} />
           )}
           {view === "day" && (
-            <DayList anchor={anchor} bookingsOn={bookingsOn} onSelectBooking={setSelected} />
+            <DayList anchor={anchor} bookingsOn={bookingsOn} freshIds={freshIds} onSelectBooking={selectBooking} />
           )}
           {view === "list" && (
-            <AgendaList bookings={filtered} selectedId={selected?.id} onSelectBooking={setSelected} />
+            <AgendaList bookings={filtered} selectedId={selected?.id} freshIds={freshIds} onSelectBooking={selectBooking} />
           )}
         </div>
 
@@ -389,10 +515,9 @@ export default function BookingsPage() {
         <BookingDrawer
           booking={selected}
           business={business}
-          businessName={business.name}
-          paymentQrUrl={business.payment_qr_url}
           isStaff={isStaff}
           onUpdate={updateBooking}
+          onPatched={patchBooking}
           onClose={() => setSelected(null)}
         />
       )}
@@ -400,41 +525,77 @@ export default function BookingsPage() {
       {showAddForm && (
         <ManualBookingForm
           businessId={business.id}
-          onAdded={(b) => setBookings((prev) => [b, ...prev])}
+          isStaff={isStaff}
+          onAdded={(b) => setBookings((prev) => (prev.some((x) => x.id === b.id) ? prev : [b, ...prev]))}
           onClose={() => setShowAddForm(false)}
         />
       )}
 
-      {toasts.length > 0 && (
-        <div className="fixed top-20 right-4 sm:right-6 z-[60] w-[calc(100%-2rem)] sm:w-80 space-y-2.5">
-          {toasts.map((t) => (
-            <NewBookingToast
-              key={t.id}
-              booking={t.booking}
-              onOpen={() => { setSelected(t.booking); setToasts((prev) => prev.filter((x) => x.id !== t.id)); }}
-              onDismiss={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
-function NewBookingToast({ booking, onOpen, onDismiss }: { booking: any; onOpen: () => void; onDismiss: () => void }) {
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+// Jumping from Jan 31 to "February" must land on Feb 28/29, not roll over
+// into March the way new Date(y, 1, 31) does.
+function clampedDate(year: number, month: number, day: number): Date {
+  return new Date(year, month, Math.min(day, daysInMonth(year, month)));
+}
+
+// Pending requests, front and centre — reply without hunting the calendar.
+function NeedsReply({
+  pending,
+  onRespond,
+  onOpen,
+}: {
+  pending: any[];
+  onRespond: (id: string, status: "confirmed" | "declined") => Promise<{ error?: string }>;
+  onOpen: (id: string) => void;
+}) {
   return (
-    <div className="fade-up bg-white rounded-xl border border-teal/30 shadow-lg shadow-black/10 p-3.5 flex items-start gap-3">
-      <span className="w-9 h-9 rounded-full bg-teal/10 text-teal-dim flex items-center justify-center shrink-0">
-        <CalendarPlus size={16} />
-      </span>
-      <button onClick={onOpen} className="flex-1 min-w-0 text-left">
-        <p className="text-xs font-semibold text-teal-dim uppercase tracking-wide">New booking</p>
-        <p className="text-sm font-medium text-ink truncate mt-0.5">{booking.customer_name}</p>
-        <p className="text-xs text-stone truncate">{booking.service || "No service specified"}</p>
+    <div className="mt-6 rounded-2xl border border-teal/25 bg-gradient-to-br from-teal/[0.06] to-white p-4 fade-up">
+      <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+        <span className="relative flex w-2.5 h-2.5">
+          <span className="absolute inset-0 rounded-full bg-teal animate-ping opacity-60" />
+          <span className="relative w-2.5 h-2.5 rounded-full bg-teal" />
+        </span>
+        <BellRing size={14} className="text-teal-dim" />
+        {pending.length} {pending.length === 1 ? "request needs" : "requests need"} a reply
+      </p>
+      <div className="mt-3 flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
+        {pending.slice(0, 10).map((b) => (
+          <NeedsReplyCard key={b.id} booking={b} onRespond={onRespond} onOpen={() => onOpen(b.id)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NeedsReplyCard({ booking: b, onRespond, onOpen }: { booking: any; onRespond: (id: string, s: "confirmed" | "declined") => Promise<{ error?: string }>; onOpen: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  async function act(status: "confirmed" | "declined") {
+    setBusy(status);
+    await onRespond(b.id, status);
+    setBusy(null);
+  }
+  return (
+    <div className="shrink-0 w-[250px] rounded-xl bg-white border border-stone-line p-3.5 shadow-sm hover:shadow-md transition-shadow">
+      <button onClick={onOpen} className="w-full text-left">
+        <p className="text-sm font-semibold text-ink truncate">{b.customer_name || "Customer"}</p>
+        <p className="text-xs text-stone truncate">{b.service || "Service not specified"}</p>
+        <p className="text-xs text-navy font-medium mt-1">{formatWhen(b)}</p>
       </button>
-      <button onClick={onDismiss} aria-label="Dismiss" className="text-stone hover:text-ink shrink-0 p-0.5">
-        <X size={14} />
-      </button>
+      <div className="grid grid-cols-2 gap-2 mt-3">
+        <button onClick={() => act("confirmed")} disabled={!!busy} className="flex items-center justify-center gap-1 text-xs font-semibold py-1.5 rounded-lg bg-navy text-white hover:bg-navy-light disabled:opacity-60">
+          {busy === "confirmed" ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Confirm
+        </button>
+        <button onClick={() => act("declined")} disabled={!!busy} className="flex items-center justify-center gap-1 text-xs font-semibold py-1.5 rounded-lg border border-stone-line text-ink hover:text-red-600 hover:border-red-200 disabled:opacity-60">
+          {busy === "declined" ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />} Decline
+        </button>
+      </div>
     </div>
   );
 }
@@ -486,7 +647,7 @@ function SimpleStatCard({ icon, label, value, tint, onClick }: { icon: React.Rea
   );
 }
 
-function MonthGrid({ anchor, bookingsOn, onSelectDay }: { anchor: Date; bookingsOn: (d: Date) => any[]; onSelectDay: (d: Date) => void }) {
+function MonthGrid({ anchor, bookingsOn, freshIds, onSelectDay }: { anchor: Date; bookingsOn: (d: Date) => any[]; freshIds: Set<string>; onSelectDay: (d: Date) => void }) {
   const weeks = getMonthGrid(anchor);
   const today = new Date();
   return (
@@ -498,24 +659,49 @@ function MonthGrid({ anchor, bookingsOn, onSelectDay }: { anchor: Date; bookings
         {weeks.flat().map((day, i) => {
           const inMonth = day.getMonth() === anchor.getMonth();
           const dayBookings = bookingsOn(day);
+          const pendingHere = dayBookings.filter((b) => b.status === "pending").length;
+          const hasFresh = dayBookings.some((b) => freshIds.has(b.id));
           return (
             <button
               key={i}
               onClick={() => onSelectDay(day)}
-              className={`aspect-square sm:aspect-[4/3] border-t border-l border-stone-line p-1.5 text-left hover:bg-canvas2 transition-colors ${
+              className={`relative aspect-square sm:aspect-[4/3] border-t border-l border-stone-line p-1.5 text-left hover:bg-canvas2 transition-colors overflow-hidden ${
                 i % 7 === 6 ? "border-r" : ""
-              } ${!inMonth ? "text-stone-dim bg-canvas2/40" : "text-ink"}`}
+              } ${!inMonth ? "text-stone-dim bg-canvas2/40" : "text-ink"} ${pendingHere > 0 ? "bg-teal/[0.04]" : ""}`}
             >
-              <span className={`text-xs ${isSameDay(day, today) ? "bg-teal text-white rounded-full w-5 h-5 inline-flex items-center justify-center" : ""}`}>
-                {day.getDate()}
+              <span className="flex items-center justify-between gap-1">
+                <span className={`text-xs ${isSameDay(day, today) ? "bg-teal text-white rounded-full w-5 h-5 inline-flex items-center justify-center" : ""}`}>
+                  {day.getDate()}
+                </span>
+                {pendingHere > 0 && (
+                  <span className={`text-[9px] font-bold text-white bg-teal rounded-full min-w-[16px] h-4 px-1 inline-flex items-center justify-center ${hasFresh ? "new-glow" : ""}`} title={`${pendingHere} awaiting reply`}>
+                    {pendingHere}
+                  </span>
+                )}
               </span>
               {dayBookings.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-0.5">
-                  {dayBookings.slice(0, 3).map((b) => (
-                    <span key={b.id} className={`w-1.5 h-1.5 rounded-full ${b.status === "pending" ? "bg-teal" : "bg-navy"}`} />
-                  ))}
-                  {dayBookings.length > 3 && <span className="text-[9px] text-stone">+{dayBookings.length - 3}</span>}
-                </div>
+                <>
+                  {/* Phones: compact dots. Larger screens: named pills, so a
+                      new request reads as a booking, not a speck. */}
+                  <div className="mt-1 flex flex-wrap gap-0.5 sm:hidden">
+                    {dayBookings.slice(0, 3).map((b) => (
+                      <span key={b.id} className={`w-1.5 h-1.5 rounded-full ${b.status === "pending" ? "bg-teal" : "bg-navy"}`} />
+                    ))}
+                  </div>
+                  <div className="hidden sm:block mt-1 space-y-0.5">
+                    {dayBookings.slice(0, 2).map((b) => (
+                      <span
+                        key={b.id}
+                        className={`block truncate text-[10px] leading-4 rounded px-1 ${
+                          b.status === "pending" ? "bg-teal/15 text-teal-dim font-semibold" : b.status === "completed" ? "bg-emerald-50 text-emerald-700" : "bg-navy/10 text-navy"
+                        }`}
+                      >
+                        {b.preferred_time ? `${b.preferred_time} ` : ""}{b.customer_name}
+                      </span>
+                    ))}
+                    {dayBookings.length > 2 && <span className="block text-[9px] text-stone px-1">+{dayBookings.length - 2} more</span>}
+                  </div>
+                </>
               )}
             </button>
           );
@@ -525,7 +711,11 @@ function MonthGrid({ anchor, bookingsOn, onSelectDay }: { anchor: Date; bookings
   );
 }
 
-function WeekGrid({ anchor, bookingsOn, onSelectBooking, onSelectDay }: { anchor: Date; bookingsOn: (d: Date) => any[]; onSelectBooking: (b: any) => void; onSelectDay: (d: Date) => void }) {
+function NewBadge() {
+  return <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-white bg-teal px-1.5 py-0.5 rounded-full new-glow">New</span>;
+}
+
+function WeekGrid({ anchor, bookingsOn, freshIds, onSelectBooking, onSelectDay }: { anchor: Date; bookingsOn: (d: Date) => any[]; freshIds: Set<string>; onSelectBooking: (b: any) => void; onSelectDay: (d: Date) => void }) {
   const days = getWeekDays(anchor);
   const today = new Date();
   return (
@@ -546,7 +736,7 @@ function WeekGrid({ anchor, bookingsOn, onSelectBooking, onSelectDay }: { anchor
                 <button
                   key={b.id}
                   onClick={() => onSelectBooking(b)}
-                  className={`w-full text-left text-[10px] rounded px-1.5 py-1 truncate transition-transform hover:scale-[1.03] ${b.status === "pending" ? "bg-teal/15 text-teal-dim" : "bg-navy/10 text-navy"}`}
+                  className={`w-full text-left text-[10px] rounded px-1.5 py-1 truncate transition-transform hover:scale-[1.03] ${b.status === "pending" ? "bg-teal/15 text-teal-dim font-semibold" : "bg-navy/10 text-navy"} ${freshIds.has(b.id) ? "new-glow" : ""}`}
                 >
                   {b.preferred_time && <span className="font-medium">{b.preferred_time} </span>}
                   {b.customer_name}
@@ -560,7 +750,7 @@ function WeekGrid({ anchor, bookingsOn, onSelectBooking, onSelectDay }: { anchor
   );
 }
 
-function DayList({ anchor, bookingsOn, onSelectBooking }: { anchor: Date; bookingsOn: (d: Date) => any[]; onSelectBooking: (b: any) => void }) {
+function DayList({ anchor, bookingsOn, freshIds, onSelectBooking }: { anchor: Date; bookingsOn: (d: Date) => any[]; freshIds: Set<string>; onSelectBooking: (b: any) => void }) {
   const dayBookings = bookingsOn(anchor);
   return (
     <div className="p-4 space-y-2.5">
@@ -576,7 +766,10 @@ function DayList({ anchor, bookingsOn, onSelectBooking }: { anchor: Date; bookin
           }`}
         >
           <div className="flex items-center justify-between gap-3">
-            <span className="font-medium text-ink text-sm">{b.customer_name}</span>
+            <span className="font-medium text-ink text-sm flex items-center gap-2 min-w-0">
+              <span className="truncate">{b.customer_name}</span>
+              {freshIds.has(b.id) && <NewBadge />}
+            </span>
             <StatusChip status={b.status} />
           </div>
           <p className="text-xs text-stone mt-0.5">
@@ -590,7 +783,7 @@ function DayList({ anchor, bookingsOn, onSelectBooking }: { anchor: Date; bookin
 
 // Flat, chronological view of every filtered booking — the fastest way to
 // scan "what's coming up" on a small phone screen without navigating a grid.
-function AgendaList({ bookings, selectedId, onSelectBooking }: { bookings: any[]; selectedId?: string; onSelectBooking: (b: any) => void }) {
+function AgendaList({ bookings, selectedId, freshIds, onSelectBooking }: { bookings: any[]; selectedId?: string; freshIds: Set<string>; onSelectBooking: (b: any) => void }) {
   const sorted = [...bookings].sort((a, b) => {
     const aKey = `${a.preferred_date || toKey(new Date(a.created_at))} ${a.preferred_time || ""}`;
     const bKey = `${b.preferred_date || toKey(new Date(b.created_at))} ${b.preferred_time || ""}`;
@@ -602,7 +795,7 @@ function AgendaList({ bookings, selectedId, onSelectBooking }: { bookings: any[]
   const tomorrow = toKey(addDays(new Date(), 1));
   for (const b of sorted) {
     const key = b.preferred_date || toKey(new Date(b.created_at));
-    const label = key === today ? "Today" : key === tomorrow ? "Tomorrow" : new Date(key).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+    const label = key === today ? "Today" : key === tomorrow ? "Tomorrow" : new Date(`${key}T00:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
     const existing = groups.find((g) => g.label === label);
     if (existing) existing.items.push(b);
     else groups.push({ label, items: [b] });
@@ -631,12 +824,16 @@ function AgendaList({ bookings, selectedId, onSelectBooking }: { bookings: any[]
                 </span>
                 <span className="flex-1 min-w-0">
                   <span className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-ink text-sm truncate">{b.customer_name}</span>
+                    <span className="font-medium text-ink text-sm truncate flex items-center gap-2 min-w-0">
+                      <span className="truncate">{b.customer_name}</span>
+                      {freshIds.has(b.id) && <NewBadge />}
+                    </span>
                     <StatusChip status={b.status} />
                   </span>
                   <span className="block text-xs text-stone mt-0.5 truncate">
                     {b.preferred_time && `${b.preferred_time} · `}{b.service || "No service specified"}
-                    {b.amount != null && ` · BHD ${b.amount}`}
+                    {b.amount != null && ` · ${formatBhd(b.amount)}`}
+                    {b.paid && " · Paid"}
                   </span>
                 </span>
               </button>

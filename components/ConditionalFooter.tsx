@@ -17,6 +17,8 @@ const NO_FOOTER_PREFIXES = [
   "/account/profile",
   "/staff/login",
   "/admin",
+  "/receipt",
+  "/review",
 ];
 
 export default function ConditionalFooter() {
