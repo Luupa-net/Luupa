@@ -12,7 +12,9 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("reviews")
-    .select("id, business_id, rating, body, author_name, status, owner_reply, owner_replied_at, created_at, businesses(name)")
+    .select("id, business_id, rating, body, author_name, status, owner_reply, owner_replied_at, created_at, reported_at, report_reason, businesses(name)")
+    // Reports from business owners first — those are the ones waiting on a decision.
+    .order("reported_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   if (error) {

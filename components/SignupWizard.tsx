@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useBusiness } from "@/lib/BusinessContext";
 import { SUBCATEGORIES, AREAS, Service } from "@/lib/taxonomy";
-import { isValidBahrainPhone, isValidWhatsAppNumber } from "@/lib/validation";
+import { isValidBahrainPhone, isValidWhatsAppNumber, normalizeWhatsAppNumber } from "@/lib/validation";
 import ServicesEditor from "@/components/ServicesEditor";
-import PasswordChecklist, { passwordIsValid } from "@/components/PasswordChecklist";
+import PasswordChecklist, { friendlyAuthError, passwordIsValid } from "@/components/PasswordChecklist";
 import { Check, ChevronLeft } from "lucide-react";
 
 const STEPS = ["Account", "Details", "Services", "Verification", "Review"];
@@ -42,6 +43,7 @@ export default function SignupWizard() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const router = useRouter();
+  const { refresh } = useBusiness();
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -87,11 +89,11 @@ export default function SignupWizard() {
     setError(null);
 
     const { data, error: signUpError } = await supabase.auth.signUp({
-      email: form.email,
+      email: form.email.trim(),
       password: form.password,
     });
     if (signUpError) {
-      setError(signUpError.message);
+      setError(friendlyAuthError(signUpError.message));
       setLoading(false);
       return;
     }
@@ -99,14 +101,15 @@ export default function SignupWizard() {
     if (data.user) {
       const { error: insertError } = await supabase.from("businesses").insert({
         owner_id: data.user.id,
-        name: form.name,
+        name: form.name.trim(),
         subcategories: form.subcategories,
         areas: form.areas,
         is_mobile: form.isMobile,
-        phone: form.phone,
-        whatsapp: form.whatsapp,
-        hours: form.hours,
-        description: form.description,
+        phone: form.phone.trim(),
+        // Digits with country code — exactly what wa.me links need.
+        whatsapp: normalizeWhatsAppNumber(form.whatsapp),
+        hours: form.hours.trim(),
+        description: form.description.trim(),
         services: form.services,
         cr_number: form.crNumber || null,
         social_link: form.socialLink || null,
@@ -121,6 +124,11 @@ export default function SignupWizard() {
       }
     }
 
+    // The sign-up's auth event made the shared business context look the
+    // account up BEFORE the insert above landed — reload it now, so "Go to
+    // dashboard" finds the business instead of treating this as a new
+    // non-business account.
+    await refresh();
     setLoading(false);
     setSubmitted(true);
   }

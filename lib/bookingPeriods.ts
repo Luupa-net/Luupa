@@ -44,12 +44,35 @@ export function getPeriodBounds(period: "day" | "week" | "month", offset = 0) {
   return { start, end };
 }
 
+// The day a booking is FOR (its appointment date), falling back to when it
+// was made for a booking with no date. Local-midnight parse — a bare
+// "YYYY-MM-DD" would otherwise be read as UTC.
+export function appointmentDate(b: { preferred_date?: string | null; created_at: string }): Date {
+  return b.preferred_date ? new Date(`${b.preferred_date}T00:00:00`) : new Date(b.created_at);
+}
+
+// Counted by appointment date, not creation date: the "Today" card jumps to
+// the Day view of today's appointments, so it has to count the same thing
+// (it used to count bookings *made* today, which never matched that view).
 export function countInPeriod(bookings: any[], period: "day" | "week" | "month", offset = 0): number {
   const { start, end } = getPeriodBounds(period, offset);
   return bookings.filter((b) => {
-    const created = new Date(b.created_at);
-    return created >= start && created < end;
+    const when = appointmentDate(b);
+    return when >= start && when < end;
   }).length;
+}
+
+// Money actually taken in a period, by when it was paid (falls back to the
+// appointment date for bookings paid before paid_at existed).
+export function revenueInPeriod(bookings: any[], period: "day" | "week" | "month", offset = 0): number {
+  const { start, end } = getPeriodBounds(period, offset);
+  return bookings
+    .filter((b) => {
+      if (!b.paid || b.amount == null) return false;
+      const when = b.paid_at ? new Date(b.paid_at) : appointmentDate(b);
+      return when >= start && when < end;
+    })
+    .reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
 }
 
 export function periodComparison(bookings: any[], period: "day" | "week" | "month") {
@@ -78,7 +101,7 @@ export function filterByPeriod(bookings: any[], period: "day" | "week" | "month"
   if (period === "all") return bookings;
   const { start, end } = getPeriodBounds(period, 0);
   return bookings.filter((b) => {
-    const ref = b.preferred_date ? new Date(b.preferred_date) : new Date(b.created_at);
+    const ref = appointmentDate(b);
     return ref >= start && ref < end;
   });
 }

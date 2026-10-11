@@ -2,15 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { isValidAdminSession } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { PUBLIC_FIELDS } from "@/lib/businessFields";
+import { isUuid, readJson } from "@/lib/serverAuth";
 
 export async function POST(req: NextRequest) {
   if (!(await isValidAdminSession())) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 
-  const { businessId, action } = await req.json();
+  const body = await readJson<{ businessId?: unknown; action?: unknown }>(req);
+  const businessId = body?.businessId;
+  const action = body?.action;
 
-  if (!businessId || !["approve", "reject"].includes(action)) {
+  if (!isUuid(businessId) || (action !== "approve" && action !== "reject")) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 

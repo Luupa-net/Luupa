@@ -1,14 +1,17 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { safeNextPath } from "@/lib/validation";
-import { useGoogleOAuthCompletion } from "@/lib/useGoogleOAuthCompletion";
+import { useAuthCompletion } from "@/lib/useAuthCompletion";
+import { loginHref } from "@/lib/authReturn";
+import SigningIn from "@/components/SigningIn";
 import PhoneInput from "@/components/PhoneInput";
 import GoogleAuthButton from "@/components/GoogleAuthButton";
-import { AlertCircle } from "lucide-react";
+import PasswordChecklist, { friendlyAuthError, passwordIsValid } from "@/components/PasswordChecklist";
+import { AlertCircle, MailCheck } from "lucide-react";
 
 function AccountSignupForm() {
   const [name, setName] = useState("");
@@ -17,20 +20,37 @@ function AccountSignupForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [checkInbox, setCheckInbox] = useState(false);
   const searchParams = useSearchParams();
-  const hadExplicitNext = searchParams.get("next") != null;
   const next = safeNextPath(searchParams.get("next"));
-  const { oauthError, setOauthError, completingOAuth } = useGoogleOAuthCompletion(next, hadExplicitNext);
+  const { authError: oauthError, setAuthError: setOauthError, completing, finish } = useAuthCompletion(next);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!passwordIsValid(password)) {
+      setError("Use at least 8 characters with an upper-case letter, a lower-case letter, a number and a symbol.");
+      return;
+    }
     setLoading(true);
     setError(null);
 
-    const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+    // Name/phone ride along as user_metadata instead of a separate insert
+    // here: if email confirmation is on, there's no session yet and a
+    // direct `customers` insert would be rejected by RLS (that used to
+    // leave the user on this page with a confusing error). Whenever the
+    // session does appear — now, or after they click the confirmation
+    // link — useAuthCompletion creates the profile from this metadata and
+    // sends them back to `next` (e.g. the booking they started).
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: { full_name: name.trim(), phone },
+        emailRedirectTo: `${window.location.origin}${loginHref(next)}`,
+      },
+    });
     if (signUpError) {
-      setError(signUpError.message);
+      setError(friendlyAuthError(signUpError.message));
       setLoading(false);
       return;
     }
@@ -39,25 +59,36 @@ function AccountSignupForm() {
       setLoading(false);
       return;
     }
-
-    const { error: insertError } = await supabase.from("customers").insert({
-      id: data.user.id,
-      name,
-      email,
-      phone,
-    });
-    setLoading(false);
-    if (insertError) {
-      setError("Account created, but we couldn't save your details: " + insertError.message);
+    if (!data.session) {
+      // Confirmation required — nothing more to do on this page.
+      setLoading(false);
+      setCheckInbox(true);
       return;
     }
-    router.push(next);
+    finish(data.user);
   }
 
-  if (completingOAuth) {
+  if (checkInbox) {
     return (
-      <div className="max-w-md mx-auto px-6 py-24 text-center text-stone">Finishing sign-in…</div>
+      <div className="max-w-md mx-auto px-6 py-20 text-center fade-up">
+        <span className="mx-auto w-14 h-14 rounded-full bg-teal/10 flex items-center justify-center">
+          <MailCheck size={24} className="text-teal-dim" />
+        </span>
+        <h1 className="font-display text-3xl font-semibold text-ink mt-5">Check your inbox</h1>
+        <p className="text-stone mt-2 text-sm">
+          We sent a confirmation link to <b className="text-ink">{email}</b>. Tap it and you'll land right back
+          {next !== "/" ? " where you left off" : " on Luupa"}, signed in.
+        </p>
+        <p className="text-xs text-stone mt-6">
+          Wrong address?{" "}
+          <button onClick={() => setCheckInbox(false)} className="text-teal-dim font-medium">Go back</button>
+        </p>
+      </div>
     );
+  }
+
+  if (completing) {
+    return <SigningIn returning={next !== "/"} />;
   }
 
   return (
@@ -102,10 +133,12 @@ function AccountSignupForm() {
             required
             minLength={8}
             type="password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="input mt-1"
           />
+          <PasswordChecklist password={password} />
         </label>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -120,7 +153,7 @@ function AccountSignupForm() {
 
       <p className="text-sm text-stone mt-6">
         Already have an account?{" "}
-        <Link href={`/account/login?next=${encodeURIComponent(next)}`} className="text-teal-dim font-medium">
+        <Link href={loginHref(next)} className="text-teal-dim font-medium">
           Log in
         </Link>
       </p>

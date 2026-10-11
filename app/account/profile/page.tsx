@@ -4,14 +4,17 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { currentPath, loginHref } from "@/lib/authReturn";
 import PhoneInput from "@/components/PhoneInput";
 import PlateInput from "@/components/PlateInput";
 import BookingStepper from "@/components/BookingStepper";
 import StarRating from "@/components/StarRating";
+import PasswordChecklist, { friendlyAuthError, passwordIsValid } from "@/components/PasswordChecklist";
 import { useRealtimeBookings } from "@/lib/useRealtimeBookings";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
 import {
   User, Check, Loader2, CalendarClock, MapPin, Car, ChevronRight, Pencil, Trash2, Lock, ClipboardList, Star,
+  ReceiptText, XCircle,
 } from "lucide-react";
 
 type Customer = { id: string; name: string; email: string | null; phone: string | null };
@@ -24,6 +27,7 @@ type Booking = {
   status: string;
   vehicle_make: string | null;
   vehicle_model: string | null;
+  paid: boolean | null;
   created_at: string;
 };
 type BusinessLite = { id: string; name: string; areas: string[] };
@@ -68,6 +72,13 @@ function ProfileContent() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  // Accounts created with Google have no password to "re-enter" — they get a
+  // set-a-password email link instead of a form they can never complete.
+  const [hasPassword, setHasPassword] = useState(true);
+  const [setPasswordLinkSent, setSetPasswordLinkSent] = useState(false);
+
+  const [bookingAction, setBookingAction] = useState<{ id: string; kind: "cancel" | "receipt" } | null>(null);
+  const [bookingActionError, setBookingActionError] = useState<{ id: string; message: string } | null>(null);
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [businesses, setBusinesses] = useState<Record<string, BusinessLite>>({});
@@ -106,9 +117,11 @@ function ProfileContent() {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        router.push("/account/login?next=/account/profile");
+        router.replace(loginHref(currentPath()));
         return;
       }
+      const providers = (session.user.app_metadata?.providers as string[] | undefined) ?? [session.user.app_metadata?.provider];
+      setHasPassword(providers.includes("email"));
       // These three only depend on session.user.id, not on each other — kick
       // off all three at once (supabase-js query builders are lazy and don't
       // actually fire until awaited/then()'d, so this .then() chain — not a
@@ -131,7 +144,7 @@ function ProfileContent() {
 
       supabase
         .from("bookings")
-        .select("id, business_id, service, preferred_date, preferred_time, status, vehicle_make, vehicle_model, created_at")
+        .select("id, business_id, service, preferred_date, preferred_time, status, vehicle_make, vehicle_model, paid, created_at")
         .eq("customer_id", session.user.id)
         .order("created_at", { ascending: false })
         .then(async ({ data: bookingRows }) => {
@@ -216,8 +229,8 @@ function ProfileContent() {
     setPasswordError(null);
     setPasswordSaved(false);
 
-    if (newPassword.length < 8) {
-      setPasswordError("New password should be at least 8 characters.");
+    if (!passwordIsValid(newPassword)) {
+      setPasswordError("Use at least 8 characters with an upper-case letter, a lower-case letter, a number and a symbol.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -245,7 +258,7 @@ function ProfileContent() {
     const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
     setSavingPassword(false);
     if (updateError) {
-      setPasswordError(updateError.message);
+      setPasswordError(friendlyAuthError(updateError.message));
       return;
     }
     setCurrentPassword("");
@@ -253,6 +266,67 @@ function ProfileContent() {
     setConfirmPassword("");
     setPasswordSaved(true);
     setTimeout(() => setPasswordSaved(false), 2500);
+  }
+
+  async function sendSetPasswordLink() {
+    if (!customer?.email) return;
+    setPasswordError(null);
+    setSavingPassword(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(customer.email, {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/account/reset-password`,
+    });
+    setSavingPassword(false);
+    if (error) {
+      setPasswordError(error.message);
+      return;
+    }
+    setSetPasswordLinkSent(true);
+  }
+
+  async function authHeaders() {
+    const { data: { session } } = await supabase.auth.getSession();
+    return { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` };
+  }
+
+  async function cancelBooking(b: Booking, businessName: string) {
+    if (!window.confirm(`Cancel your booking with ${businessName}? They'll be notified right away.`)) return;
+    setBookingAction({ id: b.id, kind: "cancel" });
+    setBookingActionError(null);
+    try {
+      const res = await fetch("/api/bookings/cancel", { method: "POST", headers: await authHeaders(), body: JSON.stringify({ bookingId: b.id }) });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setBookingActionError({ id: b.id, message: data?.error || "Couldn't cancel — try again." });
+      } else {
+        setBookings((prev) => prev.map((x) => (x.id === b.id ? { ...x, status: "cancelled" } : x)));
+      }
+    } catch {
+      setBookingActionError({ id: b.id, message: "Couldn't reach the server — try again." });
+    }
+    setBookingAction(null);
+  }
+
+  async function openReceipt(b: Booking) {
+    // Opened synchronously inside the click so popup blockers allow it.
+    const win = window.open("", "_blank");
+    setBookingAction({ id: b.id, kind: "receipt" });
+    setBookingActionError(null);
+    try {
+      const res = await fetch(`/api/bookings/my-receipt?bookingId=${b.id}`, { headers: await authHeaders() });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.url) {
+        win?.close();
+        setBookingActionError({ id: b.id, message: data?.error || "Couldn't open the receipt — try again." });
+      } else if (win) {
+        win.location.href = data.url;
+      } else {
+        window.location.href = data.url;
+      }
+    } catch {
+      win?.close();
+      setBookingActionError({ id: b.id, message: "Couldn't reach the server — try again." });
+    }
+    setBookingAction(null);
   }
 
   async function handleAddVehicle(e: React.FormEvent) {
@@ -490,8 +564,29 @@ function ProfileContent() {
               <span className="w-8 h-8 rounded-lg bg-navy/10 flex items-center justify-center shrink-0">
                 <Lock size={14} className="text-navy" />
               </span>
-              <h2 className="font-display text-lg font-semibold text-ink">Change password</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">{hasPassword ? "Change password" : "Password"}</h2>
             </div>
+            {!hasPassword ? (
+              <div className="ml-[42px]">
+                <p className="text-sm text-stone">
+                  You sign in with Google, so there's no password on this account. Want to be able to log in with your email too?
+                </p>
+                {setPasswordLinkSent ? (
+                  <p className="mt-3 flex items-center gap-1.5 text-sm text-teal-dim"><Check size={15} /> Check {customer.email} for a link to set your password.</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={sendSetPasswordLink}
+                    disabled={savingPassword}
+                    className="mt-3 px-5 h-10 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-light active:scale-95 transition-colors disabled:opacity-60 flex items-center gap-2"
+                  >
+                    {savingPassword && <Loader2 size={14} className="animate-spin" />} Email me a set-password link
+                  </button>
+                )}
+                {passwordError && <p className="text-sm text-red-600 mt-2">{passwordError}</p>}
+              </div>
+            ) : (
+            <>
             <p className="text-sm text-stone mb-4 ml-[42px]">Enter your current password to set a new one.</p>
             <form onSubmit={handleChangePassword} className="space-y-4">
               <label className="block">
@@ -500,7 +595,8 @@ function ProfileContent() {
               </label>
               <label className="block">
                 <span className="text-sm font-medium text-ink">New password</span>
-                <input required minLength={8} type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input mt-1" />
+                <input required minLength={8} type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input mt-1" />
+                <PasswordChecklist password={newPassword} />
               </label>
               <label className="block">
                 <span className="text-sm font-medium text-ink">Confirm new password</span>
@@ -520,6 +616,8 @@ function ProfileContent() {
                 )}
               </div>
             </form>
+            </>
+            )}
           </section>
         </div>
       ) : tab === "bookings" ? (
@@ -556,7 +654,7 @@ function ProfileContent() {
                       <p className="text-sm text-stone mt-0.5 truncate">{b.service || "Service not specified"}</p>
                       <div className="flex items-center gap-3 text-xs text-stone mt-1.5 flex-wrap">
                         {b.preferred_date && (
-                          <span className="flex items-center gap-1"><CalendarClock size={12} /> {new Date(b.preferred_date).toLocaleDateString()}{b.preferred_time ? ` · ${b.preferred_time}` : ""}</span>
+                          <span className="flex items-center gap-1"><CalendarClock size={12} /> {new Date(`${b.preferred_date}T00:00:00`).toLocaleDateString()}{b.preferred_time ? ` · ${b.preferred_time}` : ""}</span>
                         )}
                         {biz?.areas?.[0] && (
                           <span className="flex items-center gap-1"><MapPin size={12} /> {biz.areas[0]}</span>
@@ -584,6 +682,31 @@ function ProfileContent() {
 
                   {/* Sibling to the Link, not nested inside it — an <a> containing
                       buttons/inputs is invalid HTML and breaks keyboard/a11y. */}
+                  {(["pending", "confirmed"].includes(b.status) || b.paid) && (
+                    <div className="mt-2 flex items-center gap-4 px-1">
+                      {b.paid && (
+                        <button
+                          type="button"
+                          onClick={() => openReceipt(b)}
+                          disabled={bookingAction?.id === b.id}
+                          className="flex items-center gap-1.5 text-sm font-medium text-navy hover:text-navy-light disabled:opacity-60"
+                        >
+                          {bookingAction?.id === b.id && bookingAction.kind === "receipt" ? <Loader2 size={14} className="animate-spin" /> : <ReceiptText size={14} />} Receipt
+                        </button>
+                      )}
+                      {["pending", "confirmed"].includes(b.status) && (
+                        <button
+                          type="button"
+                          onClick={() => cancelBooking(b, biz?.name ?? "this business")}
+                          disabled={bookingAction?.id === b.id}
+                          className="flex items-center gap-1.5 text-sm font-medium text-stone hover:text-red-600 disabled:opacity-60"
+                        >
+                          {bookingAction?.id === b.id && bookingAction.kind === "cancel" ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />} Cancel booking
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {bookingActionError?.id === b.id && <p className="text-sm text-red-600 mt-1.5 px-1">{bookingActionError.message}</p>}
                   {eligibleForReview && (
                     reviewFormBookingId === b.id ? (
                       <div className="mt-2 rounded-xl border border-teal/30 bg-teal/5 p-4 space-y-3">
@@ -693,7 +816,7 @@ function ProfileContent() {
                             {r.body && <p className="text-sm text-ink/80 mt-2 leading-relaxed">{r.body}</p>}
                             {r.owner_reply && (
                               <div className="mt-3 ml-1 pl-3 border-l-2 border-teal/30">
-                                <p className="text-xs font-semibold text-teal-dim">{bizName} replied</p>
+                                <p className="text-xs font-semibold text-teal-dim">Official response from {bizName}</p>
                                 <p className="text-sm text-ink/80 mt-0.5 leading-relaxed">{r.owner_reply}</p>
                               </div>
                             )}

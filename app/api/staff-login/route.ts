@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { createStaffAuthClient } from "@/lib/supabaseAuthClient";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
-import { pinToPassword, staffAuthEmail } from "@/lib/staffPin";
+import { legacyPinToPassword, pinToPassword, staffAuthEmail } from "@/lib/staffPin";
+import { readJson } from "@/lib/serverAuth";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
@@ -20,9 +21,44 @@ const GENERIC_INVALID = {
   reason: "invalid_credentials",
 };
 
+function lockedResponse(lockedUntil: string | null) {
+  const retryAfterSeconds = lockedUntil
+    ? Math.max(1, Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 1000))
+    : LOCKOUT_MINUTES * 60;
+  const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
+  return NextResponse.json(
+    { error: `Too many failed attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`, reason: "locked", retryAfterSeconds },
+    { status: 423 }
+  );
+}
+
+// Charges one attempt BEFORE the PIN is checked, atomically under a row lock
+// (staff_pin_attempt, migration-v30) — so N parallel guesses count as N, not
+// as 1 each. Falls back to the old read-then-write if v30 isn't applied yet.
+async function chargeAttempt(staff: { id: string; failed_pin_attempts: number; locked_until: string | null }) {
+  const { data, error } = await supabaseAdmin.rpc("staff_pin_attempt", {
+    p_staff_id: staff.id,
+    p_max: MAX_FAILED_ATTEMPTS,
+    p_lock_minutes: LOCKOUT_MINUTES,
+  });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!error && row) {
+    return { allowed: !!row.allowed, attempts: Number(row.attempts) || 0, lockedUntil: row.locked_until as string | null, atomic: true };
+  }
+
+  const now = Date.now();
+  const locked = !!staff.locked_until && new Date(staff.locked_until).getTime() > now;
+  if (locked) return { allowed: false, attempts: staff.failed_pin_attempts, lockedUntil: staff.locked_until, atomic: false };
+  // Lazy-expiry reset: an expired lock starts a fresh window.
+  const previous = staff.locked_until ? 0 : staff.failed_pin_attempts;
+  return { allowed: true, attempts: previous + 1, lockedUntil: null, atomic: false };
+}
+
 export async function POST(req: NextRequest) {
-  const { phone, pin } = await req.json();
-  if (!phone || typeof pin !== "string" || !pin) {
+  const body = await readJson<{ phone?: unknown; pin?: unknown }>(req);
+  const phone = typeof body?.phone === "string" ? body.phone : "";
+  const pin = typeof body?.pin === "string" ? body.pin : "";
+  if (!phone || !/^\d{4,6}$/.test(pin)) {
     return NextResponse.json({ error: "Enter your phone number and PIN." }, { status: 400 });
   }
 
@@ -37,7 +73,7 @@ export async function POST(req: NextRequest) {
   // found" rather than a hard 500.
   const { data: rows } = await supabaseAdmin
     .from("staff")
-    .select("id, active, failed_pin_attempts, locked_until")
+    .select("id, active, auth_user_id, failed_pin_attempts, locked_until")
     .eq("phone", normalizedPhone)
     .not("auth_user_id", "is", null)
     .limit(1);
@@ -49,29 +85,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(GENERIC_INVALID, { status: 401 });
   }
 
-  const now = Date.now();
-  const isLocked = !!staffRow.locked_until && new Date(staffRow.locked_until).getTime() > now;
+  const attempt = await chargeAttempt(staffRow);
+  if (!attempt.allowed) return lockedResponse(attempt.lockedUntil);
 
-  if (isLocked) {
-    const retryAfterSeconds = Math.max(0, Math.ceil((new Date(staffRow.locked_until!).getTime() - now) / 1000));
-    const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
-    return NextResponse.json(
-      { error: `Too many failed attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`, reason: "locked", retryAfterSeconds },
-      { status: 423 }
-    );
-  }
-
-  // Lazy-expiry reset: a past locked_until means "treat as unlocked," and the
-  // counter starts over from here — computed in-memory (not a separate
-  // write) so a fresh post-expiry failure counts as 1, not stale+1, which
-  // would instantly re-lock on the very first attempt after expiry.
-  const effectiveFailedAttempts = staffRow.locked_until && !isLocked ? 0 : staffRow.failed_pin_attempts;
-
+  const email = staffAuthEmail(staffRow.id);
   const authClient = createStaffAuthClient();
-  const { data, error: signInError } = await authClient.auth.signInWithPassword({
-    email: staffAuthEmail(staffRow.id),
-    password: pinToPassword(pin),
+  let { data, error: signInError } = await authClient.auth.signInWithPassword({
+    email,
+    password: pinToPassword(pin, staffRow.id),
   });
+
+  // Accounts whose PIN was set before the secret-derived scheme: accept the
+  // old form once (still behind this same lockout) and upgrade on the spot.
+  if (signInError?.code === "invalid_credentials") {
+    const legacy = await authClient.auth.signInWithPassword({ email, password: legacyPinToPassword(pin) });
+    if (!legacy.error && legacy.data.session) {
+      data = legacy.data;
+      signInError = null;
+      await supabaseAdmin.auth.admin.updateUserById(staffRow.auth_user_id!, { password: pinToPassword(pin, staffRow.id) });
+    }
+  }
 
   if (!signInError && data.session) {
     await supabaseAdmin
@@ -84,21 +117,24 @@ export async function POST(req: NextRequest) {
   const code = signInError?.code;
 
   // Allowlist, not a blocklist: only a confirmed wrong-credentials rejection
-  // counts as a guess. Any other/unknown code falls through untouched below.
+  // counts as a guess. Any other/unknown code is refunded below.
   if (code === "invalid_credentials") {
-    const newCount = effectiveFailedAttempts + 1;
-    if (newCount >= MAX_FAILED_ATTEMPTS) {
-      const lockedUntil = new Date(now + LOCKOUT_MINUTES * 60_000).toISOString();
-      await supabaseAdmin.from("staff").update({ failed_pin_attempts: newCount, locked_until: lockedUntil }).eq("id", staffRow.id);
-      return NextResponse.json(
-        { error: `Too many failed attempts. Try again in ${LOCKOUT_MINUTES} minutes.`, reason: "locked", retryAfterSeconds: LOCKOUT_MINUTES * 60 },
-        { status: 423 }
-      );
+    const lockNow = attempt.attempts >= MAX_FAILED_ATTEMPTS;
+    if (!attempt.atomic) {
+      const lockedUntil = lockNow ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000).toISOString() : null;
+      await supabaseAdmin.from("staff").update({ failed_pin_attempts: attempt.attempts, locked_until: lockedUntil }).eq("id", staffRow.id);
     }
-    await supabaseAdmin.from("staff").update({ failed_pin_attempts: newCount, locked_until: null }).eq("id", staffRow.id);
+    if (lockNow) return lockedResponse(attempt.lockedUntil);
     return NextResponse.json(GENERIC_INVALID, { status: 401 });
   }
 
+  // A system error isn't the staff member's fault — give the attempt back.
+  if (attempt.atomic) {
+    await supabaseAdmin
+      .from("staff")
+      .update({ failed_pin_attempts: Math.max(0, attempt.attempts - 1), locked_until: null })
+      .eq("id", staffRow.id);
+  }
   return NextResponse.json(
     { error: (code && SYSTEM_ERROR_MESSAGES[code]) || "Something went wrong — try again.", reason: "system_error", code: code || "unknown" },
     { status: 400 }

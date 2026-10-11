@@ -7,8 +7,10 @@ const FAQS = [
   { q: "Is listing my business really free?", a: "Yes — always, for every business, with no catch and no expiry." },
   { q: "How does the verified badge work?", a: "Verification normally carries a small fee, but as one of our first 10 founding businesses, it's completely free. It shows customers you've been personally checked, not just an open listing." },
   { q: "How do I get approved?", a: "Every listing is personally reviewed before it goes live — usually within a day of signing up." },
-  { q: "Can I stop or remove my listing anytime?", a: "Yes, anytime, directly from your dashboard — no need to ask anyone." },
+  { q: "Can I edit or remove my listing anytime?", a: "Yes. Edit your details anytime from your dashboard (changes to a live listing go live once we've had a quick look). To remove your listing, email luupa.net@gmail.com from your account email and it's taken down within a day." },
   { q: "What do I need to sign up?", a: "Just your business details, a few photos, and the services you offer. Takes about 5 minutes." },
+  { q: "What do I get beyond the listing?", a: "A full booking calendar, one-tap checkout with emailed and WhatsApp receipts, automatic review requests, a customer list with visit history and notes, staff logins with their own PINs, and live alerts the moment a booking comes in." },
+  { q: "How do customers pay?", a: "Directly to you — cash, card, or BenefitPay. Luupa never handles the money; you record the payment at checkout and the customer gets a receipt." },
 ];
 
 export default function HelpPage() {

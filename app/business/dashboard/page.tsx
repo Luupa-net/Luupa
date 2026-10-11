@@ -3,15 +3,18 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
-import { useBusiness } from "@/lib/BusinessContext";
+import { useBusinessGuard } from "@/lib/useBusinessGuard";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SUBCATEGORIES, AREAS } from "@/lib/taxonomy";
 import { computeCompleteness } from "@/lib/completeness";
 import { isEffectivelyVerified } from "@/lib/verification";
-import { isValidBahrainPhone, isValidWhatsAppNumber } from "@/lib/validation";
-import { getPeriodBounds } from "@/lib/bookingPeriods";
+import { isValidBahrainPhone, isValidWhatsAppNumber, normalizeWhatsAppNumber } from "@/lib/validation";
+import { countInPeriod, revenueInPeriod } from "@/lib/bookingPeriods";
+import { toKey } from "@/lib/calendarGrid";
+import { formatBhd } from "@/lib/money";
 import { PUBLIC_FIELDS } from "@/lib/businessFields";
+import NotBusinessAccount from "@/components/NotBusinessAccount";
 import ServicesEditor from "@/components/ServicesEditor";
 import PhotoUploader from "@/components/PhotoUploader";
 import LogoUploader from "@/components/LogoUploader";
@@ -25,8 +28,15 @@ import {
   Clock, CheckCircle2, XCircle, Eye, BadgeCheck, ImageIcon, Wrench,
   ShieldCheck, ExternalLink, User, FolderClock, LayoutDashboard,
   Wallet, CalendarClock, ArrowRight, Plus, Sparkles, MapPin, Phone, Clock4,
-  FileText, Building2, Users, UsersRound, AlertCircle, Star,
+  FileText, Building2, Users, UsersRound, AlertCircle, Star, Sun,
 } from "lucide-react";
+
+// Same value, compared as data — so a re-saved form with nothing public
+// changed doesn't queue a no-op "change request" for admin review.
+function sameValue(a: any, b: any): boolean {
+  const norm = (v: any) => (v === undefined || v === "" ? null : v);
+  return JSON.stringify(norm(a)) === JSON.stringify(norm(b));
+}
 
 // Internal/verification info — never shown to customers, so no review needed.
 const DIRECT_FIELDS = ["cr_number", "social_link", "applicant_note", "payment_qr_url"] as const;
@@ -55,7 +65,7 @@ const CHECKLIST_META: Record<string, { icon: React.ReactNode; tab: (typeof TABS)
 };
 
 export default function Dashboard() {
-  const { business, role, checked, loadError, refresh, patchBusiness } = useBusiness();
+  const { business, state: guardState, refresh, patchBusiness } = useBusinessGuard({ ownerOnly: true });
   const [liveRow, setLiveRow] = useState<any>(null); // untouched, as-fetched — source of truth for status/banners
   const [form, setForm] = useState<any>(null);        // the editable draft the business is working on
   const [saved, setSaved] = useState(false);
@@ -63,8 +73,9 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("Overview");
-  const [bookingStats, setBookingStats] = useState({ monthCount: 0, pendingCount: 0, revenueMonth: 0 });
+  const [bookingStats, setBookingStats] = useState({ monthCount: 0, pendingCount: 0, revenueMonth: 0, revenueLastMonth: 0 });
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
+  const [todayBookings, setTodayBookings] = useState<any[]>([]);
   const [bookingsLoadError, setBookingsLoadError] = useState(false);
   const [reviews, setReviews] = useState<PublicReview[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -72,19 +83,11 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!checked) return;
-    if (loadError) {
-      setLoading(false);
-      return;
-    }
-    if (!business) {
-      router.push("/account/login");
-      return;
-    }
     // The dashboard (revenue, full profile editing, verification) is
-    // owner/manager only — a staff session lands on their own view instead.
-    if (role === "staff") {
-      router.push("/business/bookings");
+    // owner/manager only — useBusinessGuard sends a staff session to their
+    // own bookings view, and a signed-out visitor to log in.
+    if (guardState !== "ready") {
+      if (guardState !== "checking") setLoading(false);
       return;
     }
     async function load() {
@@ -112,20 +115,25 @@ export default function Dashboard() {
 
       const { data: bks, error: bookingsError } = await supabase
         .from("bookings")
-        .select("id, customer_name, service, status, created_at, preferred_date, preferred_time, amount, paid")
+        .select("*")
         .eq("business_id", business.id)
         .order("created_at", { ascending: false })
-        .limit(200);
+        .limit(500);
       setBookingsLoadError(!!bookingsError);
       const all = bks || [];
-      const { start, end } = getPeriodBounds("month", 0);
-      const inMonth = all.filter((b) => new Date(b.created_at) >= start && new Date(b.created_at) < end);
+      const todayKey = toKey(new Date());
       setBookingStats({
-        monthCount: inMonth.length,
+        monthCount: countInPeriod(all, "month"),
         pendingCount: all.filter((b) => b.status === "pending").length,
-        revenueMonth: inMonth.filter((b) => b.paid && b.amount != null).reduce((sum, b) => sum + Number(b.amount || 0), 0),
+        revenueMonth: revenueInPeriod(all, "month"),
+        revenueLastMonth: revenueInPeriod(all, "month", -1),
       });
       setRecentBookings(all.slice(0, 5));
+      setTodayBookings(
+        all
+          .filter((b) => b.preferred_date === todayKey && !["declined", "cancelled"].includes(b.status))
+          .sort((a, b) => (a.preferred_time || "99").localeCompare(b.preferred_time || "99"))
+      );
       setLoading(false);
     }
     load();
@@ -134,7 +142,8 @@ export default function Dashboard() {
     // context value. If this effect depended on the object identity, every
     // save would retrigger it — resetting the in-progress `form` draft back
     // to the just-saved snapshot and firing a redundant bookings refetch.
-  }, [checked, loadError, business?.id, role, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardState, business?.id]);
 
   function toggle(key: "subcategories" | "areas", value: string) {
     const current: string[] = form[key] || [];
@@ -148,27 +157,38 @@ export default function Dashboard() {
     e.preventDefault();
     setError(null);
 
-    if (!isValidBahrainPhone(form.phone)) {
+    if (!form.name?.trim()) {
+      setError("Your business needs a name.");
+      return;
+    }
+    if (!isValidBahrainPhone(form.phone || "")) {
       setError("Phone should be an 8-digit Bahrain number.");
       return;
     }
-    if (!isValidWhatsAppNumber(form.whatsapp)) {
+    if (!isValidWhatsAppNumber(form.whatsapp || "")) {
       setError("WhatsApp number looks incomplete — include the country code.");
       return;
     }
 
     setSaving(true);
+    // Stored as plain digits with the country code — exactly what wa.me
+    // links need ("+973 3xxx" or spaces would break the WhatsApp button).
+    const normalized = { ...form, whatsapp: normalizeWhatsAppNumber(form.whatsapp) };
     const payload: Record<string, any> = {};
-    DIRECT_FIELDS.forEach((f) => { payload[f] = form[f]; });
+    DIRECT_FIELDS.forEach((f) => { payload[f] = normalized[f]; });
 
     if (liveRow.status === "active") {
-      // Live listing — hold public-facing edits for review, don't touch what's shown now
+      // Live listing — hold public-facing edits for review, don't touch what's
+      // shown now. Only fields that actually differ from the live version go
+      // to review; if nothing public changed, any old draft is cleared.
       const proposed: Record<string, any> = {};
-      PUBLIC_FIELDS.forEach((f) => { proposed[f] = form[f]; });
-      payload.pending_changes = proposed;
+      PUBLIC_FIELDS.forEach((f) => {
+        if (!sameValue(normalized[f], liveRow[f])) proposed[f] = normalized[f];
+      });
+      payload.pending_changes = Object.keys(proposed).length > 0 ? proposed : null;
     } else {
       // Not live yet (or suspended) — nothing public to protect, save directly
-      PUBLIC_FIELDS.forEach((f) => { payload[f] = form[f]; });
+      PUBLIC_FIELDS.forEach((f) => { payload[f] = normalized[f]; });
     }
 
     const { error: saveError } = await supabase.from("businesses").update(payload).eq("id", form.id);
@@ -209,6 +229,22 @@ export default function Dashboard() {
     }
   }
 
+  async function handleReport(reviewId: string, reason: string, details: string) {
+    const { data: { session } } = await supabase.auth.getSession();
+    try {
+      const res = await fetch("/api/business/review-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ reviewId, reason, details }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) return { error: result.error || "Couldn't send that report — try again." };
+      return {};
+    } catch {
+      return { error: "Couldn't reach the server — try again." };
+    }
+  }
+
   if (loading) {
     return (
       <div className="bg-canvas2 min-h-screen">
@@ -219,8 +255,9 @@ export default function Dashboard() {
       </div>
     );
   }
-  if (loadError) return <BusinessLoadError onRetry={refresh} />;
-  if (!liveRow) return <div className="max-w-4xl mx-auto px-6 py-16 text-stone">No listing found.</div>;
+  if (guardState === "error") return <BusinessLoadError onRetry={refresh} />;
+  if (guardState === "not_business") return <NotBusinessAccount />;
+  if (!liveRow || !form) return null;
 
   const { percent, items } = computeCompleteness(form);
   const verified = isEffectivelyVerified(liveRow);
@@ -352,8 +389,50 @@ export default function Dashboard() {
                   <StatCard icon={<Eye size={16} />} tint="navy" label="Profile views" value={liveRow.view_count ?? 0} />
                   <StatCard icon={<CalendarClock size={16} />} tint="teal" label="Bookings this month" value={bookingStats.monthCount} />
                   <StatCard icon={<Clock size={16} />} tint="stone" label="Pending confirmations" value={bookingStats.pendingCount} />
-                  <StatCard icon={<Wallet size={16} />} tint="emerald" label="Revenue this month" value={`BHD ${bookingStats.revenueMonth.toFixed(bookingStats.revenueMonth % 1 === 0 ? 0 : 2)}`} />
-                  <StatCard icon={<Star size={16} />} tint="teal" label="Average rating" value={liveRow.rating_avg ?? "—"} />
+                  <StatCard icon={<Wallet size={16} />} tint="emerald" label={bookingStats.revenueLastMonth > 0 ? `Revenue this month (last: ${formatBhd(bookingStats.revenueLastMonth)})` : "Revenue this month"} value={formatBhd(bookingStats.revenueMonth)} />
+                  <StatCard icon={<Star size={16} />} tint="teal" label={liveRow.review_count ? `Average rating · ${liveRow.review_count} review${liveRow.review_count === 1 ? "" : "s"}` : "Average rating"} value={liveRow.rating_avg ?? "—"} />
+                </div>
+
+                {/* Today — the day's appointments at a glance, one tap into each. */}
+                <div className="rounded-2xl bg-white border border-stone-line p-5 sm:p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+                      <span className="w-7 h-7 rounded-lg bg-teal/10 text-teal-dim flex items-center justify-center"><Sun size={14} /></span>
+                      Today's schedule
+                      <span className="text-xs font-normal text-stone">
+                        {new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" })}
+                      </span>
+                    </p>
+                    <Link href="/business/bookings" className="text-xs font-medium text-navy hover:text-navy-light flex items-center gap-1">
+                      Calendar <ArrowRight size={12} />
+                    </Link>
+                  </div>
+                  {bookingsLoadError ? (
+                    <p className="text-sm text-red-600 py-3">Couldn't load today's bookings — try refreshing.</p>
+                  ) : todayBookings.length === 0 ? (
+                    <p className="text-sm text-stone py-3">Nothing booked for today yet.</p>
+                  ) : (
+                    <div className="relative border-l-2 border-stone-line ml-3 space-y-2.5 py-1">
+                      {todayBookings.map((b) => (
+                        <Link
+                          key={b.id}
+                          href={`/business/bookings?open=${b.id}`}
+                          className="relative flex items-center gap-3 ml-4 rounded-xl px-3 py-2.5 hover:bg-canvas2 transition-colors"
+                        >
+                          <span className={`absolute -left-[23px] w-3 h-3 rounded-full ring-4 ring-white ${b.status === "completed" ? "bg-emerald-500" : b.status === "pending" ? "bg-teal-light" : "bg-navy"}`} />
+                          <span className="w-14 shrink-0 text-xs font-semibold text-ink tabular-nums">{b.preferred_time || "Any time"}</span>
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-sm font-medium text-ink truncate">{b.customer_name}</span>
+                            <span className="block text-xs text-stone truncate">
+                              {[b.service || "No service specified", [b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ")].filter(Boolean).join(" · ")}
+                            </span>
+                          </span>
+                          {b.paid && <span className="text-[10px] font-semibold text-teal-dim bg-teal/10 px-1.5 py-0.5 rounded-full shrink-0">Paid</span>}
+                          <BookingStatusBadge status={b.status} />
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Quick actions */}
@@ -444,7 +523,7 @@ export default function Dashboard() {
                       {recentBookings.map((b) => (
                         <Link
                           key={b.id}
-                          href="/business/bookings"
+                          href={`/business/bookings?open=${b.id}`}
                           className="flex items-center gap-3 rounded-lg px-2.5 py-2 hover:bg-canvas2 transition-colors"
                         >
                           <span className="w-8 h-8 rounded-full bg-navy/10 text-navy font-semibold text-xs flex items-center justify-center shrink-0">
@@ -464,7 +543,14 @@ export default function Dashboard() {
             )}
 
             {tab === "Reviews" && (
-              <ReviewsSection reviews={reviews} loading={reviewsLoading} loadError={reviewsLoadError} onReply={handleReply} />
+              <ReviewsSection
+                reviews={reviews}
+                loading={reviewsLoading}
+                loadError={reviewsLoadError}
+                business={{ name: business.name, logo_url: business.logo_url, verified: isEffectivelyVerified(business) }}
+                onReply={handleReply}
+                onReport={handleReport}
+              />
             )}
 
             {tab !== "Overview" && tab !== "Reviews" && (

@@ -31,6 +31,7 @@ type Business = {
   view_count: number;
   created_at: string;
   pending_changes: Record<string, any> | null;
+  owner_email?: string | null;
 };
 
 type Customer = {
@@ -86,6 +87,8 @@ type AdminReview = {
   owner_reply: string | null;
   owner_replied_at: string | null;
   created_at: string;
+  reported_at: string | null;
+  report_reason: string | null;
   businesses: { name: string } | null;
 };
 
@@ -126,6 +129,30 @@ export default function AdminPage() {
   const [bookingStatusFilter, setBookingStatusFilter] = useState<string>("all");
   const [bookingSearch, setBookingSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  // Every admin action goes through here so a failure is shown, not
+  // swallowed (they used to ignore the response entirely).
+  async function adminPost(url: string, body: Record<string, unknown>) {
+    setLoading(true);
+    setActionError(null);
+    try {
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (res.status === 401) {
+        setAuthed(false);
+        return;
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setActionError(data?.error || "That didn't go through — try again.");
+      }
+      await loadAll();
+    } catch {
+      setActionError("Couldn't reach the server — check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function loadAll() {
     const [bizRes, custRes, bookRes, reviewRes] = await Promise.all([
@@ -169,37 +196,16 @@ export default function AdminPage() {
     setPassword("");
   }
 
-  async function updateStatus(businessId: string, status: string, verified: boolean, verifiedUntil?: string | null) {
-    setLoading(true);
-    await fetch("/api/admin/update-status", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ businessId, status, verified, verifiedUntil }),
-    });
-    await loadAll();
-    setLoading(false);
+  function updateStatus(businessId: string, status: string, verified: boolean, verifiedUntil?: string | null) {
+    return adminPost("/api/admin/update-status", { businessId, status, verified, verifiedUntil });
   }
 
-  async function reviewChanges(businessId: string, action: "approve" | "reject") {
-    setLoading(true);
-    await fetch("/api/admin/review-changes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ businessId, action }),
-    });
-    await loadAll();
-    setLoading(false);
+  function reviewChanges(businessId: string, action: "approve" | "reject") {
+    return adminPost("/api/admin/review-changes", { businessId, action });
   }
 
-  async function updateReviewStatus(reviewId: string, status: "visible" | "hidden") {
-    setLoading(true);
-    await fetch("/api/admin/review-status", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reviewId, status }),
-    });
-    await loadAll();
-    setLoading(false);
+  function updateReviewStatus(reviewId: string, status: "visible" | "hidden" | "dismiss") {
+    return adminPost("/api/admin/review-status", status === "dismiss" ? { reviewId, dismissReport: true } : { reviewId, status });
   }
 
   const counts = useMemo(() => ({
@@ -310,6 +316,12 @@ export default function AdminPage() {
         </div>
 
         <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8">
+          {actionError && (
+            <div className="mb-5 flex items-center justify-between gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+              <p className="flex items-center gap-2 text-sm text-red-700"><AlertCircle size={15} /> {actionError}</p>
+              <button onClick={() => setActionError(null)} aria-label="Dismiss" className="text-red-600 hover:text-red-800"><XCircle size={15} /></button>
+            </div>
+          )}
           {section === "overview" && (
             <OverviewSection
               businesses={businesses}
@@ -478,7 +490,10 @@ export default function AdminPage() {
           {section === "reviews" && (
             <div>
               <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Reviews</h1>
-              <p className="text-sm text-stone mt-1">{reviews.length} review{reviews.length === 1 ? "" : "s"} across every business</p>
+              <p className="text-sm text-stone mt-1">
+                {reviews.length} review{reviews.length === 1 ? "" : "s"} across every business
+                {reviews.some((r) => r.reported_at) && <> · <b className="text-red-600">{reviews.filter((r) => r.reported_at).length} reported</b></>}
+              </p>
               <div className="mt-6 space-y-4">
                 {reviews.length === 0 && (
                   <p className="text-stone text-sm py-10 text-center">No reviews yet.</p>
@@ -640,8 +655,9 @@ function BusinessCard({
       <p className="text-sm text-ink/80 mt-3 leading-relaxed">{b.description || "No description provided."}</p>
 
       <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-4 text-sm">
+        <Info label="Owner email" value={b.owner_email || "—"} link={b.owner_email ? `mailto:${b.owner_email}` : undefined} />
         <Info label="Phone" value={b.phone} />
-        <Info label="WhatsApp" value={b.whatsapp} />
+        <Info label="WhatsApp" value={b.whatsapp} link={b.whatsapp ? `https://wa.me/${String(b.whatsapp).replace(/\D/g, "")}` : undefined} />
         <Info label="CR number" value={b.cr_number || "Not provided"} />
         <Info
           label="Social / website"
@@ -667,6 +683,11 @@ function BusinessCard({
       <p className="text-xs text-stone mt-3 flex items-center gap-1.5 flex-wrap">
         Applied {new Date(b.created_at).toLocaleDateString()}
         <span className="flex items-center gap-1"><Eye size={11} /> {b.view_count} views</span>
+        {b.status === "active" && (
+          <a href={`/listing/${b.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-navy font-medium hover:underline">
+            View listing <ExternalLink size={10} />
+          </a>
+        )}
         {b.verified && (
           <> · {effectivelyVerified
             ? (b.verified_until ? `Verified until ${new Date(b.verified_until).toLocaleDateString()}` : "Verified (no expiry)")
@@ -792,12 +813,18 @@ function ReviewModerationCard({
   loading,
 }: {
   review: AdminReview;
-  onUpdateStatus: (reviewId: string, status: "visible" | "hidden") => void;
+  onUpdateStatus: (reviewId: string, status: "visible" | "hidden" | "dismiss") => void;
   loading: boolean;
 }) {
   const hidden = review.status === "hidden";
   return (
-    <div className="border border-stone-line rounded-xl p-5 bg-white">
+    <div className={`border rounded-xl p-5 bg-white ${review.reported_at ? "border-red-200 shadow-[0_0_0_3px_rgba(239,68,68,0.08)]" : "border-stone-line"}`}>
+      {review.reported_at && (
+        <div className="mb-3 -mt-1 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+          <span className="font-semibold shrink-0">Reported by the business</span>
+          <span className="min-w-0 break-words">· {(review.report_reason || "").replace(/_/g, " ")} · {new Date(review.reported_at).toLocaleDateString()}</span>
+        </div>
+      )}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="font-display text-lg font-semibold text-ink truncate">{review.businesses?.name ?? "Unknown business"}</p>
@@ -816,7 +843,7 @@ function ReviewModerationCard({
 
       {review.owner_reply && (
         <div className="mt-3 ml-1 pl-3 border-l-2 border-teal/30">
-          <p className="text-xs font-semibold text-teal-dim">Business reply</p>
+          <p className="text-xs font-semibold text-teal-dim">Official business response</p>
           <p className="text-sm text-ink/80 mt-0.5 leading-relaxed">{review.owner_reply}</p>
         </div>
       )}
@@ -839,6 +866,15 @@ function ReviewModerationCard({
             <XCircle size={15} /> Hide
           </button>
         )}
+        {review.reported_at && !hidden && (
+          <button
+            disabled={loading}
+            onClick={() => onUpdateStatus(review.id, "dismiss")}
+            className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border border-stone-line text-ink hover:bg-canvas2 transition-colors disabled:opacity-60"
+          >
+            Keep visible
+          </button>
+        )}
       </div>
     </div>
   );
@@ -858,7 +894,12 @@ function Info({ label, value, link }: { label: string; value: string; link?: str
     <div className="flex justify-between gap-3">
       <span className="text-stone">{label}</span>
       {link ? (
-        <a href={link.startsWith("http") ? link : `https://${link}`} target="_blank" className="text-navy font-medium flex items-center gap-1 truncate">
+        <a
+          href={/^(https?:|mailto:)/.test(link) ? link : `https://${link}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-navy font-medium flex items-center gap-1 truncate"
+        >
           {value} <ExternalLink size={11} />
         </a>
       ) : (

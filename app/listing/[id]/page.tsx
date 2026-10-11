@@ -1,10 +1,13 @@
 import Image from "next/image";
+import type { Metadata } from "next";
 import { supabase } from "@/lib/supabase";
 import { isEffectivelyVerified } from "@/lib/verification";
 import { BadgeCheck, Phone, MapPin, Clock, Car, MessageCircle, AlertCircle, Wrench, Building2, Star } from "lucide-react";
 import { notFound } from "next/navigation";
 import BookingForm from "@/components/BookingForm";
 import ReviewsSection from "@/components/ReviewsSection";
+import ViewTracker from "@/components/ViewTracker";
+import { normalizeWhatsAppNumber } from "@/lib/validation";
 
 // params usage already forces this route to render dynamically per request,
 // but Next's fetch cache (which wraps supabase-js's underlying fetch calls
@@ -14,6 +17,27 @@ import ReviewsSection from "@/components/ReviewsSection";
 // Doesn't affect the increment_view_count call below (a write, never
 // cached).
 export const revalidate = 30;
+
+// A listing link shared on WhatsApp/Instagram previews as the business itself
+// (name, what they do, their photo) rather than Luupa's generic homepage card.
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const { data } = await supabase
+    .from("businesses_public")
+    .select("name, description, subcategories, areas, photos, logo_url")
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) return { title: "Listing not found — Luupa" };
+  const what = [(data.subcategories || []).slice(0, 2).join(" & "), (data.areas || []).join(", ")].filter(Boolean).join(" · ");
+  const description = (data.description || `${data.name} on Luupa${what ? ` — ${what}` : ""}. Book online, see prices and real reviews.`).slice(0, 180);
+  const image = (data.photos || [])[0] || data.logo_url || undefined;
+  return {
+    title: `${data.name}${what ? ` — ${what}` : ""} | Luupa`,
+    description,
+    openGraph: { title: data.name, description, type: "website", ...(image ? { images: [{ url: image }] } : {}) },
+    twitter: { card: image ? "summary_large_image" : "summary", title: data.name, description },
+  };
+}
 
 export default async function ListingPage({ params }: { params: Promise<{ id: string }> }) {
   // Next.js 15+: params is now a Promise and must be awaited
@@ -57,11 +81,8 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
   }
   if (!listing) return notFound();
 
-  // Fire-and-forget view tracking — doesn't block the page render, doesn't matter
-  // if it occasionally fails (e.g. offline admin preview)
-  supabase.rpc("increment_view_count", { business_id: listing.id }).then(() => {});
-
   const verified = isEffectivelyVerified(listing);
+  const whatsapp = listing.whatsapp ? normalizeWhatsAppNumber(listing.whatsapp) : null;
   const subcategories: string[] = listing.subcategories || [];
   const areas: string[] = listing.areas || [];
   const waMessage = encodeURIComponent(`Hi ${listing.name}, I found you on Luupa and I'd like to ask about ${subcategories[0] || "your services"}.`);
@@ -70,6 +91,7 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="bg-canvas2 min-h-screen">
+      <ViewTracker businessId={listing.id} />
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-8 sm:py-10">
         {/* Hero — same gradient/orb language as the business dashboard and
             staff headers, so a customer arriving from a booking link and an
@@ -161,10 +183,11 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
               )}
             </div>
             <div className="flex flex-col sm:flex-row gap-3 mt-6">
-              {listing.whatsapp && (
+              {whatsapp && (
                 <a
-                  href={`https://wa.me/${listing.whatsapp}?text=${waMessage}`}
+                  href={`https://wa.me/${whatsapp}?text=${waMessage}`}
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border-2 border-teal text-teal-dim font-semibold hover:bg-teal/5 active:scale-95 transition-all"
                 >
                   <MessageCircle size={16} /> Message on WhatsApp
@@ -197,7 +220,11 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
         </div>
 
         <div className="mt-6">
-          <ReviewsSection reviews={reviewRows || []} loadError={!!reviewsError} />
+          <ReviewsSection
+            reviews={reviewRows || []}
+            loadError={!!reviewsError}
+            business={{ name: listing.name, logo_url: listing.logo_url, verified }}
+          />
         </div>
       </div>
     </div>

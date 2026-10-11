@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { loadStaffDirectory } from "@/lib/staffDirectory";
 import { History } from "lucide-react";
 
 const cardCls = "rounded-2xl bg-white border border-stone-line p-4 transition-shadow hover:shadow-sm";
@@ -39,22 +40,25 @@ export default function BookingDrawerHistoryTab({ booking }: { booking: any }) {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const [{ data: { user } }, { data: historyRows }, { data: staffRows }] = await Promise.all([
-        supabase.auth.getUser(),
+      const [{ data: { session } }, { data: historyRows }, staffRows] = await Promise.all([
+        supabase.auth.getSession(),
         supabase.from("booking_status_history").select("*").eq("booking_id", booking.id).order("changed_at"),
-        supabase.from("staff").select("auth_user_id, name").eq("business_id", booking.business_id),
+        loadStaffDirectory(booking.business_id),
       ]);
       if (cancelled) return;
       const map: Record<string, string> = {};
-      (staffRows || []).forEach((s: any) => { if (s.auth_user_id) map[s.auth_user_id] = s.name; });
-      if (user) map[user.id] = "You";
+      staffRows.forEach((s) => { if (s.auth_user_id) map[s.auth_user_id] = s.name; });
+      // A customer's own actions (requesting, cancelling) are theirs, not
+      // the owner's — this used to fall through to "Owner".
+      if (booking.customer_id) map[booking.customer_id] = "Customer";
+      if (session?.user) map[session.user.id] = "You";
       setNames(map);
       setRows((historyRows || []) as HistoryRow[]);
       setLoading(false);
     }
     load();
     return () => { cancelled = true; };
-  }, [booking.id, booking.business_id]);
+  }, [booking.id, booking.business_id, booking.customer_id]);
 
   function whoChanged(row: HistoryRow): string {
     if (!row.changed_by) return "System";

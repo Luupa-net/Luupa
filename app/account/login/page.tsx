@@ -1,13 +1,14 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { safeNextPath } from "@/lib/validation";
-import { useGoogleOAuthCompletion } from "@/lib/useGoogleOAuthCompletion";
-import { resolveLoginRedirect } from "@/lib/resolveLoginRedirect";
+import { useAuthCompletion } from "@/lib/useAuthCompletion";
+import { loginHref } from "@/lib/authReturn";
 import GoogleAuthButton from "@/components/GoogleAuthButton";
+import SigningIn from "@/components/SigningIn";
 import { Check, AlertCircle } from "lucide-react";
 
 function AccountLoginForm() {
@@ -17,29 +18,30 @@ function AccountLoginForm() {
   const [loading, setLoading] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const hadExplicitNext = searchParams.get("next") != null;
   const next = safeNextPath(searchParams.get("next"));
-  const { oauthError, setOauthError, completingOAuth } = useGoogleOAuthCompletion(next, hadExplicitNext);
+  const { authError: oauthError, setAuthError: setOauthError, completing, finish } = useAuthCompletion(next);
 
-  // One login for everyone — business owner or customer, same form. Which
-  // account type this is only matters for where it lands afterward: an
-  // explicit ?next= (e.g. "sign in to book") always wins, otherwise a
-  // business owner goes to their dashboard and everyone else goes to `next`
-  // (home, by default). See lib/resolveLoginRedirect.ts.
+  // One login for everyone — business owner, staff or customer, same form.
+  // Where it lands afterward is decided in one place (useAuthCompletion):
+  // back to whatever the user was doing (?next=, e.g. the booking form),
+  // otherwise the account's own home. The auth event usually gets there
+  // first; calling finish() here too is a no-op if it already has.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (signInError || !data.user) {
-      setError(signInError?.message || "Couldn't log in. Please try again.");
+      setError(
+        signInError?.message === "Invalid login credentials"
+          ? "That email and password don't match. Try again, or reset your password below."
+          : signInError?.message || "Couldn't log in. Please try again."
+      );
       setLoading(false);
       return;
     }
-    const dest = await resolveLoginRedirect(data.user.id, next, hadExplicitNext);
-    router.push(dest);
+    finish(data.user);
   }
 
   async function handleResetRequest(e: React.FormEvent) {
@@ -93,10 +95,8 @@ function AccountLoginForm() {
     );
   }
 
-  if (completingOAuth) {
-    return (
-      <div className="max-w-md mx-auto px-6 py-24 text-center text-stone">Finishing sign-in…</div>
-    );
+  if (completing) {
+    return <SigningIn returning={next !== "/"} />;
   }
 
   return (
@@ -145,7 +145,7 @@ function AccountLoginForm() {
 
       <p className="text-sm text-stone mt-6">
         New here?{" "}
-        <Link href={`/account/signup?next=${encodeURIComponent(next)}`} className="text-teal-dim font-medium">
+        <Link href={loginHref(next, "signup")} className="text-teal-dim font-medium">
           Create an account
         </Link>
       </p>

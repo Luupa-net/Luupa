@@ -1,3 +1,7 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "About — Luupa" };
+
 export default function AboutPage() {
   return (
     <div className="max-w-2xl mx-auto px-5 py-16 sm:py-20">

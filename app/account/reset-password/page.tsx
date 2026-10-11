@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import PasswordChecklist, { friendlyAuthError, passwordIsValid } from "@/components/PasswordChecklist";
 
 export default function ResetPassword() {
   const [ready, setReady] = useState(false);
@@ -31,8 +32,8 @@ export default function ResetPassword() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (password.length < 8) {
-      setError("Password should be at least 8 characters.");
+    if (!passwordIsValid(password)) {
+      setError("Use at least 8 characters with an upper-case letter, a lower-case letter, a number and a symbol.");
       return;
     }
     if (password !== confirm) {
@@ -43,7 +44,7 @@ export default function ResetPassword() {
     const { data: updateData, error: updateError } = await supabase.auth.updateUser({ password });
     setSaving(false);
     if (updateError) {
-      setError(updateError.message);
+      setError(friendlyAuthError(updateError.message));
       return;
     }
     // Business and customer accounts now share this one reset flow — send a
@@ -79,7 +80,8 @@ export default function ResetPassword() {
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         <label className="block">
           <span className="text-sm font-medium text-ink">New password</span>
-          <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input mt-1" />
+          <input required type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="input mt-1" />
+          <PasswordChecklist password={password} />
         </label>
         <label className="block">
           <span className="text-sm font-medium text-ink">Confirm new password</span>

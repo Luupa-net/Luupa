@@ -1,6 +1,12 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import SignupWizard from "@/components/SignupWizard";
-import { Eye, MessageCircleMore, ShieldCheck } from "lucide-react";
+import { Eye, MessageCircleMore, ShieldCheck, LayoutDashboard } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "List your car care business — Luupa",
+  description: "Get found by drivers across Bahrain, take bookings online, check out customers in one tap and collect real reviews.",
+};
 
 export default function BusinessSignup() {
   return (
@@ -31,7 +37,12 @@ export default function BusinessSignup() {
           <Reason
             icon={<ShieldCheck size={18} className="text-navy" />}
             title="Trust, built in"
-            text="A verified badge and a real profile do the convincing before the first message is even sent."
+            text="A verified badge, real reviews and a real profile do the convincing before the first message is even sent."
+          />
+          <Reason
+            icon={<LayoutDashboard size={18} className="text-navy" />}
+            title="Run your whole day from one screen"
+            text="A live booking calendar with instant alerts, one-tap checkout with emailed and WhatsApp receipts, automatic review requests, staff logins with their own PINs, and every customer's history in one place."
           />
         </div>
 

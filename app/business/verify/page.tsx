@@ -1,7 +1,20 @@
 import Link from "next/link";
-import { ShieldCheck, TrendingUp, MessageCircle, BadgeCheck } from "lucide-react";
+import type { Metadata } from "next";
+import { ShieldCheck, TrendingUp, MessageCircle, BadgeCheck, Mail, Sparkles } from "lucide-react";
+
+export const metadata: Metadata = { title: "Get verified — Luupa for Business" };
+
+// Luupa's own support WhatsApp (digits with country code, e.g. 9733xxxxxxx).
+// Until it's configured, the button emails instead — it used to point at a
+// placeholder number (97300000000) that reached nobody.
+const SUPPORT_WHATSAPP = (process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || "").replace(/\D/g, "");
+const SUPPORT_EMAIL = "luupa.net@gmail.com";
+const VERIFY_MESSAGE = "Hi, I'd like to get verified on Luupa";
 
 export default function VerifyPage() {
+  const contactHref = SUPPORT_WHATSAPP
+    ? `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(VERIFY_MESSAGE)}`
+    : `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Verification on Luupa")}&body=${encodeURIComponent(`${VERIFY_MESSAGE}.\n\nBusiness name: `)}`;
   return (
     <div className="max-w-2xl mx-auto px-6 py-16">
       <div className="w-12 h-12 rounded-xl bg-navy/10 flex items-center justify-center mb-5">
@@ -42,19 +55,28 @@ export default function VerifyPage() {
           <PriceTier length="12 months" price="24" best />
         </div>
 
+        <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-teal/10 px-4 py-3">
+          <Sparkles size={16} className="text-teal-dim shrink-0 mt-0.5" />
+          <p className="text-sm text-ink">
+            <b>Founding partner?</b> The first 10 businesses on Luupa get verified free — just get in touch below.
+          </p>
+        </div>
+
         <div className="h-px bg-stone-line my-5" />
 
         <p className="text-sm font-medium text-ink">How to pay right now</p>
         <p className="text-sm text-stone mt-1.5 leading-relaxed">
-          Since payments aren't automated yet, message us on WhatsApp to arrange payment
-          (BenefitPay or bank transfer both work) — once received, your badge is added within a day.
+          Payments aren't automated yet — {SUPPORT_WHATSAPP ? "message us on WhatsApp" : "email us"} to arrange payment
+          (BenefitPay or bank transfer both work). Once received, your badge is added within a day.
         </p>
         <a
-          href="https://wa.me/97300000000?text=Hi%2C%20I%27d%20like%20to%20get%20verified%20on%20Luupa"
-          target="_blank"
-          className="inline-block mt-4 px-6 py-3 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim active:scale-[0.98] transition-all"
+          href={contactHref}
+          target={SUPPORT_WHATSAPP ? "_blank" : undefined}
+          rel={SUPPORT_WHATSAPP ? "noopener noreferrer" : undefined}
+          className="inline-flex items-center gap-2 mt-4 px-6 py-3 rounded-lg bg-teal text-white font-medium hover:bg-teal-dim active:scale-[0.98] transition-all"
         >
-          Message us to pay
+          {SUPPORT_WHATSAPP ? <MessageCircle size={16} /> : <Mail size={16} />}
+          {SUPPORT_WHATSAPP ? "Message us on WhatsApp" : "Email us to get verified"}
         </a>
       </div>
 

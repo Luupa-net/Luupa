@@ -1,31 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
-import { createAdminToken, ADMIN_COOKIE_NAME } from "@/lib/adminAuth";
+import { createAdminToken, adminPasswordMatches, ADMIN_COOKIE_NAME, ADMIN_SESSION_SECONDS } from "@/lib/adminAuth";
+import { readJson } from "@/lib/serverAuth";
 
 export async function POST(req: NextRequest) {
-  const { password } = await req.json();
-
-  const expected = process.env.ADMIN_PASSWORD;
-  if (!expected) {
+  if (!process.env.ADMIN_PASSWORD || !process.env.ADMIN_SESSION_SECRET) {
     return NextResponse.json({ error: "Admin login is not configured." }, { status: 500 });
   }
 
-  const provided = Buffer.from(password || "");
-  const correct = Buffer.from(expected);
+  const body = await readJson<{ password?: unknown }>(req);
+  const password = typeof body?.password === "string" ? body.password : "";
 
-  // Constant-time comparison so a wrong guess can't be timed to learn the password
-  const matches = provided.length === correct.length && timingSafeEqual(provided, correct);
-
-  if (!matches) {
+  if (!adminPasswordMatches(password)) {
+    // Slows down password guessing — every wrong attempt costs the caller a
+    // second, which turns a scripted brute force into a non-starter.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
   }
 
   const res = NextResponse.json({ ok: true });
   res.cookies.set(ADMIN_COOKIE_NAME, createAdminToken(), {
     httpOnly: true,       // never readable by browser JavaScript
-    secure: true,         // only sent over HTTPS
+    secure: process.env.NODE_ENV === "production", // HTTPS-only in production (plain http://localhost in dev)
     sameSite: "strict",   // never sent on cross-site requests
-    maxAge: 60 * 60 * 8,  // 8 hours
+    maxAge: ADMIN_SESSION_SECONDS,
     path: "/",
   });
   return res;

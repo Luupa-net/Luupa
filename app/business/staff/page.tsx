@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useBusiness } from "@/lib/BusinessContext";
-import { useRouter } from "next/navigation";
+import { useBusinessGuard } from "@/lib/useBusinessGuard";
 import Link from "next/link";
 import PhoneInput from "@/components/PhoneInput";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
 import BusinessLoadError from "@/components/BusinessLoadError";
+import NotBusinessAccount from "@/components/NotBusinessAccount";
 import { ArrowLeft, Plus, X, Trash2, KeyRound, Pencil, Loader2, Check, Users, AlertCircle } from "lucide-react";
 
 type Staff = {
@@ -31,7 +31,7 @@ function isLocked(s: Staff): boolean {
 }
 
 export default function StaffPage() {
-  const { business, role, checked, loadError: businessLoadError, refresh } = useBusiness();
+  const { business, state: guardState, refresh } = useBusinessGuard({ ownerOnly: true });
   const [staff, setStaff] = useState<Staff[]>([]);
   const [bookingCounts, setBookingCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -40,23 +40,13 @@ export default function StaffPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [pinTarget, setPinTarget] = useState<Staff | null>(null);
   const [editTarget, setEditTarget] = useState<Staff | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
-    if (!checked) return;
-    if (businessLoadError) {
-      setLoading(false);
-      return;
-    }
-    if (!business) {
-      router.push("/account/login");
-      return;
-    }
-    // Staff management is owner/manager only — a staff session that lands
-    // here directly (typed URL, old bookmark) gets bounced to their own
-    // dashboard, not shown a stripped-down version of this page.
-    if (role === "staff") {
-      router.push("/business/bookings");
+    // Staff management is owner/manager only — useBusinessGuard bounces a
+    // staff session to their own bookings view, not a stripped-down version
+    // of this page.
+    if (guardState !== "ready") {
+      if (guardState !== "checking") setLoading(false);
       return;
     }
     async function load() {
@@ -68,7 +58,8 @@ export default function StaffPage() {
     load();
     // Keyed on business?.id, not the business object itself, so a content-only
     // update to the shared context doesn't retrigger this effect for nothing.
-  }, [checked, businessLoadError, business?.id, role, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardState, business?.id]);
 
   useEffect(() => {
     if (staff.length === 0 || !business) return;
@@ -105,14 +96,22 @@ export default function StaffPage() {
   }
 
   async function removeStaff(member: Staff) {
-    if (!window.confirm(`Remove ${member.name} from your staff?`)) return;
+    if (!window.confirm(`Remove ${member.name} from your staff? Their login stops working immediately.`)) return;
     const previous = staff;
     setStaff((prev) => prev.filter((s) => s.id !== member.id));
     setActionError(null);
-    const { error } = await supabase.from("staff").delete().eq("id", member.id);
-    if (error) {
+    // Server route: deletes the row AND disables their Supabase login (a
+    // client-side delete left the login itself working).
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch("/api/business/staff-remove", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+      body: JSON.stringify({ staffId: member.id }),
+    }).catch(() => null);
+    if (!res || !res.ok) {
       setStaff(previous);
-      setActionError(`Couldn't remove ${member.name} — try again.`);
+      const result = await res?.json().catch(() => null);
+      setActionError(result?.error || `Couldn't remove ${member.name} — try again.`);
     }
   }
 
@@ -131,8 +130,9 @@ export default function StaffPage() {
       </div>
     );
   }
-  if (businessLoadError) return <BusinessLoadError onRetry={refresh} />;
-  if (!business) return <div className="max-w-4xl mx-auto px-6 py-16 text-stone">No listing found.</div>;
+  if (guardState === "error") return <BusinessLoadError onRetry={refresh} />;
+  if (guardState === "not_business") return <NotBusinessAccount />;
+  if (!business || guardState !== "ready") return null;
 
   const activeCount = staff.filter((s) => s.active).length;
 
@@ -504,13 +504,14 @@ function AddStaffModal({
       .from("staff")
       .insert({
         business_id: businessId,
-        name,
-        role: role || null,
+        name: name.trim(),
+        role: role.trim() || null,
         // Normalized on write, same as every other place staff.phone is set —
         // keeps lookups (app/api/staff-login/route.ts) matching regardless of
         // how the number was typed in.
-        phone: phone ? normalizeWhatsAppNumber(phone) : null,
-        national_id: nationalId || null,
+        // A bare country code ("973") means the number was left empty.
+        phone: normalizeWhatsAppNumber(phone).length >= 8 ? normalizeWhatsAppNumber(phone) : null,
+        national_id: nationalId.trim() || null,
         active: true,
       })
       .select()
