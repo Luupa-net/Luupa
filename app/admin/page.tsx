@@ -5,10 +5,11 @@ import Image from "next/image";
 import {
   CheckCircle2, XCircle, Clock, ShieldCheck, LogOut, ExternalLink,
   LayoutDashboard, Building2, Users, CalendarClock, Search, Eye,
-  AlertCircle, TrendingUp, Star,
+  AlertCircle, TrendingUp, Star, Inbox, Phone, Mail, MessageCircle, Car,
 } from "lucide-react";
 import { isEffectivelyVerified, VERIFICATION_DURATIONS, addMonths } from "@/lib/verification";
 import StarRating from "@/components/StarRating";
+import { formatPhoneDisplay } from "@/lib/validation";
 
 type Business = {
   id: string;
@@ -74,8 +75,23 @@ const SECTIONS = [
   { key: "customers", label: "Customers", icon: Users },
   { key: "bookings", label: "Bookings", icon: CalendarClock },
   { key: "reviews", label: "Reviews", icon: Star },
+  { key: "messages", label: "Messages", icon: Inbox },
 ] as const;
 type Section = (typeof SECTIONS)[number]["key"];
+
+type ContactMessage = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  role: "driver" | "business" | "other";
+  topic: string;
+  car: string | null;
+  message: string;
+  emailed: boolean;
+  handled_at: string | null;
+  created_at: string;
+};
 
 type AdminReview = {
   id: string;
@@ -122,6 +138,8 @@ export default function AdminPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [reviews, setReviews] = useState<AdminReview[]>([]);
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [messageFilter, setMessageFilter] = useState<"open" | "handled">("open");
 
   const [bizTab, setBizTab] = useState<"pending" | "active" | "suspended">("pending");
   const [bizSearch, setBizSearch] = useState("");
@@ -155,11 +173,12 @@ export default function AdminPage() {
   }
 
   async function loadAll() {
-    const [bizRes, custRes, bookRes, reviewRes] = await Promise.all([
+    const [bizRes, custRes, bookRes, reviewRes, msgRes] = await Promise.all([
       fetch("/api/admin/businesses"),
       fetch("/api/admin/customers"),
       fetch("/api/admin/bookings"),
       fetch("/api/admin/reviews"),
+      fetch("/api/admin/messages"),
     ]);
     if (!bizRes.ok) {
       setAuthed(false);
@@ -169,6 +188,7 @@ export default function AdminPage() {
     if (custRes.ok) setCustomers((await custRes.json()).customers ?? []);
     if (bookRes.ok) setBookings((await bookRes.json()).bookings ?? []);
     if (reviewRes.ok) setReviews((await reviewRes.json()).reviews ?? []);
+    if (msgRes.ok) setMessages((await msgRes.json()).messages ?? []);
     setAuthed(true);
   }
 
@@ -207,6 +227,13 @@ export default function AdminPage() {
   function updateReviewStatus(reviewId: string, status: "visible" | "hidden" | "dismiss") {
     return adminPost("/api/admin/review-status", status === "dismiss" ? { reviewId, dismissReport: true } : { reviewId, status });
   }
+
+  function setMessageHandled(messageId: string, handled: boolean) {
+    return adminPost("/api/admin/messages", { messageId, handled });
+  }
+
+  const openMessagesCount = messages.filter((m) => !m.handled_at).length;
+  const filteredMessages = messages.filter((m) => (messageFilter === "open" ? !m.handled_at : !!m.handled_at));
 
   const counts = useMemo(() => ({
     pending: businesses.filter((b) => b.status === "pending").length,
@@ -283,7 +310,7 @@ export default function AdminPage() {
         <nav className="flex md:flex-col overflow-x-auto md:overflow-visible px-2 md:px-3 py-2 md:py-2 gap-1 flex-1">
           {SECTIONS.map((s) => {
             const Icon = s.icon;
-            const badge = s.key === "businesses" ? counts.pending : s.key === "bookings" ? pendingBookingsCount : 0;
+            const badge = s.key === "businesses" ? counts.pending : s.key === "bookings" ? pendingBookingsCount : s.key === "messages" ? openMessagesCount : 0;
             return (
               <button
                 key={s.key}
@@ -504,6 +531,34 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+
+          {section === "messages" && (
+            <div>
+              <h1 className="font-display text-2xl sm:text-3xl font-semibold text-ink">Messages</h1>
+              <p className="text-sm text-stone mt-1">From the contact form · {openMessagesCount} open</p>
+              <div className="flex gap-2 mt-5">
+                {(["open", "handled"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setMessageFilter(t)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition-colors ${
+                      messageFilter === t ? "bg-navy text-white" : "bg-white border border-stone-line text-ink/70"
+                    }`}
+                  >
+                    {t} ({messages.filter((m) => (t === "open" ? !m.handled_at : !!m.handled_at)).length})
+                  </button>
+                ))}
+              </div>
+              <div className="mt-5 space-y-3">
+                {filteredMessages.length === 0 && (
+                  <p className="text-stone text-sm py-10 text-center">{messageFilter === "open" ? "You're all caught up." : "Nothing handled yet."}</p>
+                )}
+                {filteredMessages.map((m) => (
+                  <MessageCard key={m.id} message={m} loading={loading} onSetHandled={setMessageHandled} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -592,6 +647,59 @@ function OverviewSection({
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MessageCard({ message: m, loading, onSetHandled }: { message: ContactMessage; loading: boolean; onSetHandled: (id: string, handled: boolean) => void }) {
+  const digits = m.phone.replace(/\D/g, "");
+  const roleLabel = m.role === "driver" ? "Driver" : m.role === "business" ? "Business owner" : "Other";
+  return (
+    <div className={`bg-white rounded-xl border border-stone-line p-5 ${m.handled_at ? "opacity-70" : ""}`}>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-medium text-ink">{m.name}</p>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-navy/10 text-navy">{m.topic}</span>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-stone-line text-stone">{roleLabel}</span>
+          </div>
+          <p className="text-xs text-stone mt-1 flex items-center gap-3 flex-wrap">
+            <span className="flex items-center gap-1"><Phone size={11} /> {formatPhoneDisplay(m.phone) || m.phone}</span>
+            {m.email && <span className="flex items-center gap-1"><Mail size={11} /> {m.email}</span>}
+            {m.car && <span className="flex items-center gap-1"><Car size={11} /> {m.car}</span>}
+          </p>
+        </div>
+        <p className="text-xs text-stone shrink-0">
+          {new Date(m.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+          {!m.emailed && <span className="block text-right">Not emailed</span>}
+        </p>
+      </div>
+      <p className="text-sm text-ink mt-3 whitespace-pre-wrap leading-relaxed">{m.message}</p>
+      <div className="flex items-center gap-2 mt-4 flex-wrap">
+        <a
+          href={`https://wa.me/${digits}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-lg bg-teal text-white hover:bg-teal-dim transition-colors"
+        >
+          <MessageCircle size={14} /> Reply on WhatsApp
+        </a>
+        {m.email && (
+          <a
+            href={`mailto:${m.email}?subject=${encodeURIComponent(`Re: ${m.topic}`)}`}
+            className="flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-lg border border-stone-line text-ink hover:bg-canvas2 transition-colors"
+          >
+            <Mail size={14} /> Email
+          </a>
+        )}
+        <button
+          onClick={() => onSetHandled(m.id, !m.handled_at)}
+          disabled={loading}
+          className="ml-auto flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-lg border border-stone-line text-ink hover:bg-canvas2 transition-colors disabled:opacity-50"
+        >
+          <CheckCircle2 size={14} /> {m.handled_at ? "Reopen" : "Mark handled"}
+        </button>
       </div>
     </div>
   );

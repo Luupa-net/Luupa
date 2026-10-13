@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 export const metadata: Metadata = { title: "Privacy Policy — Luupa" };
 
@@ -51,7 +52,7 @@ export default function PrivacyPage() {
         </section>
         <section>
           <h2 className="font-bodyAlt font-bold text-ink mb-2">Contact</h2>
-          <p>Questions about this policy can be sent to <a href="mailto:luupa.net@gmail.com" className="text-teal font-semibold">luupa.net@gmail.com</a>.</p>
+          <p>Questions about this policy can be sent to <a href={`mailto:${SUPPORT_EMAIL}`} className="text-teal font-semibold">{SUPPORT_EMAIL}</a>.</p>
         </section>
       </div>
     </div>

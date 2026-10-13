@@ -146,8 +146,14 @@ export default function BookingDrawer({
           </div>
 
           {/* Quick contact — one tap to call, WhatsApp, or copy the number,
-              instead of hunting for it further down in the edit fields. */}
-          <div className="flex items-center gap-2 fade-up" style={{ animationDuration: "0.35s", animationDelay: "0.04s" }}>
+              instead of hunting for it further down in the edit fields.
+              relative z-30: fade-up leaves a transform on this row, the
+              stepper and the tab content, so each is its own stacking
+              context — without lifting this row, the Quick message menu
+              (which opens downward out of it) was painted UNDER the
+              stepper circles and the Details tab. The row is also the
+              menu's anchor on phones, so it spans the row's width. */}
+          <div className="relative z-30 flex items-center gap-2 fade-up" style={{ animationDuration: "0.35s", animationDelay: "0.04s" }}>
             <a
               href={phoneDigits ? `tel:+${phoneDigits}` : undefined}
               aria-label="Call"
@@ -244,11 +250,18 @@ function QuickMessages({ booking, businessName, phone, dateLabel }: { booking: a
 
   useEffect(() => {
     if (!open) return;
-    function onDown(e: MouseEvent) {
+    function onDown(e: PointerEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   const first = String(booking.customer_name || "").split(" ")[0] || "there";
@@ -263,7 +276,7 @@ function QuickMessages({ booking, businessName, phone, dateLabel }: { booking: a
   ];
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="sm:relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="Quick WhatsApp messages"
@@ -274,7 +287,9 @@ function QuickMessages({ booking, businessName, phone, dateLabel }: { booking: a
         <MessageSquareText size={14} /> <span className="hidden sm:inline">Quick message</span>
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-2 w-64 bg-white rounded-xl border border-stone-line shadow-2xl shadow-black/15 py-1.5 z-20 fade-up" style={{ animationDuration: "0.15s" }}>
+        // Phones: anchored to the whole contact row (full width) so it can't
+        // run off the right edge; sm+: anchored to the button itself.
+        <div className="absolute left-0 right-0 sm:right-auto top-full mt-2 sm:w-72 bg-white rounded-xl border border-stone-line shadow-2xl shadow-black/15 py-1.5 z-20 fade-up" style={{ animationDuration: "0.15s" }}>
           <p className="px-3.5 pt-1 pb-2 text-[10px] uppercase tracking-wider font-semibold text-stone">Send on WhatsApp</p>
           {templates.map((t) => (
             <a

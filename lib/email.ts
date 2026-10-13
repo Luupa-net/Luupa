@@ -386,6 +386,40 @@ export async function sendReviewReplyEmail(
 }
 
 // Label/value rows; null values are skipped. Values are escaped here.
+// ---------------------------------------------------------------------------
+// Contact form — a copy to Luupa's support inbox. Reply goes straight to the
+// sender when they left an email; the phone is there for a WhatsApp reply.
+// ---------------------------------------------------------------------------
+export async function sendContactMessageEmail(
+  to: string,
+  d: { name: string; phone: string; email?: string | null; role: string; topic: string; car?: string | null; message: string; adminUrl: string }
+) {
+  const whatsapp = `https://wa.me/${d.phone.replace(/\D/g, "")}`;
+  const body = `
+    <div style="padding:26px;">
+      <div style="display:inline-block;background:#ECFDF5;color:${BRAND.teal};font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;letter-spacing:.5px;">● NEW MESSAGE</div>
+      <h1 style="margin:14px 0 4px 0;font-size:22px;color:${BRAND.ink};">${escapeHtml(d.topic)}</h1>
+      <p style="margin:0 0 16px 0;font-size:14px;color:${BRAND.stone};">From the Luupa contact form</p>
+      ${detailsTable([
+        ["Name", d.name],
+        ["Phone", d.phone],
+        ["Email", d.email],
+        ["They are", d.role],
+        ["Car", d.car],
+      ])}
+      <div style="margin:16px 0 20px 0;background:${BRAND.canvas2};border-radius:12px;padding:14px 16px;font-size:15px;line-height:22px;color:${BRAND.ink};white-space:pre-wrap;">${escapeHtml(d.message)}</div>
+      ${button(safeUrl(whatsapp), "Reply on WhatsApp", BRAND.navy)}
+      <p style="margin:16px 0 0 0;font-size:13px;color:${BRAND.stone};">Also saved in your <a href="${safeUrl(d.adminUrl)}" style="color:${BRAND.teal};">admin inbox</a>.</p>
+    </div>`;
+  return deliver("contact message", {
+    from: FROM,
+    to,
+    ...(d.email ? { replyTo: d.email } : {}),
+    subject: headerSafe(`Contact form: ${d.topic} — ${d.name}`, 140),
+    html: emailShell({ preheader: d.message.slice(0, 120), body, footer: "Sent from the contact form on Luupa." }),
+  });
+}
+
 function detailsTable(rows: [string, string | null | undefined][]): string {
   const cells = rows
     .filter(([, value]) => value)

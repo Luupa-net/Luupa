@@ -14,13 +14,13 @@ export default function BusinessSignup() {
       {/* Pitch — belongs here, in business context, not on the customer-facing homepage */}
       <div>
         <span className="inline-block text-xs uppercase tracking-wide font-medium text-teal-dim bg-teal/10 px-3 py-1.5 rounded-full mb-4">
-          Founding partner offer — first 10 businesses
+          Free during launch
         </span>
         <h1 className="font-display text-3xl sm:text-4xl font-semibold text-ink leading-tight">
           Bahrain searches for car care every day. Most of it never reaches you.
         </h1>
         <p className="text-stone mt-3">
-          3 months free for the first 10 businesses. After that, simple monthly pricing — no surprises, cancel anytime.
+          Everything is free while we launch. When paid plans arrive, you'll get at least 30 days' notice, and businesses that joined during launch keep a lower rate.
         </p>
 
         <div className="space-y-6 mt-10">

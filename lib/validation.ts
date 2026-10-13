@@ -31,6 +31,16 @@ export function normalizeWhatsAppNumber(raw: string): string {
   return digits; // already has a country code (or something unusual) — leave it
 }
 
+// For display only (receipts): "32011432" / "97332011432" → "+973 3201 1432".
+// Other complete numbers are shown as typed.
+export function formatPhoneDisplay(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const digits = normalizeWhatsAppNumber(raw);
+  if (digits.length < 8) return null; // incomplete (e.g. just "973") — better blank than wrong
+  if (digits.length === 11 && digits.startsWith("973")) return `+973 ${digits.slice(3, 7)} ${digits.slice(7)}`;
+  return raw.trim();
+}
+
 /**
  * SECURITY: a `?next=` query param controls where login/signup redirect
  * after success. Without this check, someone could craft a link like
