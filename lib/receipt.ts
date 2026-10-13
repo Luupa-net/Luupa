@@ -15,6 +15,8 @@ export type ReceiptData = {
   businessLogo: string | null;
   businessPhone: string | null;
   businessWhatsapp: string | null;
+  businessArea: string | null;
+  businessCr: string | null;
   ownerId: string | null;
   customerId: string | null;
   customerName: string;
@@ -22,6 +24,11 @@ export type ReceiptData = {
   customerContact: string | null;
   service: string | null;
   vehicle: string | null;
+  vehicleName: string | null;
+  vehiclePlate: string | null;
+  serviceDate: string | null;
+  serviceTime: string | null;
+  source: string | null;
   status: string;
   paid: boolean;
   paidAt: string | null;
@@ -43,7 +50,7 @@ export async function loadReceipt(bookingId: string): Promise<ReceiptData | null
     supabaseAdmin
       .from("bookings")
       .select(
-        "id, business_id, customer_id, customer_name, customer_email, customer_contact, service, vehicle_make, vehicle_model, vehicle_plate, status, paid, paid_at, payment_method, amount, discount_amount, discount_note, receipt_sent_at, review_requested_at, businesses(name, logo_url, phone, whatsapp, owner_id)"
+        "id, business_id, customer_id, customer_name, customer_email, customer_contact, service, vehicle_make, vehicle_model, vehicle_plate, preferred_date, preferred_time, source, status, paid, paid_at, payment_method, amount, discount_amount, discount_note, receipt_sent_at, review_requested_at, businesses(name, logo_url, phone, whatsapp, area, areas, cr_number, owner_id)"
       )
       .eq("id", bookingId)
       .maybeSingle(),
@@ -60,7 +67,8 @@ export async function loadReceipt(bookingId: string): Promise<ReceiptData | null
     return { description: it.description || "Item", qty, unitPrice, total: qty * unitPrice };
   });
   const subtotal = lineItems.length > 0 ? lineItems.reduce((s, it) => s + it.total, 0) : null;
-  const vehicle = [b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ") + (b.vehicle_plate ? ` (${b.vehicle_plate})` : "");
+  const vehicleName = [b.vehicle_make, b.vehicle_model].filter(Boolean).join(" ").trim();
+  const vehicle = vehicleName + (b.vehicle_plate ? ` (${b.vehicle_plate})` : "");
 
   return {
     bookingId: b.id,
@@ -70,6 +78,8 @@ export async function loadReceipt(bookingId: string): Promise<ReceiptData | null
     businessLogo: biz?.logo_url ?? null,
     businessPhone: biz?.phone ?? null,
     businessWhatsapp: biz?.whatsapp ?? null,
+    businessArea: biz?.area || (Array.isArray(biz?.areas) && biz.areas[0]) || null,
+    businessCr: biz?.cr_number?.trim() || null,
     ownerId: biz?.owner_id ?? null,
     customerId: b.customer_id,
     customerName: b.customer_name || "there",
@@ -77,6 +87,11 @@ export async function loadReceipt(bookingId: string): Promise<ReceiptData | null
     customerContact: b.customer_contact,
     service: b.service,
     vehicle: vehicle.trim() || null,
+    vehicleName: vehicleName || null,
+    vehiclePlate: b.vehicle_plate?.trim() || null,
+    serviceDate: b.preferred_date,
+    serviceTime: b.preferred_time,
+    source: b.source,
     status: b.status,
     paid: !!b.paid,
     paidAt: b.paid_at,

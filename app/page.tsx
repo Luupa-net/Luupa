@@ -66,7 +66,7 @@ export default async function HomePage() {
         <div className="relative max-w-4xl mx-auto px-5 pt-16 sm:pt-24 pb-6 text-center">
           <Reveal>
             <span className="inline-flex items-center gap-2 bg-ink text-cream text-xs font-bodyAlt font-semibold px-4 py-2 rounded-full mb-7">
-              Now onboarding founding businesses in Bahrain
+              Now live across Bahrain
             </span>
           </Reveal>
           <Reveal delay={80}>
@@ -195,7 +195,7 @@ export default async function HomePage() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-6 border-t border-skyblue/20">
-              <p className="text-sm text-stone font-bodyAlt">Run a business? Get verified free as one of our first 10.</p>
+              <p className="text-sm text-stone font-bodyAlt">Run a business? Verification is free during launch.</p>
               <Link
                 href="/business/verify"
                 className="shrink-0 px-6 py-3 rounded-full bg-skyblue text-white font-bodyAlt font-bold text-sm hover:bg-skyblue-dim transition-colors"
@@ -207,7 +207,7 @@ export default async function HomePage() {
         </div>
       </Reveal>
 
-      {/* FOUNDING OFFER */}
+      {/* FOR BUSINESSES */}
       <Reveal className="px-5 pb-20 sm:pb-24">
         <div className="max-w-6xl mx-auto relative bg-ink rounded-[32px] px-8 py-14 sm:px-16 sm:py-20 text-center overflow-hidden">
           <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full bg-teal/25 blur-2xl" />
@@ -215,13 +215,13 @@ export default async function HomePage() {
 
           <div className="relative">
             <span className="inline-block text-xs font-bodyAlt uppercase tracking-wide font-bold text-skyblue bg-white/10 px-3 py-1.5 rounded-full mb-5">
-              Founding partner offer
+              Now accepting businesses
             </span>
             <h2 className="font-displayAlt text-white text-3xl sm:text-4xl font-bold max-w-lg mx-auto leading-tight">
-              Run a car care business? The first 10 get verified, completely free.
+              Bahrain's best car care, curated. Is your shop on it?
             </h2>
-            <p className="text-white/60 font-bodyAlt text-sm mt-3 max-w-sm mx-auto">
-              Listing is always free. Verification normally carries a small fee — not for our first 10.
+            <p className="text-white/60 font-bodyAlt text-sm mt-3 max-w-xl mx-auto">
+              Online bookings, receipts and a verified badge. <span className="sm:block">Free during launch.</span>
             </p>
             <Link
               href="/business/signup"

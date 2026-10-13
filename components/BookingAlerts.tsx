@@ -12,7 +12,7 @@ export function BookingAlertToasts() {
   const { enabled, toasts, dismissToast, respond, openBooking } = useBookingAlerts();
   if (!enabled || toasts.length === 0) return null;
   return (
-    <div className="fixed top-20 right-3 sm:right-6 z-[70] w-[calc(100%-1.5rem)] sm:w-[360px] space-y-2.5 pointer-events-none" aria-live="polite">
+    <div className="print:hidden fixed top-20 right-3 sm:right-6 z-[70] w-[calc(100%-1.5rem)] sm:w-[360px] space-y-2.5 pointer-events-none" aria-live="polite">
       {toasts.map((t) => (
         <AlertToast
           key={t.key}

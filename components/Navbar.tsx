@@ -76,6 +76,11 @@ export default function Navbar() {
     : "ring-red-400";
   const verified = business ? isEffectivelyVerified(business) : false;
 
+  // Receipts are documents a customer opens from WhatsApp or prints — the
+  // site's menu, bell and home icons don't belong on them (they also used to
+  // print in the top-right corner of every receipt).
+  if (pathname?.startsWith("/receipt")) return null;
+
   return (
     <header className="sticky top-0 z-50 bg-canvas/95 border-b border-stone-line">
       <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">

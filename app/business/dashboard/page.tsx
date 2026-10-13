@@ -13,6 +13,7 @@ import { isValidBahrainPhone, isValidWhatsAppNumber, normalizeWhatsAppNumber } f
 import { countInPeriod, revenueInPeriod } from "@/lib/bookingPeriods";
 import { toKey } from "@/lib/calendarGrid";
 import { formatBhd } from "@/lib/money";
+import { SUPPORT_EMAIL } from "@/lib/support";
 import { PUBLIC_FIELDS } from "@/lib/businessFields";
 import NotBusinessAccount from "@/components/NotBusinessAccount";
 import ServicesEditor from "@/components/ServicesEditor";
@@ -320,7 +321,7 @@ export default function Dashboard() {
         {suspended && (
           <Banner tone="red" icon={<XCircle size={18} />} title="Your listing is suspended">
             It's not visible to customers right now. If you think this is a mistake, contact{" "}
-            <a href="mailto:luupa.net@gmail.com" className="underline">luupa.net@gmail.com</a>.
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="underline">{SUPPORT_EMAIL}</a>.
           </Banner>
         )}
 
