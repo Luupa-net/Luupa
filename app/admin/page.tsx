@@ -9,7 +9,9 @@ import {
 } from "lucide-react";
 import { isEffectivelyVerified, VERIFICATION_DURATIONS, addMonths } from "@/lib/verification";
 import StarRating from "@/components/StarRating";
+import { bookingStatusLabel } from "@/components/BookingStatusBadge";
 import { formatPhoneDisplay } from "@/lib/validation";
+import { formatServicePrice } from "@/lib/money";
 
 type Business = {
   id: string;
@@ -464,7 +466,7 @@ export default function AdminPage() {
                 >
                   <option value="all">All statuses</option>
                   {["pending", "confirmed", "declined", "arrived", "in_progress", "completed", "no_show", "cancelled"].map((s) => (
-                    <option key={s} value={s}>{s.replace("_", " ")}</option>
+                    <option key={s} value={s}>{bookingStatusLabel(s)}</option>
                   ))}
                 </select>
                 <div className="relative flex-1 min-w-[180px] max-w-xs">
@@ -487,8 +489,8 @@ export default function AdminPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium text-ink">{b.businesses?.name ?? "Unknown business"}</p>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${BOOKING_STATUS_STYLES[b.status] ?? "bg-stone-line text-stone"}`}>
-                          {b.status.replace("_", " ")}
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${BOOKING_STATUS_STYLES[b.status] ?? "bg-stone-line text-stone"}`}>
+                          {bookingStatusLabel(b.status)}
                         </span>
                         {b.source === "manual" && (
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-stone-line text-stone">Manual entry</span>
@@ -639,8 +641,8 @@ function OverviewSection({
                     <p className="text-sm font-medium text-ink truncate">{b.businesses?.name ?? "—"}</p>
                     <p className="text-xs text-stone truncate">{b.customer_name}</p>
                   </div>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize shrink-0 ${BOOKING_STATUS_STYLES[b.status] ?? "bg-stone-line text-stone"}`}>
-                    {b.status.replace("_", " ")}
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${BOOKING_STATUS_STYLES[b.status] ?? "bg-stone-line text-stone"}`}>
+                    {bookingStatusLabel(b.status)}
                   </span>
                 </div>
               ))}
@@ -778,7 +780,7 @@ function BusinessCard({
         <div className="flex flex-wrap gap-1.5 mt-3">
           {b.services.map((s, i) => (
             <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-canvas2 text-ink/70">
-              {s.name}{s.price ? ` (BHD ${s.price})` : ""}
+              {s.name}{s.price ? ` (${formatServicePrice(s.price)})` : ""}
             </span>
           ))}
         </div>

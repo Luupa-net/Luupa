@@ -8,6 +8,7 @@ import Link from "next/link";
 import { periodComparison, revenueInPeriod } from "@/lib/bookingPeriods";
 import { getMonthGrid, getWeekDays, addDays, addMonths, toKey, isSameDay, WEEKDAY_LABELS } from "@/lib/calendarGrid";
 import ManualBookingForm from "@/components/ManualBookingForm";
+import { bookingStatusLabel } from "@/components/BookingStatusBadge";
 import dynamic from "next/dynamic";
 import BusinessLoadError from "@/components/BusinessLoadError";
 import NotBusinessAccount from "@/components/NotBusinessAccount";
@@ -212,7 +213,7 @@ function BookingsBoard() {
           b.service || "",
           [b.vehicle_make, b.vehicle_model].filter(Boolean).join(" "),
           b.vehicle_plate || "",
-          String(b.status || "").replace("_", " "),
+          bookingStatusLabel(b.status),
           b.source === "manual" ? "Manual" : "Luupa",
         ];
         if (!isStaff) {
@@ -857,8 +858,8 @@ function StatusChip({ status }: { status: string }) {
     cancelled: "bg-red-50 text-red-600",
   };
   return (
-    <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${tones[status] || "bg-stone-line text-stone"}`}>
-      {status.replace("_", " ")}
+    <span className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full ${tones[status] || "bg-stone-line text-stone"}`}>
+      {bookingStatusLabel(status)}
     </span>
   );
 }

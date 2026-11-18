@@ -88,7 +88,7 @@ export default function BookingForm({
       .from("customers")
       .select("id, name, email, phone")
       .eq("id", session.user.id)
-      .single();
+      .maybeSingle();
     setCustomer(data ?? null);
     if (data?.phone) setContactPhone(data.phone);
 

@@ -9,6 +9,7 @@ import { isValidBahrainPhone, isValidWhatsAppNumber, normalizeWhatsAppNumber } f
 import ServicesEditor from "@/components/ServicesEditor";
 import PasswordChecklist, { friendlyAuthError, passwordIsValid } from "@/components/PasswordChecklist";
 import { Check, ChevronLeft } from "lucide-react";
+import { formatServicePrice } from "@/lib/money";
 
 const STEPS = ["Account", "Details", "Services", "Verification", "Review"];
 
@@ -283,7 +284,7 @@ export default function SignupWizard() {
           <ReviewRow label="Phone / WhatsApp" value={`${form.phone} / ${form.whatsapp}`} onEdit={() => setStep(1)} />
           <ReviewRow
             label="Services listed"
-            value={form.services.length ? form.services.map((s) => s.price ? `${s.name} (BHD ${s.price})` : s.name).join(", ") : "None"}
+            value={form.services.length ? form.services.map((s) => s.price ? `${s.name} (${formatServicePrice(s.price)})` : s.name).join(", ") : "None"}
             onEdit={() => setStep(2)}
           />
           <ReviewRow label="CR number" value={form.crNumber || "Not provided"} onEdit={() => setStep(3)} />
