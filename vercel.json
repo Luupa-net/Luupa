@@ -1,5 +1,5 @@
 {
-  "regions": ["icn1"],
+  "regions": ["bom1"],
   "crons": [
     { "path": "/api/send-reminders", "schedule": "0 6 * * *" }
   ]
