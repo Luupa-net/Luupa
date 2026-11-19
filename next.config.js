@@ -15,19 +15,21 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
 ];
 
+// Taken from the project URL rather than hardcoded, so moving to another
+// Supabase project (e.g. a different region) only means changing env vars.
+const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+  : null;
+
 const nextConfig = {
   poweredByHeader: false,
   images: {
     // Lets next/image optimize photos stored in Supabase Storage (business
     // logos, listing photos) — without this, next/image refuses to load
     // any remote host it doesn't explicitly allow.
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "illqnwboycmtuusfrkpv.supabase.co",
-        pathname: "/storage/v1/object/public/**",
-      },
-    ],
+    remotePatterns: supabaseHost
+      ? [{ protocol: "https", hostname: supabaseHost, pathname: "/storage/v1/object/public/**" }]
+      : [],
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
