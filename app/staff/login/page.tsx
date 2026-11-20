@@ -113,8 +113,8 @@ export default function StaffLoginPage() {
       {/* Ambient background flare — the same drift/blur language used for the
           gradient hero headers elsewhere in the app (dashboard, staff list),
           scaled down to sit behind a centered card instead of inside a bar. */}
-      <div aria-hidden className="absolute -top-24 -left-16 w-72 h-72 rounded-full bg-navy/[0.07] blur-3xl drift-slow pointer-events-none" />
-      <div aria-hidden className="absolute -bottom-28 -right-20 w-80 h-80 rounded-full bg-teal/[0.08] blur-3xl drift-slow-reverse pointer-events-none" />
+      <div aria-hidden className="absolute -top-24 -left-16 w-72 h-72 rounded-full bg-navy/[0.07] blur-3xl pointer-events-none" />
+      <div aria-hidden className="absolute -bottom-28 -right-20 w-80 h-80 rounded-full bg-teal/[0.08] blur-3xl pointer-events-none" />
 
       <div className="relative w-full max-w-sm bg-white rounded-2xl border border-stone-line shadow-lg shadow-black/[0.04] p-6 sm:p-8 fade-up">
         <div className="w-12 h-12 rounded-full bg-navy/10 flex items-center justify-center mx-auto mb-3">

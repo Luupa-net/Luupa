@@ -479,8 +479,8 @@ function ProfileContent() {
             treatment as the business booking drawer header, so the customer
             side reads as one product instead of a plainer "second app". */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-navy to-navy-dim px-6 py-7 sm:px-8 sm:py-9 mb-6 fade-up">
-          <div className="absolute -top-12 -right-8 w-44 h-44 rounded-full bg-teal/25 blur-3xl drift-slow pointer-events-none" />
-          <div className="absolute -bottom-16 -left-12 w-52 h-52 rounded-full bg-white/5 blur-3xl drift-slow-reverse pointer-events-none" />
+          <div className="absolute -top-12 -right-8 w-44 h-44 rounded-full bg-teal/25 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-16 -left-12 w-52 h-52 rounded-full bg-white/5 blur-3xl pointer-events-none" />
           <div className="relative flex items-center gap-4">
             <span className="w-16 h-16 rounded-full bg-white/10 border border-white/15 flex items-center justify-center shrink-0 text-white font-display text-2xl font-semibold">
               {customer.name?.[0]?.toUpperCase() || <User size={24} />}

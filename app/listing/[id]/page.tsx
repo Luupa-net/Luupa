@@ -97,8 +97,8 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
             staff headers, so a customer arriving from a booking link and an
             owner arriving at their own dashboard see one consistent brand. */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-navy to-navy-dim px-6 py-8 sm:px-10 sm:py-10 fade-up">
-          <div className="absolute -top-14 -right-10 w-56 h-56 rounded-full bg-teal/25 blur-3xl drift-slow pointer-events-none" />
-          <div className="absolute -bottom-20 -left-16 w-60 h-60 rounded-full bg-white/5 blur-3xl drift-slow-reverse pointer-events-none" />
+          <div className="absolute -top-14 -right-10 w-56 h-56 rounded-full bg-teal/25 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-20 -left-16 w-60 h-60 rounded-full bg-white/5 blur-3xl pointer-events-none" />
           <div className="relative flex items-start gap-4 sm:gap-5 flex-wrap">
             <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 border-2 border-white/20 overflow-hidden flex items-center justify-center shrink-0">
               {listing.logo_url ? (

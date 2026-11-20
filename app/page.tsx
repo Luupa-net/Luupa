@@ -50,7 +50,7 @@ export default async function HomePage() {
       <section className="relative overflow-hidden">
         <div
           aria-hidden
-          className="absolute -top-24 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full bg-navy/[0.06] blur-3xl drift-slow pointer-events-none"
+          className="absolute -top-24 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full bg-navy/[0.06] blur-3xl pointer-events-none"
         />
         <div
           aria-hidden
@@ -90,7 +90,7 @@ export default async function HomePage() {
                 <Link
                   key={name}
                   href={`/browse?sub=${encodeURIComponent(name)}`}
-                  className="group flex flex-col items-center text-center gap-2 sm:gap-3 bg-white/80 backdrop-blur-sm border border-stone-line rounded-2xl px-2 py-4 sm:px-4 sm:py-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-teal/40"
+                  className="group flex flex-col items-center text-center gap-2 sm:gap-3 bg-white/90 border border-stone-line rounded-2xl px-2 py-4 sm:px-4 sm:py-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:border-teal/40"
                 >
                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-teal/10 text-teal-dim flex items-center justify-center group-hover:bg-teal group-hover:text-white transition-colors">
                     <Icon size={20} />
