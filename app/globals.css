@@ -33,19 +33,14 @@ body {
   animation: fadeUp 0.6s ease-out both;
 }
 
-/* Slow ambient drift — used for subtle background flare, not content */
-@keyframes drift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(2%, -3%) scale(1.05); }
-}
-.drift-slow {
-  animation: drift 16s ease-in-out infinite;
-  will-change: transform;
-}
-.drift-slow-reverse {
-  animation: drift 20s ease-in-out infinite reverse;
-  will-change: transform;
-}
+/* PERFORMANCE: the soft background glows (big `blur-3xl` circles) must stay
+   STILL. They used to drift forever (an infinite transform animation with
+   will-change), which made the browser re-run a 64px blur on every single
+   frame instead of painting it once — and every `backdrop-blur` sitting on
+   top had to re-blur too. That was the low-FPS, juddery scrolling. A static
+   blurred element is painted once and then just moves with the page.
+   Don't animate blurred elements, and don't put backdrop-blur over
+   anything that moves. */
 
 /* Booking detail panel sliding in beside the calendar (desktop) or up from
    the bottom (mobile) — direction is picked by the component via class. */

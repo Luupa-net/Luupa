@@ -59,7 +59,7 @@ function AlertToast({
   }
 
   return (
-    <div className="pointer-events-auto group relative overflow-hidden rounded-2xl bg-white/95 backdrop-blur border border-teal/25 shadow-[0_20px_50px_-15px_rgba(6,37,28,0.45)] panel-in">
+    <div className="pointer-events-auto group relative overflow-hidden rounded-2xl bg-white/95 border border-teal/25 shadow-[0_20px_50px_-15px_rgba(6,37,28,0.45)] panel-in">
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-teal via-teal-light to-navy" />
       <div className="p-4">
         <div className="flex items-start gap-3">
