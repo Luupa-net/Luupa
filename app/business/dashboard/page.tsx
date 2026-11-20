@@ -684,7 +684,11 @@ export default function Dashboard() {
                       >
                         {saving ? "Saving…" : liveRow.status === "active" ? "Submit for approval" : "Save changes"}
                       </button>
-                      {saved && <span className="text-sm text-green-700">Saved</span>}
+                      {saved && (
+                        <span className="text-sm text-green-700">
+                          {liveRow.status === "active" && liveRow.pending_changes ? "Sent for review — live once approved" : "Saved"}
+                        </span>
+                      )}
                     </div>
                   </form>
                 </fieldset>

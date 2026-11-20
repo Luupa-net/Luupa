@@ -8,6 +8,7 @@ import BookingForm from "@/components/BookingForm";
 import ReviewsSection from "@/components/ReviewsSection";
 import ViewTracker from "@/components/ViewTracker";
 import { normalizeWhatsAppNumber } from "@/lib/validation";
+import { formatServicePrice } from "@/lib/money";
 
 // params usage already forces this route to render dynamically per request,
 // but Next's fetch cache (which wraps supabase-js's underlying fetch calls
@@ -209,7 +210,7 @@ export default async function ListingPage({ params }: { params: Promise<{ id: st
                 {services.map((s, i) => (
                   <li key={i} className="flex items-baseline justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
                     <span className="text-ink">{s.name}</span>
-                    {s.price && <span className="text-stone shrink-0">BHD {s.price}</span>}
+                    {s.price && <span className="text-stone shrink-0">{formatServicePrice(s.price)}</span>}
                   </li>
                 ))}
               </ul>

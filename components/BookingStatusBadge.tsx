@@ -16,11 +16,29 @@ const TONES: Record<string, string> = {
   cancelled: "bg-red-50 text-red-600",
 };
 
+// Same wording as the bookings filter and stepper — the raw key used to be
+// shown ("In Progress", "No Show") right next to an "In service" filter.
+export const BOOKING_STATUS_LABEL: Record<string, string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  arrived: "Arrived",
+  in_progress: "In service",
+  completed: "Completed",
+  declined: "Declined",
+  no_show: "No-show",
+  cancelled: "Cancelled",
+};
+
+export function bookingStatusLabel(status: string | null | undefined): string {
+  const s = String(status || "");
+  return BOOKING_STATUS_LABEL[s] || s.replace(/_/g, " ");
+}
+
 export default function BookingStatusBadge({ status, size = "sm" }: { status: string; size?: "sm" | "md" }) {
   const sizeClasses = size === "md" ? "text-xs px-2.5 py-1" : "text-[10px] px-2 py-0.5";
   return (
-    <span className={`shrink-0 font-medium rounded-full capitalize ${sizeClasses} ${TONES[status] || "bg-stone-line text-stone"}`}>
-      {status.replace("_", " ")}
+    <span className={`shrink-0 font-medium rounded-full ${sizeClasses} ${TONES[status] || "bg-stone-line text-stone"}`}>
+      {bookingStatusLabel(status)}
     </span>
   );
 }

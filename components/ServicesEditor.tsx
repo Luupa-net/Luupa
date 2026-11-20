@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Service } from "@/lib/taxonomy";
+import { formatServicePrice } from "@/lib/money";
 
 export default function ServicesEditor({
   services,
@@ -46,6 +47,7 @@ export default function ServicesEditor({
         <button
           type="button"
           onClick={add}
+          aria-label="Add service"
           className="w-11 h-11 rounded-lg bg-navy text-white flex items-center justify-center hover:bg-navy-light transition-colors"
         >
           <Plus size={18} />
@@ -59,7 +61,7 @@ export default function ServicesEditor({
           <div key={i} className="flex items-center justify-between bg-white rounded-lg pl-4 pr-2 py-2.5 text-sm border border-stone-line">
             <span className="text-ink truncate">{s.name}</span>
             <div className="flex items-center gap-3 shrink-0">
-              {s.price && <span className="text-stone">BHD {s.price}</span>}
+              {s.price && <span className="text-stone">{formatServicePrice(s.price)}</span>}
               <button onClick={() => remove(i)} aria-label="Remove" className="w-7 h-7 flex items-center justify-center">
                 <X size={15} className="text-stone" />
               </button>

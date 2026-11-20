@@ -2,7 +2,7 @@ const STAGES = [
   { key: "pending", label: "Pending" },
   { key: "confirmed", label: "Confirmed" },
   { key: "arrived", label: "Arrived" },
-  { key: "in_progress", label: "In Service" },
+  { key: "in_progress", label: "In service" },
   { key: "completed", label: "Done" },
 ];
 

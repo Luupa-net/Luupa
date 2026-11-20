@@ -27,6 +27,17 @@ export function priceFromText(text: string | null | undefined): number | null {
   return m ? roundFils(Number(m[1])) : null;
 }
 
+// Display side of the same free text: a bare number gets the usual
+// 3-decimal format, and anything that already names the currency is shown
+// as typed — "BHD 25" used to render as "BHD BHD 25".
+export function formatServicePrice(text: string | null | undefined): string {
+  const t = String(text ?? "").trim();
+  if (!t) return "";
+  if (/^\d+(\.\d+)?$/.test(t)) return formatBhd(t);
+  if (/bhd|\bbd\b|fils|د\.?ب/i.test(t)) return t;
+  return `BHD ${t}`;
+}
+
 export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   cash: "Cash",
   card: "Card",

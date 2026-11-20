@@ -213,7 +213,7 @@ export default function StaffPage() {
                 const metaParts = [
                   s.national_id && `CPR ${s.national_id}`,
                   `${bookingCounts[s.id] ?? "…"} bookings`,
-                  `Active ${formatRelativeTime(s.last_login_at)}`,
+                  s.last_login_at ? `Active ${formatRelativeTime(s.last_login_at)}` : "Hasn't signed in yet",
                 ].filter(Boolean);
                 return (
                   // flex-col on mobile (name on its own line, controls on a
@@ -402,7 +402,7 @@ function StaffPinModal({
           <div className="text-sm text-ink space-y-3">
             <p>
               <span className="font-medium">{staff.name}</span> can now sign in at{" "}
-              <span className="font-mono text-teal-dim">/staff/login</span> with their phone number and this PIN.
+              <span className="font-mono text-teal-dim break-all">{window.location.host}/staff/login</span> with their phone number and this PIN.
             </p>
             <p className="text-xs text-stone">Share the PIN with them directly — it isn't sent anywhere automatically.</p>
             <button onClick={onClose} className="w-full h-11 rounded-lg bg-navy text-white font-medium hover:bg-navy-light transition-colors">
